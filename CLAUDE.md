@@ -12,6 +12,9 @@ PWA de uso propio para llevar **pagos con abonos y metas de ahorro**. Antes viv�
 - **El repo es público: no van pagos, nombres reales ni datos personales en el código** (la app arranca vacía). Los datos se entregan por chat como archivo para ⋯ Importar.
 - Probar: `python3 -m http.server 8765` en la raíz y Playwright (Chromium en `/opt/pw-browsers/chromium`) a 358–390 px. Para sembrar datos: `import('./js/db.js')` y `db.batch({movimientos:{clear:true,put:[...]}})`, luego `reload()`.
 
+## Flujo de trabajo
+- El usuario autorizó que, **después de cada cambio**, se abra el PR y se haga merge a `main` sin preguntar. Si el PR anterior ya está fusionado, la rama se reinicia desde `main`.
+
 ## Datos compartidos con SecondBrain
 - Vive en el **mismo origen** (`jeal1498.github.io`) que SecondBrain (`/JEAL/`), así que usa la **misma IndexedDB `secondbrain`** (`js/db.js`, `VERSION` 7): stores `movimientos` y `metas`, más `settings` (`finance`, `backup`). No se perdieron datos al mover la app.
 - `js/db.js`, `js/backup.js`, `js/migrar-finanzas.js` y `js/finance.js` son **copias** de las de `jeal1498/JEAL`. Si cambia el esquema de la DB (subir `VERSION`), hay que cambiarlo **en los dos repos a la vez** o una app dejará de abrir la base.
