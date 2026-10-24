@@ -861,7 +861,7 @@ function renderPerfil() {
     </div>
     <h2 class="perfil-h">Respaldo y datos</h2>
     <div class="menu">
-      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen con resumen y detalle de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
+      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de Pagos de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Misma hoja de SecondBrain, otra pestaña; tú decides cuándo'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV (Excel)</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar JSON</b><small>Respaldo completo, con historial de abonos</small></span></button>
@@ -869,66 +869,58 @@ function renderPerfil() {
     </div>`;
 }
 
-/* Imagen PNG del mes (canvas, paleta clara fija) para mandarla directo por WhatsApp. */
+/* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
+   y completa hasta el último pago. Se dibuja como SVG con foreignObject; fuentes e iconos van embebidos. */
+const IMG_W = 390;
+const blobDataURL = blob => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(blob); });
+
+async function monthCSS() {
+  let css = await (await fetch('styles.css')).text();
+  const urls = [...new Set([...css.matchAll(/url\('?(fonts\/[^')]+)'?\)/g)].map(m => m[1]))];
+  for (const u of urls) css = css.split(u).join(await blobDataURL(await (await fetch(u)).blob()));
+  return css.replace(/url\('?(data:[^')]+)'?\)/g, 'url($1)') + '\nbody{min-height:0;padding:0}';
+}
+
+function monthMarkup() {
+  const base = movimientos.map(procesar).filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month);
+  const titulo = `${isCurrentMonth() ? HOY.getDate() + ' ' : ''}${MESES[state.month.month]} ${state.month.year}`;
+  const list = base.length
+    ? pagosTable({ items: base })
+    : `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong></div>`;
+  const box = document.createElement('div');
+  box.innerHTML = `<div class="app"><header class="header"><div class="header-title-row"><span class="hp-label"><span>${titulo}</span></span></div></header>
+    <main><section class="hero"><div id="kpi-dash">${kpiDashboard(base)}</div></section>
+    <div class="list-head"><div class="list-title"><span id="list-caption">Pagos</span><span id="list-count">${plural(base.length, 'movimiento', 'movimientos')}</span></div></div>
+    <div id="list">${list}</div></main></div>`;
+  box.style.cssText = `width:${IMG_W}px;padding-bottom:28px;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.35;-webkit-font-smoothing:antialiased`;
+  box.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  return new XMLSerializer().serializeToString(box);
+}
+
 async function monthImage() {
-  const base = movimientos.map(procesar)
-    .filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month)
-    .sort((a, c) => a.date - c.date);
-  const grupos = [['Vencido', 'Atrasados', '#b42318', '#fde4e0'], ['Pendiente', 'Por vencer', '#9c5700', '#fbeacc'], ['Pagado', 'Pagados', '#1a6e3d', '#d8efdf']]
-    .map(([e, t, c, bg]) => ({ t, c, bg, e, arr: base.filter(m => m.estado === e) })).filter(g => g.arr.length);
-  const W = 1080, P = 56, ROW = 92, HEAD = 70, SUM = 370, sc = 2;
-  const H = P + 150 + SUM + grupos.reduce((t, g) => t + HEAD + g.arr.length * ROW + 30, 0) + (base.length ? 0 : 120) + 100;
-  const cv = document.createElement('canvas'); cv.width = W * sc; cv.height = H * sc;
-  const x = cv.getContext('2d'); x.scale(sc, sc);
-  const SANS = "'IBM Plex Sans', system-ui, sans-serif";
-  try { await Promise.all(['500 30px', '600 30px', '700 30px'].map(f => document.fonts.load(`${f} 'IBM Plex Sans'`))); } catch { /* usa la fuente del sistema */ }
-  const txt = (t, px, y, o = {}) => {
-    x.font = `${o.w || 500} ${px}px ${SANS}`; x.fillStyle = o.c || '#14201a'; x.textAlign = o.a || 'left'; x.textBaseline = 'alphabetic';
-    let v = String(t), max = o.max;
-    if (max) while (x.measureText(v).width > max && v.length > 1) v = v.slice(0, -2) + '…';
-    x.fillText(v, o.x ?? P, y);
-  };
-  const rect = (rx, ry, w, h, r, fill, stroke) => { x.beginPath(); x.roundRect(rx, ry, w, h, r); if (fill) { x.fillStyle = fill; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.lineWidth = 2; x.stroke(); } };
-  x.fillStyle = '#fbfaf6'; x.fillRect(0, 0, W, H);
-  let y = P + 52;
-  txt('FINANZAS', 26, y - 8, { w: 600, c: '#0b7a55' });
-  txt(`${MESES[state.month.month]} ${state.month.year}`, 64, y + 62, { w: 700 });
-  y += 100;
-  // Resumen
-  const imp = sum(base, 'imp'), abo = sum(base, 'abo'), pend = sum(base, 'pendiente');
-  const pct = imp > 0 ? Math.min(1, abo / imp) : 0;
-  rect(P, y, W - P * 2, SUM - 60, 28, '#ffffff', '#e8e4d9');
-  txt('PENDIENTE DEL MES', 24, y + 56, { x: P + 36, w: 600, c: '#5c675f' });
-  txt(fmtMoney(pend), 76, y + 140, { x: P + 36, w: 700 });
-  txt(`${fmtMoney(abo)} de ${fmtMoney(imp)} pagado`, 26, y + 182, { x: P + 36, c: '#5c675f' });
-  rect(P + 36, y + 206, W - P * 2 - 72, 16, 8, '#e8e4d9');
-  if (pct > 0) rect(P + 36, y + 206, Math.max(16, (W - P * 2 - 72) * pct), 16, 8, '#0b7a55');
-  const tw = (W - P * 2 - 72 - 32) / 3;
-  grupos.forEach((g, i) => {
-    const tx = P + 36 + i * (tw + 16);
-    rect(tx, y + 240, tw, 68, 18, g.bg);
-    txt(`${g.arr.length} ${g.e === 'Vencido' ? (g.arr.length === 1 ? 'atrasado' : 'atrasados') : g.e === 'Pagado' ? (g.arr.length === 1 ? 'pagado' : 'pagados') : 'por vencer'}`, 22, y + 282, { x: tx + 20, w: 600, c: g.c, max: tw - 40 });
-  });
-  y += SUM;
-  if (!base.length) txt('Sin movimientos este mes.', 32, y + 60, { c: '#5c675f' });
-  for (const g of grupos) {
-    txt(g.t.toUpperCase(), 24, y + 40, { w: 600, c: g.c });
-    txt(fmtMoney(g.e === 'Pagado' ? sum(g.arr, 'imp') : sum(g.arr, 'pendiente')), 28, y + 40, { a: 'right', x: W - P, w: 700, c: g.c });
-    y += HEAD - 14;
-    rect(P, y, W - P * 2, g.arr.length * ROW, 24, '#ffffff', '#e8e4d9');
-    g.arr.forEach((m, i) => {
-      const ry = y + i * ROW, mid = ry + ROW / 2;
-      if (i) { x.fillStyle = '#e8e4d9'; x.fillRect(P + 28, ry, W - P * 2 - 56, 2); }
-      txt(String(m.date.getDate()), 36, mid + 8, { x: P + 60, a: 'center', w: 700 });
-      txt(MESES_CORTO[m.date.getMonth()].toUpperCase(), 17, mid + 28, { x: P + 60, a: 'center', w: 600, c: '#5c675f' });
-      const parcial = m.abo > 0 && g.e !== 'Pagado';
-      txt(m.conc || 'Sin concepto', 30, parcial ? mid - 2 : mid - 4, { x: P + 124, w: 600, max: 560 });
-      txt(parcial ? `${m.cat.replace(/^\S+\s/, '')} · abonado ${fmtMoney(m.abo)} de ${fmtMoney(m.imp)}` : m.cat.replace(/^\S+\s/, ''), 22, mid + 30, { x: P + 124, c: '#5c675f', max: 560 });
-      txt(fmtMoney(g.e === 'Pagado' ? m.imp : m.pendiente), 32, mid + 11, { a: 'right', x: W - P - 28, w: 700, c: g.c });
-    });
-    y += g.arr.length * ROW + 44;
-  }
-  txt(`Generado el ${HOY.getDate()} ${MESES_CORTO[HOY.getMonth()]} ${HOY.getFullYear()}`, 20, H - 36, { a: 'center', x: W / 2, c: '#5c675f' });
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const css = await monthCSS(), markup = monthMarkup();
+  // Mide la altura real con un iframe del mismo ancho (así los media queries coinciden).
+  const fr = document.createElement('iframe');
+  fr.style.cssText = `position:fixed;left:-9999px;top:0;width:${IMG_W}px;height:100px;border:0`;
+  fr.srcdoc = `<!DOCTYPE html><html data-theme="${theme}"><head><meta charset="utf-8"><style>${css}</style></head><body>${markup}</body></html>`;
+  document.body.appendChild(fr);
+  let H;
+  try {
+    await new Promise(r => { fr.onload = r; });
+    await fr.contentDocument.fonts.ready;
+    H = Math.ceil(fr.contentDocument.body.firstElementChild.getBoundingClientRect().height);
+  } finally { fr.remove(); }
+  const svgText = `<svg xmlns="http://www.w3.org/2000/svg" width="${IMG_W}" height="${H}" data-theme="${theme}"><foreignObject x="0" y="0" width="${IMG_W}" height="${H}"><style><![CDATA[${css}]]></style>${markup}</foreignObject></svg>`;
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+  await img.decode();
+  const sc = Math.min(3, 15000 / H);
+  const cv = document.createElement('canvas'); cv.width = Math.round(IMG_W * sc); cv.height = Math.round(H * sc);
+  const x = cv.getContext('2d');
+  x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fbfaf6';
+  x.fillRect(0, 0, cv.width, cv.height);
+  x.drawImage(img, 0, 0, cv.width, cv.height);
   return new Promise(res => cv.toBlob(res, 'image/png'));
 }
 
