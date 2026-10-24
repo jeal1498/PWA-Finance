@@ -861,11 +861,44 @@ function renderPerfil() {
     </div>
     <h2 class="perfil-h">Respaldo y datos</h2>
     <div class="menu">
+      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Resumen y detalle de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Misma hoja de SecondBrain, otra pestaña; tú decides cuándo'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV (Excel)</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar JSON</b><small>Respaldo completo, con historial de abonos</small></span></button>
       <button type="button" class="menu-row" data-action="export-csv">${ICO.download}<span><b>Exportar CSV</b><small>Para abrir en Excel</small></span></button>
     </div>`;
+}
+
+/* Texto del mes en pantalla: resumen y cada pago con su estado y abonos, para WhatsApp o notas. */
+function monthText() {
+  const base = movimientos.map(procesar)
+    .filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month)
+    .sort((a, c) => a.date - c.date);
+  const grupos = [['Vencido', '🔴 Atrasados'], ['Pendiente', '🟡 Por vencer'], ['Pagado', '🟢 Pagados']];
+  const venc = base.filter(m => m.estado === 'Vencido'), porV = base.filter(m => m.estado === 'Pendiente');
+  const L = [`*Finanzas · ${MESES[state.month.month]} ${state.month.year}*`, ''];
+  L.push(`Total: ${fmtMoney(sum(base, 'imp'))}`, `Pagado: ${fmtMoney(sum(base, 'abo'))}`, `Pendiente: ${fmtMoney(sum(base, 'pendiente'))}`);
+  L.push(`Atrasado: ${fmtMoney(sum(venc, 'pendiente'))} (${venc.length})`, `Por vencer: ${fmtMoney(sum(porV, 'pendiente'))} (${porV.length})`);
+  for (const [estado, titulo] of grupos) {
+    const arr = base.filter(m => m.estado === estado);
+    if (!arr.length) continue;
+    L.push('', `*${titulo} (${arr.length})*`);
+    for (const m of arr) {
+      const parcial = m.abo > 0 && estado !== 'Pagado' ? ` (abonado ${fmtMoney(m.abo)} de ${fmtMoney(m.imp)})` : '';
+      L.push(`• ${fmtDate(m.fecha)} · ${m.conc || 'Sin concepto'} [${m.cat.replace(/^\S+\s/, '')}] — ${fmtMoney(estado === 'Pagado' ? m.imp : m.pendiente)}${parcial}`);
+    }
+  }
+  if (!base.length) L.push('', 'Sin movimientos este mes.');
+  return L.join('\n');
+}
+
+async function shareMonth() {
+  const text = monthText(), title = `Finanzas · ${MESES[state.month.month]} ${state.month.year}`;
+  try {
+    if (navigator.share) { await navigator.share({ title, text }); return; }
+    await navigator.clipboard.writeText(text);
+    toast('Resumen copiado');
+  } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir'); }
 }
 
 /* Dashboard de Gastos: atención inmediata, meta diaria, tres mosaicos de estado (filtran la lista)
@@ -1109,6 +1142,7 @@ document.addEventListener('click', async e => {
       if (lbl) lbl.textContent = themeLabel();
       break;
     }
+    case 'share-month': shareMonth(); break;
     case 'open-sync': openSync(); break;
     case 'sync-push': syncPush(); break;
     case 'sync-pull': syncPull(); break;
