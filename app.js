@@ -72,18 +72,30 @@ try {
 } catch (e) { dbOk = false; }
 
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
-/* Guarda un registro (o lo borra). La sincronización con Google Sheets es manual (Ajustes). */
+/* Guarda un registro (o lo borra). Con la hoja conectada y «auto», se envía sola unos segundos después. */
+let autoTimer;
+function autoSync() {
+  const cfg = sync.getCfg();
+  if (!cfg.auto || !sync.connection()) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(async () => {
+    try { await sync.push(movimientos, metas); }
+    catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); }
+  }, 4000);
+}
 async function persist(kind, item) {
   try {
     item.updatedAt = Date.now();
     if (!item.createdAt) item.createdAt = item.updatedAt;
     await db.put(storeOf(kind), item);
+    autoSync();
     return true;
   } catch (e) { return false; }
 }
 async function unpersist(kind, id) {
   try {
     await db.remove(storeOf(kind), id);
+    autoSync();
     return true;
   } catch (e) { return false; }
 }
@@ -862,7 +874,7 @@ function renderPerfil() {
     <h2 class="perfil-h">Respaldo y datos</h2>
     <div class="menu">
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de Pagos de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
-      <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Misma hoja de SecondBrain, otra pestaña; tú decides cuándo'}</small></span></button>
+      <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV (Excel)</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar JSON</b><small>Respaldo completo, con historial de abonos</small></span></button>
       <button type="button" class="menu-row" data-action="export-csv">${ICO.download}<span><b>Exportar CSV</b><small>Para abrir en Excel</small></span></button>
@@ -975,26 +987,33 @@ function kpiDashboard(base) {
     <button type="button" class="kpi-card kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && !state.sort.asc}"><span class="kpi-main"><span class="kpi-sec">RESUMEN OPERATIVO</span><span class="kpi-s">${plural(base.length, 'pago registrado', 'pagos registrados')}</span></span><span class="kpi-aside"><span class="kpi-l">Total cartera</span><span class="kpi-v">${fmtMoney(totalImp)}</span></span></button>`;
 }
 
-/* Sincronización manual con la hoja de Google que ya usa SecondBrain (mismo script y archivo, otras pestañas). */
-async function openSync(note) {
+/* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
+const SCRIPT_URL = 'https://github.com/jeal1498/PWA-Finance/blob/main/apps-script/Code.gs';
+function openSync(note) {
   sheet.ctx = { type: 'sync' };
-  const cfg = sync.getCfg();
-  const conn = await sync.connection();
+  const cfg = sync.getCfg(), conn = sync.connection();
   const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
   const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : (cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : '');
-  if (!conn) {
-    openSheet('Sincronizar con Google Sheets', `
-      <p class="note">Usa la misma hoja y el mismo script que ya tienes en SecondBrain, pero en otras pestañas y solo cuando tú lo pidas.</p>${msg}
-      <p class="hint">Aún no hay una hoja conectada. Entra a SecondBrain → Respaldo, conéctala una vez y vuelve aquí.</p>
-      <div class="btn-row"><a class="btn btn-primary" href="https://jeal1498.github.io/JEAL/#/respaldo">Ir a Respaldo</a></div>`);
-  } else {
-    openSheet('Sincronizar con Google Sheets', `
-      <p class="note">Misma hoja y mismo script de SecondBrain; tus datos van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas». Última sincronización: <b>${when}</b>.</p>${msg}
-      <div class="btn-row"><button type="button" class="btn btn-primary" data-action="sync-push" id="sync-push">Sincronizar ahora</button></div>
-      <div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-pull">Traer de la hoja</button></div>
-      <p class="hint">«Traer de la hoja» reemplaza tus pagos y metas de este teléfono por la última copia guardada en la hoja.</p>`);
-  }
+  openSheet('Respaldo en Google Sheets', `
+    ${conn ? `<p class="note">Tus pagos y metas van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
+    <form id="sync-form" autocomplete="off">
+      <label for="sync-url">URL de la aplicación web</label>
+      <input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required>
+      <label for="sync-token">Clave</label>
+      <input id="sync-token" type="text" autocapitalize="off" spellcheck="false" value="${esc(cfg.token || '')}" required>
+      <label class="switch-row" for="sync-auto"><span>Sincronizar sola después de cada cambio</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
+      <div class="btn-row"><button type="submit" class="btn btn-primary">${conn ? 'Guardar' : 'Conectar y sincronizar'}</button></div>
+    </form>
+    ${conn ? `<div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-push" id="sync-push">Sincronizar ahora</button></div>
+    <div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-pull">Traer de la hoja</button></div>
+    <p class="hint">«Traer de la hoja» reemplaza tus pagos y metas de este teléfono por la última copia guardada en la hoja.</p>` : ''}`);
   sheet.panel.focus({ preventScroll: true });
+}
+
+async function syncSave(form) {
+  const url = $('#sync-url', form).value.trim(), token = $('#sync-token', form).value.trim();
+  sync.setCfg({ url, token, auto: $('#sync-auto', form).checked, error: '' });
+  await syncPush();
 }
 
 async function syncPush() {
@@ -1014,6 +1033,7 @@ async function syncPull() {
   const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
   try {
     const data = await sync.pull();
+    if (!data) return openSync('La hoja aún no tiene una copia. Sincroniza primero.');
     const mov = Array.isArray(data && data.movimientos) ? data.movimientos : [];
     const met = Array.isArray(data && data.metas) ? data.metas : [];
     await db.batch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
@@ -1098,6 +1118,7 @@ async function applyImport() {
     await db.batch({ movimientos: { clear: replace, put: p.movimientos.map(stamp) }, metas: { clear: replace, put: p.metas.map(stamp) } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
+    autoSync();
   } catch (e) {
     return toast('No se pudo importar en este dispositivo');
   }
@@ -1277,6 +1298,7 @@ document.addEventListener('change', e => {
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
+  else if (e.target.id === 'sync-form') { e.preventDefault(); syncSave(e.target); }
 });
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
