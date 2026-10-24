@@ -861,11 +861,79 @@ function renderPerfil() {
     </div>
     <h2 class="perfil-h">Respaldo y datos</h2>
     <div class="menu">
+      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de Pagos de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Misma hoja de SecondBrain, otra pestaña; tú decides cuándo'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV (Excel)</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar JSON</b><small>Respaldo completo, con historial de abonos</small></span></button>
       <button type="button" class="menu-row" data-action="export-csv">${ICO.download}<span><b>Exportar CSV</b><small>Para abrir en Excel</small></span></button>
     </div>`;
+}
+
+/* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
+   y completa hasta el último pago. Se dibuja como SVG con foreignObject; fuentes e iconos van embebidos. */
+const IMG_W = 390;
+const blobDataURL = blob => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(blob); });
+
+async function monthCSS() {
+  let css = await (await fetch('styles.css')).text();
+  const urls = [...new Set([...css.matchAll(/url\('?(fonts\/[^')]+)'?\)/g)].map(m => m[1]))];
+  for (const u of urls) css = css.split(u).join(await blobDataURL(await (await fetch(u)).blob()));
+  return css.replace(/url\('?(data:[^')]+)'?\)/g, 'url($1)') + '\nbody{min-height:0;padding:0}';
+}
+
+function monthMarkup() {
+  const base = movimientos.map(procesar).filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month);
+  const titulo = `${isCurrentMonth() ? HOY.getDate() + ' ' : ''}${MESES[state.month.month]} ${state.month.year}`;
+  const list = base.length
+    ? pagosTable({ items: base })
+    : `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong></div>`;
+  const box = document.createElement('div');
+  box.innerHTML = `<div class="app"><header class="header"><div class="header-title-row"><span class="hp-label"><span>${titulo}</span></span></div></header>
+    <main><section class="hero"><div id="kpi-dash">${kpiDashboard(base)}</div></section>
+    <div class="list-head"><div class="list-title"><span id="list-caption">Pagos</span><span id="list-count">${plural(base.length, 'movimiento', 'movimientos')}</span></div></div>
+    <div id="list">${list}</div></main></div>`;
+  box.style.cssText = `width:${IMG_W}px;padding-bottom:28px;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.35;-webkit-font-smoothing:antialiased`;
+  box.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  return new XMLSerializer().serializeToString(box);
+}
+
+async function monthImage() {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const css = await monthCSS(), markup = monthMarkup();
+  // Mide la altura real con un iframe del mismo ancho (así los media queries coinciden).
+  const fr = document.createElement('iframe');
+  fr.style.cssText = `position:fixed;left:-9999px;top:0;width:${IMG_W}px;height:100px;border:0`;
+  fr.srcdoc = `<!DOCTYPE html><html data-theme="${theme}"><head><meta charset="utf-8"><style>${css}</style></head><body>${markup}</body></html>`;
+  document.body.appendChild(fr);
+  let H;
+  try {
+    await new Promise(r => { fr.onload = r; });
+    await fr.contentDocument.fonts.ready;
+    H = Math.ceil(fr.contentDocument.body.firstElementChild.getBoundingClientRect().height);
+  } finally { fr.remove(); }
+  const svgText = `<svg xmlns="http://www.w3.org/2000/svg" width="${IMG_W}" height="${H}" data-theme="${theme}"><foreignObject x="0" y="0" width="${IMG_W}" height="${H}"><style><![CDATA[${css}]]></style>${markup}</foreignObject></svg>`;
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
+  await img.decode();
+  const sc = Math.min(3, 15000 / H);
+  const cv = document.createElement('canvas'); cv.width = Math.round(IMG_W * sc); cv.height = Math.round(H * sc);
+  const x = cv.getContext('2d');
+  x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fbfaf6';
+  x.fillRect(0, 0, cv.width, cv.height);
+  x.drawImage(img, 0, 0, cv.width, cv.height);
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+
+async function shareMonth() {
+  const title = `Finanzas · ${MESES[state.month.month]} ${state.month.year}`;
+  try {
+    const blob = await monthImage();
+    const file = new File([blob], `finanzas-${state.month.year}-${String(state.month.month + 1).padStart(2, '0')}.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title }); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('Imagen descargada');
+  } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir'); }
 }
 
 /* Dashboard de Gastos: atención inmediata, meta diaria, tres mosaicos de estado (filtran la lista)
@@ -1109,6 +1177,7 @@ document.addEventListener('click', async e => {
       if (lbl) lbl.textContent = themeLabel();
       break;
     }
+    case 'share-month': shareMonth(); break;
     case 'open-sync': openSync(); break;
     case 'sync-push': syncPush(); break;
     case 'sync-pull': syncPull(); break;
