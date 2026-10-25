@@ -395,7 +395,7 @@ const SORTS = {
   conc:    (a, c) => a.conc.localeCompare(c.conc, 'es'),
   monto:   (a, c) => a.imp - c.imp
 };
-const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus'], ['cat', 'Categoría'], ['conc', 'Concepto'], ['monto', 'Monto']];
+const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['cat', 'Categoría', 'Cat.'], ['conc', 'Concepto'], ['monto', 'Monto']];
 const BADGE_ICON = {
   Vencido: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   Pendiente: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -423,9 +423,9 @@ function pagoRow(m) {
 function pagosTable(b) {
   const { col, asc } = state.sort;
   const items = [...b.items].sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
-  const head = COLS.map(([k, l]) => {
+  const head = COLS.map(([k, l, sh]) => {
     const on = col === k;
-    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${l}${on ? svg('<path d="m6 15 6-6 6 6"/>') : ''}</button></span>`;
+    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
   }).join('');
   const pend = sum(items, 'pendiente');
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
@@ -442,7 +442,7 @@ const META_SORTS = {
   conc:    SORTS.conc,
   monto:   (a, c) => a.imp - c.imp
 };
-const META_COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus'], ['cat', 'Categoría'], ['conc', 'Meta'], ['monto', 'Monto']];
+const META_COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['cat', 'Categoría', 'Cat.'], ['conc', 'Meta'], ['monto', 'Monto']];
 const META_BADGE = { vencida: ['Atrasada', 'danger', BADGE_ICON.Vencido], alcanzada: ['Alcanzada', 'ok', BADGE_ICON.Pagado] };
 
 function metaPagoRow(m) {
@@ -463,9 +463,9 @@ function metaPagoRow(m) {
 function metasTable(b) {
   const { col, asc } = state.sortMetas;
   const items = [...b.items].sort((a, c) => (META_SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
-  const head = META_COLS.map(([k, l]) => {
+  const head = META_COLS.map(([k, l, sh]) => {
     const on = col === k;
-    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${l}${on ? svg('<path d="m6 15 6-6 6 6"/>') : ''}</button></span>`;
+    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
   }).join('');
   const falta = items.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
