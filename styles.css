@@ -173,6 +173,7 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .list-title { display: flex; flex-direction: column; min-width: 0; }
 #list-caption { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 #list-count { font-size: 14px; color: var(--muted); }
+#list-count:empty { display: none; }
 
 /* ---------- Grupos ---------- */
 .group { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow); }

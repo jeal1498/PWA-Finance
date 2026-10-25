@@ -481,8 +481,8 @@ function renderMetasList(b) {
 }
 
 function renderPagos(b) {
-  $('#list-caption').textContent = 'Pagos';
-  $('#list-count').textContent = `${plural(b.items.length, 'movimiento', 'movimientos')} · toca una columna para ordenar`;
+  $('#list-caption').textContent = 'Movimientos';
+  $('#list-count').textContent = '';
   if (b.items.length) { $('#list').innerHTML = pagosTable(b); return; }
   renderList([], '', '', 'gastos', b.base.length === 0);
 }
