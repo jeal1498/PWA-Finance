@@ -603,3 +603,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .nav-btn[aria-current="page"]::before { display: none; }
 .nav-add { border-color: var(--bg); box-shadow: none; }
 .btn-soft { background: var(--surface-2); }
+
+/* «Vence en…» va dentro de la tarjeta amarilla; el relleno se ajusta para que mida lo mismo (78 px de alto). */
+.kpi-alert { padding-block: 9px; min-height: 78px; }
+.kpi-alert-note { display: block; font-size: 13px; font-weight: 500; line-height: 1.25; margin-top: 1px; }
