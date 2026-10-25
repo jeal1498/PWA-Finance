@@ -72,7 +72,7 @@ try {
 } catch (e) { dbOk = false; }
 
 /* Pagos que se repiten: cada serie crea sola la copia pendiente de cada mes, hasta el mes siguiente
-   (o hasta el mes que se esté viendo, máximo 12 meses adelante). */
+   o hasta su fecha de fin (`fin`). */
 function generarRepetidos(hasta) {
   const series = new Map();
   movimientos.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
@@ -88,10 +88,11 @@ function generarRepetidos(hasta) {
       if (mo > 11) { mo = 0; y++; }
       if (y * 12 + mo > hasta) break;
       const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
+      if (ult.fin && f > ult.fin) break;
       const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
       if (items.some(m => m.id === id)) continue;
       const now = Date.now();
-      nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, createdAt: now, updatedAt: now });
+      nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
     }
   });
   if (!nuevos.length) return;
@@ -548,7 +549,7 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
    ========================================================= */
 function render() {
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
-  generarRepetidos(Math.max(hoyIdx + 1, Math.min(state.month.year * 12 + state.month.month, hoyIdx + 12)));
+  generarRepetidos(hoyIdx + 1);
   const isG = state.view === 'gastos', isP = state.view === 'perfil';
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
@@ -858,11 +859,35 @@ function openForm(kind, id) {
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
       </div>
       ${isMeta ? '' : `<label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>`}
+      ${isMeta ? '' : `<div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
+        <label for="f-fin">Termina</label>
+        <input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}">
+        <p class="note" id="f-fin-hint"></p>
+      </div>`}
       ${editing ? '' : `<label class="switch-row" for="f-paid"><span>${isMeta ? 'Ya tengo el dinero ahorrado' : 'Ya está pagado'}</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <p class="form-error" id="f-error" role="alert"></p>
       <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : (isMeta ? 'Guardar próximo' : 'Guardar pago')}</button>
     </form>`);
+  if (!isMeta) actualizarFin();
   if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });
+}
+
+/* Campo «Termina»: solo con «Se repite cada mes»; el texto dice cuántos pagos serán. */
+function actualizarFin() {
+  const wrap = $('#f-fin-wrap');
+  if (!wrap) return;
+  wrap.hidden = !$('#f-rep').checked;
+  const fecha = $('#f-fecha').value, fin = $('#f-fin').value, hint = $('#f-fin-hint');
+  if (!fin || !fecha) { hint.textContent = 'Se repite hasta que lo detengas.'; return; }
+  const d = parseDate(fecha);
+  let n = 0, ult = null;
+  for (let k = 0; k < 600; k++) {
+    const y = d.getFullYear(), mo = d.getMonth() + k;
+    const f = new Date(y, mo, Math.min(d.getDate(), new Date(y, mo + 1, 0).getDate()));
+    if (toISO(f) > fin) break;
+    n++; ult = f;
+  }
+  hint.textContent = n ? `${plural(n, 'pago', 'pagos')} en total. El último vence el ${ult.getDate()} ${MESES_CORTO[ult.getMonth()]} ${ult.getFullYear()}.` : 'La fecha de fin es anterior al vencimiento.';
 }
 
 function submitForm() {
@@ -874,21 +899,30 @@ function submitForm() {
   const list = listOf(kind);
   const prev = id ? list.find(m => m.id === id) : null;
   if (id && !prev) return;
+  const fin = isMeta || !$('#f-rep').checked ? '' : $('#f-fin').value;
   const err = !fecha ? (isMeta ? 'Selecciona la fecha límite.' : 'Selecciona una fecha.')
+    : fin && fin < fecha ? 'La fecha de fin no puede ser anterior al vencimiento.'
     : imp < 0 ? 'El monto no puede ser negativo.'
     : (!isMeta && imp <= 0) ? 'El importe debe ser mayor a 0.'
     : (prev && imp < prev.abo) ? `El importe no puede ser menor a lo ya abonado (${fmtMoney(prev.abo)}).` : '';
-  if (err) { formError('f-error', !fecha ? 'f-fecha' : 'f-imp', err); return; }
+  if (err) { formError('f-error', !fecha ? 'f-fecha' : (fin && fin < fecha) ? 'f-fin' : 'f-imp', err); return; }
 
   let item;
   if (prev) {
     item = Object.assign(prev, { fecha, cat, conc, imp });
     if (!isMeta) {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
+      if (fin) item.fin = fin; else delete item.fin;
+      /* Repetir y fin valen para toda la serie. */
+      if (item.serie) movimientos.filter(m => m.serie === item.serie && m !== item).forEach(m => {
+        if (item.repite) m.repite = true; else delete m.repite;
+        if (item.fin) m.fin = item.fin; else delete m.fin;
+        persist(kind, m);
+      });
     }
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
-    if (!isMeta && $('#f-rep').checked) { item.repite = true; item.serie = item.id; }
+    if (!isMeta && $('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
@@ -1353,6 +1387,7 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('change', e => {
+  if (['f-rep', 'f-fecha', 'f-fin'].includes(e.target.id)) actualizarFin();
   if (e.target.name === 'f-cat' && sheet.ctx) { const c = CATS.find(x => x.id === e.target.value); if (c) sheet.ctx.cat = catString(c); }
   if (e.target.id === 'imp-file') readImportFile(e.target.files[0]);
   if (e.target.name === 'imp-mode') {
