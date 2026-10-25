@@ -23,6 +23,19 @@ function doPost(e) {
     const b = JSON.parse(e.postData.contents);
     if (b.token !== CLAVE) return salida({ ok: false, error: 'Clave incorrecta' });
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    /* Seguro: un envío vacío no pisa una copia que ya tiene datos; y siempre queda la copia anterior. */
+    const datos = JSON.parse(b.raw || '{}');
+    const vacio = !(datos.movimientos || []).length && !(datos.metas || []).length;
+    const previo = ss.getSheetByName('_respaldo');
+    const antes = previo && previo.getLastRow() ? previo.getRange(1, 1, previo.getLastRow(), 1).getValues().map(r => r[0]).join('') : '';
+    if (vacio && antes) {
+      const o = JSON.parse(antes);
+      if ((o.movimientos || []).length || (o.metas || []).length) return salida({ ok: false, error: 'Envío vacío rechazado: la hoja ya tiene datos' });
+    }
+    if (antes) {
+      const ant = ss.getSheetByName('_respaldo_anterior') || ss.insertSheet('_respaldo_anterior');
+      ant.clear(); ant.getRange(1, 1).setValue(antes.slice(0, PEDAZO)); ant.hideSheet();
+    }
     (b.tables || []).forEach(t => escribir(ss, t));
     const raw = b.raw || '';
     const sh = ss.getSheetByName('_respaldo') || ss.insertSheet('_respaldo');

@@ -50,6 +50,8 @@ export function connection() {
 export async function push(movimientos, metas) {
   const cfg = connection();
   if (!cfg) throw new Error('Primero conecta tu hoja');
+  /* Seguro: una app vacía nunca sobrescribe la hoja (así se perdieron los datos una vez). */
+  if (!movimientos.length && !metas.length) throw new Error('La app está vacía; no se envía para no borrar la hoja. Importa tus datos o usa «Traer de la hoja».');
   const raw = JSON.stringify({ app: 'finanzas', movimientos, metas });
   const out = await call(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, tables: tables(movimientos, metas), raw }) });
   if (!out.ok) throw new Error(out.error || 'Error en la hoja');
