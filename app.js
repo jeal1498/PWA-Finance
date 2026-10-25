@@ -113,7 +113,8 @@ const state = {
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
   open: {},
   search: '',
-  sort: { col: 'fecha', asc: true }
+  sort: { col: 'fecha', asc: true },
+  sortMetas: { col: 'fecha', asc: true }
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
 
@@ -202,13 +203,6 @@ function plazoKey(m) {
   if (d <= 180) return 'proxima';
   return 'largo';
 }
-const PLAZOS = {
-  vencida:   { label: 'Vencidas',    hint: 'Pasó la fecha objetivo', color: 'var(--danger)' },
-  proxima:   { label: 'Próximas',    hint: 'Hasta 6 meses',          color: 'var(--warn)' },
-  largo:     { label: 'Largo plazo', hint: 'Más de 6 meses',         color: 'var(--muted)' },
-  alcanzada: { label: 'Alcanzadas',  hint: 'Meta cumplida',          color: 'var(--ok)' }
-};
-const PLAZO_ORDER = ['vencida', 'proxima', 'largo', 'alcanzada'];
 
 /* =========================================================
    Construcción de datos por vista
@@ -314,25 +308,6 @@ function gastoRow(m, showCat) {
   </button>`;
 }
 
-function metaRow(m) {
-  const i = metaInfo(m);
-  const c = catOf(m.cat);
-  const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.pend);
-  const sub = i.plan || (i.partial ? `de ${fmtMoney(m.imp)}` : '');
-  return `<button type="button" class="row" data-action="open" data-kind="meta" data-id="${esc(m.id)}">
-    ${tileHTML(i.tone, MESES_CORTO[m.date.getMonth()], m.date.getFullYear())}
-    <span class="row-main">
-      <span class="row-title"><span class="row-emoji" aria-hidden="true">${catIcon(c)}</span>${esc(m.conc)}</span>
-      <span class="row-status t-${i.tone}">${i.done ? ICON.check : ''}${i.text}</span>
-      ${i.partial ? `<span class="mini"><span style="width:${i.pct}%"></span></span>` : ''}
-    </span>
-    <span class="row-amount">
-      <span class="amt${i.done || i.sinMonto ? ' muted' : ''}">${amount}</span>
-      ${sub ? `<span class="amt-sub">${sub}</span>` : ''}
-    </span>
-  </button>`;
-}
-
 function openState(key, fallback) {
   if (state.search.trim()) return true;
   return key in state.open ? state.open[key] : fallback;
@@ -401,30 +376,6 @@ function groupsGastos(b) {
   return out;
 }
 
-function groupsMetas(b) {
-  const out = [];
-  const buckets = {};
-  b.items.forEach(m => { const k = plazoKey(m); (buckets[k] = buckets[k] || []).push(m); });
-  PLAZO_ORDER.forEach(k => {
-    const arr = buckets[k];
-    if (!arr) return;
-    arr.sort(porFechaYMonto);
-    const cfg = PLAZOS[k];
-    const imp = sum(arr, 'imp'), abo = sum(arr, 'abo');
-    const falta = arr.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
-    const pct = imp > 0 ? Math.round(abo / imp * 100) : 0;
-    const key = `p|${k}`;
-    out.push({
-      key, name: cfg.label, color: cfg.color, icon: '<span class="dot"></span>',
-      sub: `${plural(arr.length, 'meta', 'metas')}, ${pct}% ahorrado`,
-      amount: fmtMoney(falta > 0 ? falta : imp), amountLabel: falta > 0 ? 'falta' : 'logrado', muted: falta <= 0,
-      open: openState(key, k === 'vencida' || k === 'proxima'),
-      rows: arr.map(metaRow).join('')
-    });
-  });
-  return out;
-}
-
 /* Pagos como tabla: columnas ordenables (un toque asc., otro desc.), vencidos teñidos y días debajo de cada pago. */
 const ESTADO_ORD = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 const SORTS = {
@@ -472,6 +423,53 @@ function pagosTable(b) {
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span>${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
+/* Metas con el mismo estilo de tabla: fecha objetivo, estatus (anillo si hay ahorro), categoría, meta y monto que falta. */
+const META_RANK = { vencida: 0, proxima: 1, largo: 1, alcanzada: 2 };
+const META_SORTS = {
+  fecha:   (a, c) => a.date - c.date,
+  estatus: (a, c) => META_RANK[plazoKey(a)] - META_RANK[plazoKey(c)],
+  cat:     SORTS.cat,
+  conc:    SORTS.conc,
+  monto:   (a, c) => a.imp - c.imp
+};
+const META_COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus'], ['cat', 'Categoría'], ['conc', 'Meta'], ['monto', 'Monto']];
+const META_BADGE = { vencida: ['Atrasada', 'danger', BADGE_ICON.Vencido], alcanzada: ['Alcanzada', 'ok', BADGE_ICON.Pagado] };
+
+function metaPagoRow(m) {
+  const i = metaInfo(m), c = catOf(m.cat), k = plazoKey(m);
+  const [label, tone, icon] = META_BADGE[k] || [i.sinMonto ? 'Monto por definir' : 'En curso', i.tone === 'warn' ? 'warn' : 'muted', BADGE_ICON.Pendiente];
+  const yr = m.date.getFullYear() !== HOY.getFullYear() ? ` ’${String(m.date.getFullYear()).slice(-2)}` : '';
+  const aria = `${label}${i.partial ? `, ahorrado ${i.pct}%` : ''}`;
+  const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.pend);
+  return `<button type="button" class="pt-cols pt-row${k === 'vencida' ? ' v' : ''}" data-action="open" data-kind="meta" data-id="${esc(m.id)}">
+    <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}${yr}</small></span>
+    <span class="pt-est ${tone}" role="img" aria-label="${aria}" title="${aria}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(icon)}</span>
+    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}</span>${i.done ? '' : `<span class="pt-nota ${i.tone}">${i.text}</span>`}</span>
+    <span class="pt-amt${i.done || i.sinMonto ? ' done' : ''}"><b>${amount}</b>${i.partial ? `<small>de ${fmtMoney(m.imp)}</small>` : ''}</span>
+  </button>`;
+}
+
+function metasTable(b) {
+  const { col, asc } = state.sortMetas;
+  const items = [...b.items].sort((a, c) => (META_SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
+  const head = META_COLS.map(([k, l]) => {
+    const on = col === k;
+    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${l}${on ? svg('<path d="m6 15 6-6 6 6"/>') : ''}</button></span>`;
+  }).join('');
+  const falta = items.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
+  const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
+  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'meta', 'metas')} · falta ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
+    <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span>${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
+}
+
+function renderMetasList(b) {
+  $('#list-caption').textContent = 'Metas';
+  $('#list-count').textContent = `${plural(b.items.length, 'meta', 'metas')} · toca una columna para ordenar`;
+  if (b.items.length) { $('#list').innerHTML = metasTable(b); return; }
+  renderList([], '', '', 'metas', b.base.length === 0);
+}
+
 function renderPagos(b) {
   $('#list-caption').textContent = 'Pagos';
   $('#list-count').textContent = `${plural(b.items.length, 'movimiento', 'movimientos')} · toca una columna para ordenar`;
@@ -516,7 +514,7 @@ function render() {
     const b = buildMetas();
     renderHeroMetas(b);
     $('#month-text').textContent = `${HOY.getDate()} ${MESES[HOY.getMonth()]} ${HOY.getFullYear()}`;
-    renderList(groupsMetas(b), 'Por plazo', plural(b.items.length, 'meta', 'metas'), 'metas', b.base.length === 0);
+    renderMetasList(b);
   }
 }
 
@@ -1239,7 +1237,7 @@ document.addEventListener('click', async e => {
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
     case 'pick-today': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; closeSheet(); render(); break;
     case 'resumen': state.filter = 'todos'; state.sort = { col: 'fecha', asc: false }; render(); break;
-    case 'sort': { const k = t.dataset.col; state.sort = { col: k, asc: state.sort.col === k ? !state.sort.asc : true }; render(); break; }
+    case 'sort': { const k = t.dataset.col, key = state.view === 'metas' ? 'sortMetas' : 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': state.filter = t.dataset.filter; render(); break;
     case 'toggle-group': {
       const sec = t.closest('.group');

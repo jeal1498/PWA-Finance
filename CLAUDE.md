@@ -29,7 +29,7 @@ PWA de uso propio para llevar **pagos con abonos y metas de ahorro**. Antes viv�
 ## Pantallas
 - **Barra inferior**: Pagos | + | Metas | Perfil. Arriba solo el mes (swipe de mes **solo sobre la fila del mes**; toque abre el selector).
 - **Pagos**: tarjetas de resumen (atención inmediata, meta diaria = pendiente hasta fin de mes ÷ días que quedan, mosaicos Pagado / Por vencer / Atrasado que filtran, «Resumen operativo» = todos ordenados por fecha de la más reciente a la más lejana) y **tabla** `.pt-*` del mismo ancho que las tarjetas: Fecha (día grande + mes), Estatus (ícono: palomita/reloj/triángulo; abono parcial = **anillo** de avance), Categoría (ícono; Yo/Karen/Julieta con inicial), Concepto (días atrasados/por vencer debajo; los pagados sin texto) y Monto. Todas las columnas **ordenables** (un toque asc., otro desc.; `state.sort`). Vencidos teñidos, leyenda de categorías al final.
-- **Metas**: por plazo (vencidas, próximas, largo plazo, alcanzadas).
+- **Metas**: misma tabla `.pt-*` que Pagos (Fecha, Estatus con anillo de avance, Categoría, Meta con «Faltan…/Atrasada…», Monto), ordenable (`state.sortMetas`); atrasadas teñidas.
 - **Perfil**: tema claro/oscuro, sincronizar con Google Sheets, compartir mes y sincronizar con Google Sheets.
 - Hojas: detalle, «Abonar o pagar», nuevo/editar; Eliminar → toast «Deshacer». Enlaces profundos: `#gasto-<id>` / `#meta-<id>`.
 - **Importar** (`datos.js`): JSON `{app:'secondbrain', movimientos, metas}` o CSV (Tipo, Fecha, Concepto, Categoría, Importe, Abonado, Id; acepta `,` `;` tab, fechas `AAAA-MM-DD` o `DD/MM/AAAA`; renglones «Ingreso» se omiten). Modo **Agregar** (por id; sin id, hash de tipo+fecha+concepto+importe+categoría) o **Reemplazar todo**, en una transacción con toast Deshacer.

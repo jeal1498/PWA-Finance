@@ -561,6 +561,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .pt-est .ring circle { fill: none; stroke: currentColor; stroke-width: 3.2; }
 .pt-est .ring .tr { opacity: .25; }
 .pt-est .ring .pr { stroke-linecap: round; stroke-dasharray: var(--p) 100; }
+.pt-est.muted { color: var(--muted); } .pt-nota.muted { color: var(--muted); }
 .pt-est.danger { color: var(--danger); } .pt-est.warn { color: var(--warn); } .pt-est.ok { color: var(--ok); }
 .pt-cat { display: flex; color: var(--ink); }
 .pt-cat .ic, .pt-key .ic { width: 22px; height: 22px; }
