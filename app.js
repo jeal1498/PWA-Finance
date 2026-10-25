@@ -276,8 +276,8 @@ function renderHeroMetas(b) {
       <span class="kpi-main"><span class="kpi-sec">SIGUIENTE</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
     </div>
     <div class="kpi-card kpi-meta"><span class="kpi-sec">TE FALTA AHORRAR</span><span class="kpi-meta-v">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)} en ${plural(base.length, 'próximo', 'próximos')}` : 'Aún no hay metas con monto'}</span></div>
-    <div class="kpi-legend">${tiles}</div>
-    <button type="button" class="kpi-card kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-main"><span class="kpi-sec">RESUMEN DE PRÓXIMOS</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span><span class="kpi-aside"><span class="kpi-l">Total objetivo</span><span class="kpi-v">${fmtMoney(totalObj)}</span></span></button>`;
+    <button type="button" class="kpi-card kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-main"><span class="kpi-sec">RESUMEN DE PRÓXIMOS</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span><span class="kpi-aside"><span class="kpi-l">Total objetivo</span><span class="kpi-v">${fmtMoney(totalObj)}</span></span></button>
+    <div class="kpi-legend">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
 }
 
@@ -998,8 +998,8 @@ function kpiDashboard(base) {
       <span class="kpi-main"><span class="kpi-sec">ATENCIÓN INMEDIATA</span><span class="kpi-alert-v">${grupo.length ? `Próximo: ${fmtDate(grupo[0].fecha)} · ${fmtMoney(sum(grupo, 'pendiente'))}` : (venc.length ? 'Solo hay pagos vencidos' : 'Sin pagos pendientes')}</span>${grupo.length ? `<span class="kpi-alert-note">${dprox <= 0 ? 'Vence hoy' : `Vence en ${plural(dprox, 'día', 'días')}`}</span>` : ''}</span>
     </div>
     <div class="kpi-card kpi-meta"><span class="kpi-sec">META DIARIA PARA ESTAR AL DÍA</span><span class="kpi-meta-v">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo en el mes actual'}</span></div>
-    <div class="kpi-legend">${tiles}</div>
-    <button type="button" class="kpi-card kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-main"><span class="kpi-sec">TODO EL MES</span><span class="kpi-s">${plural(base.length, 'pago registrado', 'pagos registrados')}</span></span><span class="kpi-aside"><span class="kpi-l">Total del mes</span><span class="kpi-v">${fmtMoney(totalImp)}</span></span></button>`;
+    <button type="button" class="kpi-card kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-main"><span class="kpi-sec">TODO EL MES</span><span class="kpi-s">${plural(base.length, 'pago registrado', 'pagos registrados')}</span></span><span class="kpi-aside"><span class="kpi-l">Total del mes</span><span class="kpi-v">${fmtMoney(totalImp)}</span></span></button>
+    <div class="kpi-legend">${tiles}</div>`;
 }
 
 /* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
