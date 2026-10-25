@@ -879,15 +879,22 @@ function actualizarFin() {
   wrap.hidden = !$('#f-rep').checked;
   const fecha = $('#f-fecha').value, fin = $('#f-fin').value, hint = $('#f-fin-hint');
   if (!fin || !fecha) { hint.textContent = 'Se repite hasta que lo detengas.'; return; }
-  const d = parseDate(fecha);
-  let n = 0, ult = null;
+  /* Calendario completo de la serie desde su primer pago; los ya pagados no cuentan como pendientes. */
+  const id = sheet.ctx.id, prev = id ? movimientos.find(m => m.id === id) : null;
+  const otros = prev && prev.serie ? movimientos.filter(m => m.serie === prev.serie && m.id !== id).sort(byFecha) : [];
+  const inicio = otros.length && otros[0].fecha < fecha ? otros[0].fecha : fecha;
+  const d = parseDate(inicio);
+  const pagado = new Map(otros.map(m => [m.fecha, m.abo >= m.imp]));
+  pagado.set(fecha, prev ? prev.abo >= (parseFloat($('#f-imp').value) || prev.imp) : !!($('#f-paid') && $('#f-paid').checked));
+  let n = 0, q = 0, ult = null;
   for (let k = 0; k < 600; k++) {
     const y = d.getFullYear(), mo = d.getMonth() + k;
     const f = new Date(y, mo, Math.min(d.getDate(), new Date(y, mo + 1, 0).getDate()));
     if (toISO(f) > fin) break;
     n++; ult = f;
+    if (!pagado.get(toISO(f))) q++;
   }
-  hint.textContent = n ? `${plural(n, 'pago', 'pagos')} en total. El último vence el ${ult.getDate()} ${MESES_CORTO[ult.getMonth()]} ${ult.getFullYear()}.` : 'La fecha de fin es anterior al vencimiento.';
+  hint.textContent = n ? `${plural(n, 'pago', 'pagos')} en total, ${q === 1 ? 'queda 1' : q ? `quedan ${q}` : 'ninguno pendiente'}. El último vence el ${ult.getDate()} ${MESES_CORTO[ult.getMonth()]} ${ult.getFullYear()}.` : 'La fecha de fin es anterior al vencimiento.';
 }
 
 function submitForm() {
@@ -1387,7 +1394,7 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('change', e => {
-  if (['f-rep', 'f-fecha', 'f-fin'].includes(e.target.id)) actualizarFin();
+  if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id)) actualizarFin();
   if (e.target.name === 'f-cat' && sheet.ctx) { const c = CATS.find(x => x.id === e.target.value); if (c) sheet.ctx.cat = catString(c); }
   if (e.target.id === 'imp-file') readImportFile(e.target.files[0]);
   if (e.target.name === 'imp-mode') {
