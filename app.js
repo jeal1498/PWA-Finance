@@ -207,10 +207,18 @@ function plazoKey(m) {
 /* =========================================================
    Construcción de datos por vista
    ========================================================= */
+/* Pagos del mes: los movimientos con fecha en el mes y los «Próximos» (metas con monto) que caen en él. */
+const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
+function monthItems() {
+  const pagos = movimientos.map(procesar).filter(m => enMes(m.date));
+  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date));
+  return [...pagos, ...proximos];
+}
+
 function buildGastos() {
   const all = movimientos.map(procesar);
   const isUrg = state.grouping === 'urgencia';
-  const base = all.filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month);
+  const base = monthItems();
   const q = state.search.trim().toLowerCase();
   const items = base.filter(m =>
     (state.filter === 'todos' || m.estado.toLowerCase() === state.filter) &&
@@ -255,8 +263,8 @@ function renderHeroMetas(b) {
   const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
     { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo, sub: `${pct}% del total` },
-    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'meta', 'metas') },
-    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado, sub: plural(vencidas.length, 'meta', 'metas') }
+    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'próximo', 'próximos') },
+    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado, sub: plural(vencidas.length, 'próximo', 'próximos') }
   ].map(t => {
     const on = state.filter === t.filter;
     return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todas' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span><span class="kpi-s">${t.sub}</span></span></button>`;
@@ -265,11 +273,11 @@ function renderHeroMetas(b) {
   $('#kpi-dash').innerHTML = `
     <div class="kpi-alert kpi-alert-meta">
       <span class="kpi-alert-ico">${ic('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>')}</span>
-      <span class="kpi-main"><span class="kpi-sec">SIGUIENTE META</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
+      <span class="kpi-main"><span class="kpi-sec">SIGUIENTE</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
     </div>
-    <div class="kpi-card kpi-meta"><span class="kpi-sec">TE FALTA AHORRAR</span><span class="kpi-meta-v">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)} en ${plural(base.length, 'meta', 'metas')}` : 'Aún no hay metas con monto'}</span></div>
+    <div class="kpi-card kpi-meta"><span class="kpi-sec">TE FALTA AHORRAR</span><span class="kpi-meta-v">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)} en ${plural(base.length, 'próximo', 'próximos')}` : 'Aún no hay metas con monto'}</span></div>
     <div class="kpi-legend">${tiles}</div>
-    <button type="button" class="kpi-card kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-main"><span class="kpi-sec">RESUMEN DE METAS</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span><span class="kpi-aside"><span class="kpi-l">Total objetivo</span><span class="kpi-v">${fmtMoney(totalObj)}</span></span></button>`;
+    <button type="button" class="kpi-card kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-main"><span class="kpi-sec">RESUMEN DE PRÓXIMOS</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span><span class="kpi-aside"><span class="kpi-l">Total objetivo</span><span class="kpi-v">${fmtMoney(totalObj)}</span></span></button>`;
   $('#kpi-dash').hidden = false;
 }
 
@@ -401,11 +409,11 @@ function diasTexto(m, i) {
 
 function pagoRow(m) {
   const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = diasTexto(m, i);
-  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-action="open" data-kind="gasto" data-id="${esc(m.id)}">
+  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.esProximo ? '<em class="pt-tag">Próximo</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.partial ? `<small>de ${fmtMoney(m.imp)}</small>` : ''}</span>
   </button>`;
 }
@@ -459,13 +467,13 @@ function metasTable(b) {
   }).join('');
   const falta = items.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'meta', 'metas')} · falta ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
+  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'próximo', 'próximos')} · falta ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span>${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
 function renderMetasList(b) {
-  $('#list-caption').textContent = 'Metas';
-  $('#list-count').textContent = `${plural(b.items.length, 'meta', 'metas')} · toca una columna para ordenar`;
+  $('#list-caption').textContent = 'Próximos';
+  $('#list-count').textContent = `${plural(b.items.length, 'próximo', 'próximos')} · toca una columna para ordenar`;
   if (b.items.length) { $('#list').innerHTML = metasTable(b); return; }
   renderList([], '', '', 'metas', b.base.length === 0);
 }
@@ -483,7 +491,7 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
   if (groups.length) { $('#list').innerHTML = groups.map(groupHTML).join(''); return; }
   const isMeta = state.view === 'metas';
   $('#list').innerHTML = baseEmpty
-    ? `<div class="empty"><strong>${isMeta ? 'Aún no hay metas' : `Nada en ${MESES[state.month.month].toLowerCase()}`}</strong>${isMeta ? 'Crea la primera meta de ahorro.' : 'Agrega el primer movimiento de este mes.'}<button type="button" class="btn btn-primary" data-action="add" data-mode="new">${isMeta ? 'Nueva meta' : 'Nuevo movimiento'}</button></div>`
+    ? `<div class="empty"><strong>${isMeta ? 'Aún no hay próximos' : `Nada en ${MESES[state.month.month].toLowerCase()}`}</strong>${isMeta ? 'Agrega el primero: frenos, mantenimiento…' : 'Agrega el primer movimiento de este mes.'}<button type="button" class="btn btn-primary" data-action="add" data-mode="new">${isMeta ? 'Nuevo próximo' : 'Nuevo movimiento'}</button></div>`
     : `<div class="empty"><strong>Sin resultados</strong>Prueba con otro filtro o con otra búsqueda.</div>`;
 }
 
@@ -631,9 +639,9 @@ function openDetail(kind, id) {
 
   let action;
   if (isMeta && i.sinMonto) {
-    action = '<p class="note">Esta meta todavía no tiene monto. Defínelo para empezar a ahorrar.</p>';
+    action = '<p class="note">Este próximo todavía no tiene monto. Defínelo para empezar a ahorrar.</p>';
   } else if (i.done) {
-    action = isMeta ? '<p class="note">Meta alcanzada.</p>' : '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>';
+    action = isMeta ? '<p class="note">Ya lo tienes completo.</p>' : '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>';
   } else {
     action = abonoFormHTML(isMeta, i.pend);
   }
@@ -686,7 +694,7 @@ function submitAbono() {
   if (err) { formError('abono-error', monto > 0 && monto <= falta ? 'abono-fecha' : 'abono', err); return; }
   (m.pagos = m.pagos || []).push({ fecha, monto });
   syncAbo(m);
-  finish(kind, m, m.abo >= m.imp ? (isMeta ? 'Meta alcanzada' : 'Pagado por completo') : `${isMeta ? 'Ahorro registrado' : 'Abono registrado'}: ${fmtMoney(monto)}`);
+  finish(kind, m, m.abo >= m.imp ? (isMeta ? 'Listo, ya lo tienes' : 'Pagado por completo') : `${isMeta ? 'Ahorro registrado' : 'Abono registrado'}: ${fmtMoney(monto)}`);
 }
 
 /* ----- Agregar movimiento: (+) ----- */
@@ -710,7 +718,7 @@ function requestClose() { askDiscard(closeSheet); }
 function addTabs(kind, mode) {
   const isMeta = kind === 'meta';
   return `<div class="mode" role="group" aria-label="Tipo de movimiento">
-    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">${isMeta ? 'Nueva meta' : 'Nuevo pago'}</button>
+    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">${isMeta ? 'Nuevo próximo' : 'Nuevo pago'}</button>
     <button type="button" data-action="add-mode" data-mode="pay" aria-pressed="${mode === 'pay'}">${isMeta ? 'Registrar ahorro' : 'Abonar o pagar'}</button>
   </div>`;
 }
@@ -723,7 +731,7 @@ function payListHTML(kind, q) {
   const arr = (isMeta ? metas.map(procesarMeta) : movimientos.map(procesar))
     .filter(m => m.imp > 0 && m.abo < m.imp && (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q)))
     .sort(porFechaYMonto);
-  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay metas por completar.' : 'No hay pagos pendientes.')}</p>`;
+  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay próximos por completar.' : 'No hay pagos pendientes.')}</p>`;
   return arr.map(m => {
     const i = isMeta ? metaInfo(m) : gastoInfo(m);
     const extra = m.abo > 0 ? ` · ${isMeta ? 'ahorrado' : 'abonado'} ${fmtMoney(m.abo)}` : '';
@@ -780,7 +788,7 @@ function openForm(kind, id) {
   const selected = catLabelOf(catStr);
 
   sheet.ctx = { type: 'form', kind, id: id || null, cat: catStr };
-  openSheet(editing ? (isMeta ? 'Editar meta' : 'Editar movimiento') : 'Agregar movimiento', `
+  openSheet(editing ? (isMeta ? 'Editar próximo' : 'Editar movimiento') : 'Agregar movimiento', `
     ${editing ? '' : addTabs(kind, 'new')}
     <form id="form" novalidate>
       <label for="f-conc">Concepto</label>
@@ -801,7 +809,7 @@ function openForm(kind, id) {
       </div>
       ${editing ? '' : `<label class="switch-row" for="f-paid"><span>${isMeta ? 'Ya tengo el dinero ahorrado' : 'Ya está pagado'}</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <p class="form-error" id="f-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : (isMeta ? 'Guardar meta' : 'Guardar pago')}</button>
+      <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : (isMeta ? 'Guardar próximo' : 'Guardar pago')}</button>
     </form>`);
   if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });
 }
@@ -831,15 +839,15 @@ function submitForm() {
     lsSet(KEYS.cat, cat);
   }
   list.sort(byFecha);
-  finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Meta creada' : 'Pago guardado'));
+  finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Próximo creado' : 'Pago guardado'));
 }
 
 /* ----- Selector de mes ----- */
 function openMonthPicker() {
   const set = new Set([`${HOY.getFullYear()}-${HOY.getMonth()}`, `${state.month.year}-${state.month.month}`]);
-  movimientos.forEach(m => { const d = parseDate(m.fecha); set.add(`${d.getFullYear()}-${d.getMonth()}`); });
+  [...movimientos, ...metas.filter(m => m.imp > 0)].forEach(m => { const d = parseDate(m.fecha); set.add(`${d.getFullYear()}-${d.getMonth()}`); });
   const list = Array.from(set).map(k => { const [y, mo] = k.split('-').map(Number); return { y, mo }; }).sort((a, b) => (a.y * 12 + a.mo) - (b.y * 12 + b.mo));
-  const count = (y, mo) => movimientos.filter(m => { const d = parseDate(m.fecha); return d.getFullYear() === y && d.getMonth() === mo; }).length;
+  const count = (y, mo) => [...movimientos, ...metas.filter(m => m.imp > 0)].filter(m => { const d = parseDate(m.fecha); return d.getFullYear() === y && d.getMonth() === mo; }).length;
   sheet.ctx = { type: 'months' };
   openSheet('Ir a otro mes', `
     <button type="button" class="month-opt today" data-action="pick-today">Ir a hoy<small>${MESES[HOY.getMonth()]} ${HOY.getFullYear()}</small></button>
@@ -889,7 +897,7 @@ async function monthCSS() {
 }
 
 function monthMarkup() {
-  const base = movimientos.map(procesar).filter(m => m.date.getFullYear() === state.month.year && m.date.getMonth() === state.month.month);
+  const base = monthItems();
   const titulo = `${isCurrentMonth() ? HOY.getDate() + ' ' : ''}${MESES[state.month.month]} ${state.month.year}`;
   const list = base.length
     ? pagosTable({ items: base })
@@ -1083,7 +1091,7 @@ function showImportPreview(name, p) {
     <p class="imp-file">${esc(name)}</p>
     <div class="figs">
       <div class="fig"><span>Pagos</span><b>${p.movimientos.length}</b></div>
-      <div class="fig"><span>Metas</span><b>${p.metas.length}</b></div>
+      <div class="fig"><span>Próximos</span><b>${p.metas.length}</b></div>
       <div class="fig"><span>Importe</span><b>${fmtMoney(sum(p.movimientos, 'imp'))}</b></div>
     </div>
     <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos ni metas en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>
@@ -1091,7 +1099,7 @@ function showImportPreview(name, p) {
     ${total && have ? `<div role="radiogroup" aria-labelledby="imp-mode-l">
       <span class="label" id="imp-mode-l">¿Cómo lo importo?</span>
       <label class="opt"><input type="radio" name="imp-mode" value="add" checked><span>Agregar a lo que ya tengo<small>No borra nada; lo que ya existe se actualiza.</small></span></label>
-      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'meta', 'metas')} actuales y deja solo lo del archivo.</small></span></label>
+      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')} actuales y deja solo lo del archivo.</small></span></label>
     </div>` : ''}
     <div class="btn-row">
       <button type="button" class="btn btn-soft" data-action="open-import">Otro archivo</button>
@@ -1118,7 +1126,7 @@ async function applyImport() {
     return toast('No se pudo importar en este dispositivo');
   }
   setView(state.view);
-  toast(`Importado: ${plural(p.movimientos.length, 'pago', 'pagos')} y ${plural(p.metas.length, 'meta', 'metas')}`, { label: 'Deshacer', run: () => undoImport(snap) });
+  toast(`Importado: ${plural(p.movimientos.length, 'pago', 'pagos')} y ${plural(p.metas.length, 'próximo', 'próximos')}`, { label: 'Deshacer', run: () => undoImport(snap) });
 }
 
 async function undoImport(snap) {
@@ -1200,11 +1208,11 @@ document.addEventListener('click', async e => {
     case 'open-import': openImport(); break;
     case 'export-json':
       download(`finanzas-${toISO(HOY)}.json`, exportJSON(movimientos, metas), 'application/json');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'meta', 'metas')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')}`);
       break;
     case 'export-csv':
       download(`finanzas-${toISO(HOY)}.csv`, '\uFEFF' + exportCSV(movimientos, metas), 'text/csv');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'meta', 'metas')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')}`);
       break;
     case 'template': download('plantilla-finanzas.csv', '\uFEFF' + templateCSV(), 'text/csv'); break;
     case 'import-go': await applyImport(); break;

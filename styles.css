@@ -568,6 +568,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .pt-cat .mono { width: 22px; height: 22px; font-size: 12px; }
 .pt-cc { min-width: 0; }
 .pt-conc { display: block; font-size: 14.5px; letter-spacing: -.01em; font-weight: 600; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
+.pt-tag { font-style: normal; font-size: 11px; font-weight: 600; margin-left: 6px; padding: 1px 7px; border-radius: 99px; background: var(--surface-2); color: var(--muted); vertical-align: 2px; letter-spacing: 0; }
 .pt-nota { display: block; font-size: 13px; font-weight: 600; margin-top: 3px; line-height: 1.2; }
 .pt-nota.danger { color: var(--danger); } .pt-nota.warn { color: var(--warn); } .pt-nota.ok { color: var(--ok); }
 .pt-amt { text-align: right; }
