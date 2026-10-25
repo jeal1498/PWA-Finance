@@ -583,6 +583,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .lg-b { background: rgba(239, 68, 68, .14); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .45); }
 .lg-a { background: rgba(34, 197, 94, .14); box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .45); }
 .lg-c, .lg-m { background: rgba(250, 204, 21, .14); box-shadow: inset 0 0 0 1px rgba(250, 204, 21, .45); }
+.kpi-total { background: rgba(244, 244, 239, .08); box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
 .lg-a .kpi-s { color: var(--ok); }
 .lg-c .kpi-s, .lg-m .kpi-s { color: var(--warn); }
 .kpi-lg[aria-pressed="true"], .kpi-total[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
