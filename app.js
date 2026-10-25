@@ -999,7 +999,7 @@ function kpiDashboard(base) {
     </div>
     <div class="kpi-card kpi-meta"><span class="kpi-sec">META DIARIA PARA ESTAR AL DÍA</span><span class="kpi-meta-v">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo en el mes actual'}</span></div>
     <div class="kpi-legend">${tiles}</div>
-    <button type="button" class="kpi-card kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && !state.sort.asc}"><span class="kpi-main"><span class="kpi-sec">RESUMEN OPERATIVO</span><span class="kpi-s">${plural(base.length, 'pago registrado', 'pagos registrados')}</span></span><span class="kpi-aside"><span class="kpi-l">Total cartera</span><span class="kpi-v">${fmtMoney(totalImp)}</span></span></button>`;
+    <button type="button" class="kpi-card kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-main"><span class="kpi-sec">TODO EL MES</span><span class="kpi-s">${plural(base.length, 'pago registrado', 'pagos registrados')}</span></span><span class="kpi-aside"><span class="kpi-l">Total del mes</span><span class="kpi-v">${fmtMoney(totalImp)}</span></span></button>`;
 }
 
 /* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
@@ -1243,7 +1243,7 @@ document.addEventListener('click', async e => {
     case 'month-picker': openMonthPicker(); break;
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
     case 'pick-today': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; closeSheet(); render(); break;
-    case 'resumen': state.filter = 'todos'; state.sort = { col: 'fecha', asc: false }; render(); break;
+    case 'resumen': state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = state.view === 'metas' ? 'sortMetas' : 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': state.filter = t.dataset.filter; render(); break;
     case 'toggle-group': {
