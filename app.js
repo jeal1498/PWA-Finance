@@ -71,8 +71,9 @@ try {
   metas = (await db.all('metas')).sort(byFecha);
 } catch (e) { dbOk = false; }
 
-/* Pagos que se repiten: cada serie crea sola la copia pendiente de cada mes, hasta el mes actual. */
-async function generarRepetidos() {
+/* Pagos que se repiten: cada serie crea sola la copia pendiente de cada mes, hasta el mes siguiente
+   (o hasta el mes que se esté viendo, máximo 12 meses adelante). */
+function generarRepetidos(hasta) {
   const series = new Map();
   movimientos.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
   const nuevos = [];
@@ -85,7 +86,7 @@ async function generarRepetidos() {
     let y = d.getFullYear(), mo = d.getMonth() + 1;
     for (;; mo++) {
       if (mo > 11) { mo = 0; y++; }
-      if (y * 12 + mo > HOY.getFullYear() * 12 + HOY.getMonth()) break;
+      if (y * 12 + mo > hasta) break;
       const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
       const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
       if (items.some(m => m.id === id)) continue;
@@ -94,10 +95,10 @@ async function generarRepetidos() {
     }
   });
   if (!nuevos.length) return;
-  await db.batch({ movimientos: { put: nuevos } });
-  movimientos = (await db.all('movimientos')).sort(byFecha);
+  movimientos.push(...nuevos);
+  movimientos.sort(byFecha);
+  db.batch({ movimientos: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
 }
-if (dbOk) { try { await generarRepetidos(); } catch (e) { console.error('Pagos repetidos', e); } }
 
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
 /* Guarda un registro (o lo borra). Con la hoja conectada y «auto», se envía sola unos segundos después. */
@@ -546,6 +547,8 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
    Render maestro
    ========================================================= */
 function render() {
+  const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
+  generarRepetidos(Math.max(hoyIdx + 1, Math.min(state.month.year * 12 + state.month.month, hoyIdx + 12)));
   const isG = state.view === 'gastos', isP = state.view === 'perfil';
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
