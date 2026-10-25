@@ -912,42 +912,62 @@ function monthMarkup() {
   return new XMLSerializer().serializeToString(box);
 }
 
-async function monthImage() {
+/* WhatsApp reduce toda imagen a ~1600 px de largo (y la pixela si es más larga), así que el mes sale en
+   páginas de 800 px de alto × escala 2 = 1600 px, cortadas entre renglones. */
+const PAGE_H = 800, IMG_SC = 2;
+
+async function monthImages() {
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   const css = await monthCSS(), markup = monthMarkup();
-  // Mide la altura real con un iframe del mismo ancho (así los media queries coinciden).
+  // Mide la altura real y dónde termina cada renglón con un iframe del mismo ancho (así los media queries coinciden).
   const fr = document.createElement('iframe');
   fr.style.cssText = `position:fixed;left:-9999px;top:0;width:${IMG_W}px;height:100px;border:0`;
   fr.srcdoc = `<!DOCTYPE html><html data-theme="${theme}"><head><meta charset="utf-8"><style>${css}</style></head><body>${markup}</body></html>`;
   document.body.appendChild(fr);
-  let H;
+  let H, cuts;
   try {
     await new Promise(r => { fr.onload = r; });
     await fr.contentDocument.fonts.ready;
-    H = Math.ceil(fr.contentDocument.body.firstElementChild.getBoundingClientRect().height);
+    const box = fr.contentDocument.body.firstElementChild, top = box.getBoundingClientRect().top;
+    H = Math.ceil(box.getBoundingClientRect().height);
+    cuts = [...fr.contentDocument.querySelectorAll('.pt-row')].map(r => Math.ceil(r.getBoundingClientRect().bottom - top));
   } finally { fr.remove(); }
-  const svgText = `<svg xmlns="http://www.w3.org/2000/svg" width="${IMG_W}" height="${H}" data-theme="${theme}"><foreignObject x="0" y="0" width="${IMG_W}" height="${H}"><style><![CDATA[${css}]]></style>${markup}</foreignObject></svg>`;
+  // Páginas: cada corte cae en el último renglón que cabe; la última página lleva el resto.
+  const pages = [];
+  for (let y = 0; y < H;) {
+    const fit = cuts.filter(c => c > y && c - y <= PAGE_H);
+    const end = H - y <= PAGE_H * 1.15 ? H : (fit.length ? fit[fit.length - 1] : Math.min(H, y + PAGE_H));
+    pages.push([y, end]);
+    y = end;
+  }
+  // El SVG se rasteriza ya a su tamaño final (ancho × escala), sin escalar un mapa de bits pequeño.
+  const W = IMG_W * IMG_SC, Hs = H * IMG_SC;
+  const svgText = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Hs}" viewBox="0 0 ${IMG_W} ${H}" data-theme="${theme}"><foreignObject x="0" y="0" width="${IMG_W}" height="${H}"><style><![CDATA[${css}]]></style>${markup}</foreignObject></svg>`;
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
   await img.decode();
-  const sc = Math.min(3, 15000 / H);
-  const cv = document.createElement('canvas'); cv.width = Math.round(IMG_W * sc); cv.height = Math.round(H * sc);
-  const x = cv.getContext('2d');
-  x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fbfaf6';
-  x.fillRect(0, 0, cv.width, cv.height);
-  x.drawImage(img, 0, 0, cv.width, cv.height);
-  return new Promise(res => cv.toBlob(res, 'image/png'));
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fbfaf6';
+  return Promise.all(pages.map(([y0, y1]) => {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = (y1 - y0) * IMG_SC;
+    const x = cv.getContext('2d');
+    x.fillStyle = bg; x.fillRect(0, 0, cv.width, cv.height);
+    x.drawImage(img, 0, y0 * IMG_SC, W, cv.height, 0, 0, W, cv.height);
+    return new Promise(res => cv.toBlob(res, 'image/png'));
+  }));
 }
 
 async function shareMonth() {
   const title = `Finanzas · ${MESES[state.month.month]} ${state.month.year}`;
   try {
-    const blob = await monthImage();
-    const file = new File([blob], `finanzas-${state.month.year}-${String(state.month.month + 1).padStart(2, '0')}.png`, { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title }); return; }
-    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    toast('Imagen descargada');
+    const blobs = await monthImages();
+    const base = `finanzas-${state.month.year}-${String(state.month.month + 1).padStart(2, '0')}`;
+    const files = blobs.map((b, i) => new File([b], blobs.length > 1 ? `${base}-${i + 1}.png` : `${base}.png`, { type: 'image/png' }));
+    if (navigator.canShare?.({ files })) { await navigator.share({ files, title }); return; }
+    files.forEach((f, i) => setTimeout(() => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }, i * 300));
+    toast(files.length > 1 ? `${files.length} imágenes descargadas` : 'Imagen descargada');
   } catch (e) { if (e.name !== 'AbortError') toast('No se pudo compartir'); }
 }
 
