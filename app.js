@@ -71,6 +71,34 @@ try {
   metas = (await db.all('metas')).sort(byFecha);
 } catch (e) { dbOk = false; }
 
+/* Pagos que se repiten: cada serie crea sola la copia pendiente de cada mes, hasta el mes actual. */
+async function generarRepetidos() {
+  const series = new Map();
+  movimientos.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
+  const nuevos = [];
+  series.forEach((items, serie) => {
+    items.sort(byFecha);
+    const ult = items[items.length - 1];
+    if (!ult.repite) return;
+    const dia = parseDate(items[0].fecha).getDate();
+    const d = parseDate(ult.fecha);
+    let y = d.getFullYear(), mo = d.getMonth() + 1;
+    for (;; mo++) {
+      if (mo > 11) { mo = 0; y++; }
+      if (y * 12 + mo > HOY.getFullYear() * 12 + HOY.getMonth()) break;
+      const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
+      const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
+      if (items.some(m => m.id === id)) continue;
+      const now = Date.now();
+      nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, createdAt: now, updatedAt: now });
+    }
+  });
+  if (!nuevos.length) return;
+  await db.batch({ movimientos: { put: nuevos } });
+  movimientos = (await db.all('movimientos')).sort(byFecha);
+}
+if (dbOk) { try { await generarRepetidos(); } catch (e) { console.error('Pagos repetidos', e); } }
+
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
 /* Guarda un registro (o lo borra). Con la hoja conectada y «auto», se envía sola unos segundos después. */
 let autoTimer;
@@ -210,7 +238,9 @@ function plazoKey(m) {
 /* Pagos del mes: los movimientos con fecha en el mes y los «Próximos» (metas con monto) que caen en él. */
 const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
 function monthItems() {
-  const pagos = movimientos.map(procesar).filter(m => enMes(m.date));
+  /* En el mes actual también salen los atrasados de meses anteriores. */
+  const inicio = new Date(state.month.year, state.month.month, 1);
+  const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
   const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date));
   return [...pagos, ...proximos];
 }
@@ -409,27 +439,42 @@ function diasTexto(m, i) {
   return i.text;
 }
 
+/* Los atrasados de un pago mensual se juntan en un solo renglón: «$1,500 de $750 · 2 meses». */
+function juntarSeries(items) {
+  const grupos = new Map();
+  items.forEach(m => { if (m.serie && !m.esProximo && m.estado === 'Vencido') (grupos.get(m.serie) || grupos.set(m.serie, []).get(m.serie)).push(m); });
+  const fuera = new Set();
+  const juntos = [];
+  grupos.forEach(g => {
+    if (g.length < 2) return;
+    g.sort((a, c) => a.date - c.date);
+    g.forEach(m => fuera.add(m));
+    juntos.push({ ...g[0], imp: g.reduce((t, m) => t + m.imp, 0), abo: 0, pendiente: g.reduce((t, m) => t + m.pendiente, 0), cuota: g[g.length - 1].imp, meses: g.length });
+  });
+  return fuera.size ? [...items.filter(m => !fuera.has(m)), ...juntos] : items;
+}
+
 function pagoRow(m) {
-  const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = diasTexto(m, i);
+  const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} meses · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
   return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.esProximo ? '<em class="pt-tag">Próximo</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
-    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.partial ? `<small>de ${fmtMoney(m.imp)}</small>` : ''}</span>
+    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.partial || m.meses ? `<small>de ${fmtMoney(m.cuota || m.imp)}</small>` : ''}</span>
   </button>`;
 }
 
 function pagosTable(b) {
   const { col, asc } = state.sort;
-  const items = [...b.items].sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
+  const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
   const head = COLS.map(([k, l, sh]) => {
     const on = col === k;
     return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
   }).join('');
   const pend = sum(items, 'pendiente');
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
+  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span>${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
@@ -809,6 +854,7 @@ function openForm(kind, id) {
       <div class="cat-grid" role="radiogroup" aria-labelledby="f-cat-label">
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
       </div>
+      ${isMeta ? '' : `<label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>`}
       ${editing ? '' : `<label class="switch-row" for="f-paid"><span>${isMeta ? 'Ya tengo el dinero ahorrado' : 'Ya está pagado'}</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <p class="form-error" id="f-error" role="alert"></p>
       <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : (isMeta ? 'Guardar próximo' : 'Guardar pago')}</button>
@@ -834,8 +880,12 @@ function submitForm() {
   let item;
   if (prev) {
     item = Object.assign(prev, { fecha, cat, conc, imp });
+    if (!isMeta) {
+      if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
+    }
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
+    if (!isMeta && $('#f-rep').checked) { item.repite = true; item.serie = item.id; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
@@ -1276,13 +1326,21 @@ document.addEventListener('click', async e => {
       const { kind, id } = sheet.ctx;
       const item = listOf(kind).find(m => m.id === id);
       if (!item) break;
+      /* Si se elimina el último pago de una serie mensual, la serie deja de repetirse. */
+      let previo = null;
+      if (kind !== 'meta' && item.serie && item.repite) {
+        const resto = movimientos.filter(m => m.serie === item.serie && m.id !== id).sort(byFecha);
+        const p = resto[resto.length - 1];
+        if (p && p.fecha <= item.fecha && p.repite) { previo = p; delete p.repite; await persist(kind, p); }
+      }
       if (kind === 'meta') metas = metas.filter(m => m.id !== id); else movimientos = movimientos.filter(m => m.id !== id);
       await unpersist(kind, id);
       closeSheet(); render();
-      toast('Eliminado', { label: 'Deshacer', run: async () => {
+      toast(previo ? 'Eliminado · ya no se repite' : 'Eliminado', { label: 'Deshacer', run: async () => {
         const list = listOf(kind);
         list.push(item);
         list.sort(byFecha);
+        if (previo) { previo.repite = true; await persist(kind, previo); }
         await persist(kind, item); reveal(kind, item); render();
         toast('Restaurado');
       } });
