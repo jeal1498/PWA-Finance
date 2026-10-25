@@ -864,19 +864,10 @@ const ICO = {
   upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>'),
   download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>')
 };
-const themeLabel = () => document.documentElement.dataset.theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
 
 function renderPerfil() {
   const cfg = sync.getCfg();
   $('#perfil').innerHTML = `
-    <h2 class="perfil-h">Apariencia</h2>
-    <div class="menu">
-      <button type="button" class="menu-row" data-action="theme">
-        <svg class="ic i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
-        <svg class="ic i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-        <span><b id="menu-theme">${themeLabel()}</b></span>
-      </button>
-    </div>
     <h2 class="perfil-h">Respaldo y datos</h2>
     <div class="menu">
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de Pagos de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
@@ -917,7 +908,7 @@ function monthMarkup() {
 const PAGE_H = 800, IMG_SC = 2;
 
 async function monthImages() {
-  const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  const theme = 'dark';
   const css = await monthCSS(), markup = monthMarkup();
   // Mide la altura real y dónde termina cada renglón con un iframe del mismo ancho (así los media queries coinciden).
   const fr = document.createElement('iframe');
@@ -1201,12 +1192,6 @@ function shiftMonth(delta) {
   }
 }
 
-function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
-  const m = $('meta[name=theme-color]');
-  if (m) m.content = t === 'dark' ? '#0d1311' : '#eef0ed';
-}
-
 document.addEventListener('click', async e => {
   const t = e.target.closest('[data-action]');
   if (!t) return;
@@ -1214,13 +1199,6 @@ document.addEventListener('click', async e => {
   switch (a) {
     case 'backdrop': if (e.target === t) requestClose(); break;
     case 'close-sheet': requestClose(); break;
-    case 'theme': {
-      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-      applyTheme(next); lsSet(KEYS.theme, next);
-      const lbl = $('#menu-theme');
-      if (lbl) lbl.textContent = themeLabel();
-      break;
-    }
     case 'share-month': shareMonth(); break;
     case 'open-sync': openSync(); break;
     case 'sync-push': syncPush(); break;

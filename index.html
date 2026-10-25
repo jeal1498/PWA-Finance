@@ -3,26 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#eef0ed">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0C0C10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Finanzas</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="favicon.svg">
-<script>
-/* Aplica el tema antes de pintar para evitar el parpadeo. */
-(function () {
-  try {
-    var t = localStorage.getItem('finanzas_theme');
-    if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    document.documentElement.dataset.theme = t;
-    var m = document.querySelector('meta[name=theme-color]');
-    if (m) m.content = t === 'dark' ? '#0d1311' : '#eef0ed';
-  } catch (e) {}
-})();
-</script>
+<script>document.documentElement.dataset.theme = 'dark';</script>
 <link rel="preload" href="fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 </head>

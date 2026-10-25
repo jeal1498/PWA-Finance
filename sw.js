@@ -1,5 +1,5 @@
 // Service worker: Finanzas funciona offline. Sube CACHE en cada cambio o el teléfono no se actualiza.
-const CACHE = 'finanzas-v9';
+const CACHE = 'finanzas-v10';
 const ASSETS = [
   './',
   'index.html',
@@ -14,8 +14,8 @@ const ASSETS = [
   'js/migrar-finanzas.js',
   'js/finance.js',
   'fonts/bricolage-latin.woff2',
-  'fonts/plex-sans-latin.woff2',
-  'fonts/plex-mono-600-latin.woff2',
+  'fonts/dmsans.woff2',
+  'fonts/jetbrains.woff2',
 ];
 
 self.addEventListener('install', (e) => {

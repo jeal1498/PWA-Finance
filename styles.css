@@ -18,56 +18,37 @@
       los pagos y de qué tamaño son.
    ========================================================= */
 :root {
-  --bg: #fbfaf6;
-  --surface: #ffffff;
-  --surface-2: #efebe0;
-  --line: #e8e4d9;
-  --ink: #14201a;
-  --muted: #5c675f;
-  --on-ink: #fbfaf6;
-  --accent: #0b7a55;
-  --on-accent: #ffffff;
-  --focus: #2f6bff;
-  --field-line: #77837c;  /* borde de campos y controles: 3:1 o más (WCAG 1.4.11) */
+  /* Identidad de la familia Checa (igual que Garaje y Clientela): solo oscuro. */
+  --bg: #0C0C10;
+  --surface: #16161C;
+  --surface-2: #1C1C24;
+  --line: #2A2A33;
+  --ink: #F4F4EF;
+  --muted: #A3A3AD;
+  --on-ink: #0C0C10;
+  --accent: #F4F4EF;
+  --on-accent: #0C0C10;
+  --focus: #F4F4EF;
+  --field-line: #6B6B78;  /* borde de campos y controles: 3:1 o más (WCAG 1.4.11) */
 
-  --danger: #b42318;  --danger-bg: #fde4e0;
-  --warn: #9c5700;    --warn-bg: #fbeacc;
-  --ok: #1a6e3d;      --ok-bg: #d8efdf;
+  --danger: #EF4444;  --danger-bg: #2A1417;
+  --warn: #FACC15;    --warn-bg: #2B2508;
+  --ok: #22C55E;      --ok-bg: #0F2A1A;
 
   --hero-ink: var(--ink);
   --hero-muted: var(--muted);
   --hero-line: var(--line);
-  --bar-late: #d4372a;
-  --bar-soon: #e08a00;
-  --bar-later: #cfc9b8;
-  --bar-paid: #0b7a55;
+  --bar-late: #EF4444;
+  --bar-soon: #FACC15;
+  --bar-later: #3A3A45;
+  --bar-paid: #22C55E;
 
-  --shadow: 0 1px 2px rgba(20, 32, 26, .06);
-  --font: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --shadow: none;
+  --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-title: 'Bricolage Grotesque', 'Arial Black', sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 }
-:root[data-theme="dark"] {
-  --bg: #0d1311;
-  --surface: #151d19;
-  --surface-2: #1e2824;
-  --line: #29342f;
-  --ink: #e9f0eb;
-  --muted: #94a39b;
-  --on-ink: #0d1511;
-  --focus: #7da2ff;
-  --field-line: #66756d;
-
-  --danger: #ff8c80;  --danger-bg: #3a1a17;
-  --warn: #f2b552;    --warn-bg: #3a2a0d;
-  --ok: #6fd09a;      --ok-bg: #143222;
-
-  --accent: #4fcf9b;
-  --on-accent: #06241a;
-  --bar-late: #ff8f84;
-  --bar-soon: #ffc266;
-  --bar-later: #55655d;
-  --bar-paid: #5fcf94;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
-}
+:root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
@@ -517,8 +498,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .header-title-row h1 { font-size: 30px; }
 
 .hp-label:disabled { cursor: default; }
-:root { --meta: #6b4fd6; --meta-bg: #ece6ff; }
-:root[data-theme="dark"] { --meta: #b9a3ff; --meta-bg: #241f3a; }
+:root { --meta: #F4F4EF; --meta-bg: #16161C; }
 .kpi-alert-meta { background: var(--meta-bg); }
 .kpi-alert-meta .kpi-alert-ico { color: var(--meta); background: color-mix(in srgb, var(--meta) 16%, transparent); }
 .kpi-alert-meta .kpi-sec { color: var(--meta); }
@@ -532,10 +512,10 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
    Pagos como tabla (propuesta 2): IBM Plex para la tabla, Bricolage en el resto.
    Estatus con ícono + texto (el color no es la única señal); vencidos teñidos.
    ========================================================= */
-@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('fonts/plex-sans-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('fonts/plex-mono-600-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 100 1000; font-display: swap; src: url('fonts/dmsans.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url('fonts/jetbrains.woff2') format('woff2'); }
 
-.pt { --sans: 'IBM Plex Sans', var(--font); --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-family: var(--sans); background: var(--surface); border: 1px solid var(--line); border-radius: 22px; overflow: clip; }
+.pt { --sans: var(--font); --mono: var(--font-data); font-family: var(--sans); background: var(--surface); border: 1px solid var(--line); border-radius: 22px; overflow: clip; }
 .pt-cols { display: grid; grid-template-columns: 40px 40px 50px minmax(0, 1fr) minmax(54px, max-content); column-gap: 4px; padding-inline: 8px; width: 100%; }
 .pt-th { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .pt-h { display: flex; }
@@ -588,3 +568,38 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .perfil { padding-top: 8px; }
 .perfil-h { font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 18px 4px 6px; }
 .perfil .menu { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 6px; margin-top: 0; }
+
+/* =========================================================
+   Identidad familia Checa: títulos Bricolage 800, texto DM Sans, cifras JetBrains Mono.
+   El color solo significa estado (verde pagado, amarillo por vencer, rojo atrasado).
+   ========================================================= */
+.hp-label, .header-title-row h1, #list-caption, .hero-amount, .kpi-meta-v, .kpi-v, .kpi-alert-v, .sheet-head h2, .pt-fecha b, .group-name { font-family: var(--font-title); font-weight: 800; }
+.kpi-sec, .kpi-lg-m, .pt-th, .chip .n { font-family: var(--font-data); }
+.kpi-sec { font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.kpi-lg-m { font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
+.kpi-card, .kpi-lg { background: var(--surface); }
+.kpi-card { border-radius: 28px; }
+.kpi-lg { border-radius: 20px; }
+.lg-b { background: rgba(239, 68, 68, .14); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .45); }
+.kpi-lg[aria-pressed="true"], .kpi-total[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.pt { border: 0; border-radius: 24px; }
+.pt-row.v { background: rgba(239, 68, 68, .14); }
+.pt-row { border-top-color: var(--bg); }
+.pt-th { background: var(--surface-2); border-bottom: 0; }
+.pt-foot { background: var(--surface-2); border-top: 0; }
+
+/* Atención inmediata: tarjeta amarilla llena */
+.kpi-alert { background: var(--warn); color: #2B2200; border-radius: 28px; }
+.kpi-alert .kpi-alert-ico { color: #2B2200; background: rgba(43, 34, 0, .14); }
+.kpi-alert .kpi-sec { color: #2B2200; font-weight: 700; }
+.kpi-alert-meta { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px #3A3A45; }
+.kpi-alert-meta .kpi-alert-ico { color: var(--ink); background: #222826; }
+.kpi-alert-meta .kpi-sec { color: var(--muted); }
+.lg-m .kpi-lg-t, .lg-m .kpi-lg-m { color: var(--warn); }
+
+/* Barra inferior */
+.bottom-nav, .bottom-nav-inner { background: var(--surface); }
+.bottom-nav { border-top: 1px solid #3A3A45; backdrop-filter: none; }
+.nav-btn[aria-current="page"]::before { display: none; }
+.nav-add { border-color: var(--bg); box-shadow: none; }
+.btn-soft { background: var(--surface-2); }
