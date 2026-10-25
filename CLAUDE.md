@@ -22,7 +22,7 @@ PWA de uso propio para llevar **pagos con abonos y metas de ahorro**. Antes viv�
 - Respaldo en Google Sheets: Perfil → «Sincronizar» (`sync.js`) usa la hoja y el script que se conectan en SecondBrain → Respaldo (enlace desde la app).
 
 ## Modelo
-`movimientos` {id, fecha 'YYYY-MM-DD', cat 'emoji Nombre', conc, imp, abo, pagos [{fecha|null, monto}]} y `metas` (misma forma). `abo` = suma de `pagos`. Los pagos pueden traer `repite: true` y `serie` (id del primero): `generarRepetidos()` (al abrir) crea sola la copia pendiente de cada mes hasta el mes actual (id `<serie>-AAAAMM`, mismo día del primero); eliminar el último de la serie la detiene. 7 categorías en el formulario (Finanzas, Vehículo, Yo, Karen, Julieta, Servicios, Familia); las viejas se muestran pero ya no se eligen.
+`movimientos` {id, fecha 'YYYY-MM-DD', cat 'emoji Nombre', conc, imp, abo, pagos [{fecha|null, monto}]} y `metas` (misma forma). `abo` = suma de `pagos`. Los pagos pueden traer `repite: true` y `serie` (id del primero): `generarRepetidos()` (al abrir) crea sola la copia pendiente de cada mes (id `<serie>-AAAAMM`, mismo día del primero) hasta el mes siguiente o el mes que se esté viendo; eliminar el último de la serie la detiene. 7 categorías en el formulario (Finanzas, Vehículo, Yo, Karen, Julieta, Servicios, Familia); las viejas se muestran pero ya no se eligen.
 
 ## Archivos
 - `index.html`, `styles.css`, `app.js` (módulo principal), `datos.js` (importar/exportar JSON y CSV, puro sin DOM), `sync.js` (Sheets), `sw.js`, `manifest.webmanifest`, `favicon.svg`, `fonts/` (Bricolage, DM Sans, JetBrains Mono).
