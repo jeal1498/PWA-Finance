@@ -62,7 +62,7 @@ export async function push(movimientos, metas, { force = false, dbOk = true } = 
     throw e;
   }
   const raw = JSON.stringify({ app: 'finanzas', movimientos, metas });
-  const out = await call(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, tables: tables(movimientos, metas), raw }) });
+  const out = await call(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, tables: tables(movimientos, metas), raw, force }) });
   if (!out.ok) throw new Error(out.error || 'Error en la hoja');
   setCfg({ last: Date.now(), error: '', count: total });
 }
