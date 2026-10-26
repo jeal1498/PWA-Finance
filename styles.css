@@ -774,3 +774,27 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .ap-row .pt-amt b { font-family: var(--font-data); font-size: 15px; font-weight: 600; }
 .ap-tbl { overflow-y: auto; overscroll-behavior: contain; }
 body:has(#apartar:not([hidden])) { padding-bottom: 0; }
+.ap-side { display: grid; gap: 10px; align-content: start; }
+.ap-th, .ap-x { display: none; }
+@media (min-width: 768px) {
+  body:has(#apartar:not([hidden])) .app { max-width: 1100px; }
+  .apartar { grid-template-columns: 290px minmax(0, 1fr); gap: 20px; align-items: start; padding-top: 12px; }
+  .ap-side { gap: 12px; }
+  .ap-hero { padding: 20px; }
+  .ap-big { font-size: 54px; margin-top: 8px; }
+  .ap-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ap-chip { height: 66px; padding: 10px 12px; border-radius: 16px; }
+  .ap-chip span { font-size: 10px; }
+  .ap-chip b { font-size: 16px; }
+  .ap-ya { display: block; padding: 14px 16px; border-radius: 18px; }
+  .ap-ya b { display: block; font-size: 26px; margin: 6px 0 2px; }
+  .ap-main .perfil-h { display: none; }
+  .ap-th, .ap-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) 80px 100px 120px; column-gap: 10px; padding: 0 18px; }
+  .ap-th { position: sticky; top: 0; z-index: 2; align-items: center; height: 42px; background: var(--surface); border-bottom: 1px solid var(--line); font-family: var(--font-data); font-size: 10px; font-weight: 600; letter-spacing: .12em; color: var(--muted); }
+  .ap-th span:nth-child(n+3) { text-align: right; }
+  .ap-row { min-height: 52px; }
+  .ap-x { display: block; text-align: right; font-family: var(--font-data); font-size: 13px; color: var(--muted); }
+  .ap-nota { display: none; }
+  .ap-row .pt-amt { text-align: right; }
+  .ap-row .pt-amt b { font-size: 17px; }
+}

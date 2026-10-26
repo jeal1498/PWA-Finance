@@ -1007,14 +1007,19 @@ function renderApartar() {
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
   const rows = fut.map(m => `<button type="button" class="pt-row ap-row" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}">
       <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
-      <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota">${plural(m.d, 'día', 'días')} · ${fmtMoney(m.pend)}</span></span>
+      <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota ap-nota">${plural(m.d, 'día', 'días')} · ${fmtMoney(m.pend)}</span></span>
+      <span class="ap-x">${plural(m.d, 'día', 'días')}</span><span class="ap-x">${fmtMoney(m.pend)}</span>
       <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b></span>
     </button>`).join('');
   $('#apartar').innerHTML = `
-    <div class="ap-hero"><span class="kpi-sec">APARTAR POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span><span class="ap-big">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">para llegar a cada fecha de pago</span></div>
-    <div class="ap-chips" role="group" aria-label="Periodo">${chips}</div>
-    ${ya.length ? `<button type="button" class="ap-ya" data-action="resumen-ya"><span><span class="kpi-sec">PAGAR YA</span><span class="kpi-s">${nota}</span></span><b>${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))}</b></button>` : ''}
-    ${fut.length ? `<h2 class="perfil-h">Por concepto · ${per[1].toLowerCase()}</h2><div class="ap-tbl">${rows}</div>` : `<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>`}`;
+    <div class="ap-side">
+      <div class="ap-hero"><span class="kpi-sec">APARTAR POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span><span class="ap-big">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">para llegar a cada fecha de pago</span></div>
+      <div class="ap-chips" role="group" aria-label="Periodo">${chips}</div>
+      ${ya.length ? `<button type="button" class="ap-ya" data-action="resumen-ya"><span><span class="kpi-sec">PAGAR YA</span><span class="kpi-s">${nota}</span></span><b>${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))}</b></button>` : ''}
+    </div>
+    <div class="ap-main">
+      ${fut.length ? `<h2 class="perfil-h">Por concepto · ${per[1].toLowerCase()}</h2><div class="ap-tbl"><div class="ap-th" aria-hidden="true"><span></span><span>CONCEPTO</span><span>FALTAN</span><span>PENDIENTE</span><span>POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span></div>${rows}</div>` : `<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>`}
+    </div>`;
   fitApartar();
 }
 
