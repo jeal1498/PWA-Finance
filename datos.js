@@ -99,7 +99,7 @@ function fromJSON(text, cats) {
     let id = typeof x.id === 'string' && x.id.trim() ? x.id.trim() : null;
     if (id && seen.has(id)) return out.skipped.push({ where: `${where} (${conc})`, reason: 'Id repetido en el archivo' });
     if (id) seen.add(id); else id = makeId(kind, fecha, conc, imp, cat, seen);
-    target.push(item({ id, fecha, cat, conc, imp, pagos, createdAt: x.createdAt, ...(kind === 'pago' ? { repite: x.repite, serie: x.serie, fin: x.fin } : {}) }));
+    target.push(item({ id, fecha, cat, conc, imp, pagos, createdAt: x.createdAt, repite: x.repite, serie: x.serie, fin: x.fin }));
   });
   run(data.movimientos, 'pago', out.movimientos);
   run(data.metas, 'meta', out.metas);

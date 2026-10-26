@@ -74,8 +74,13 @@ try {
 /* Pagos que se repiten: cada serie crea sola la copia pendiente de cada mes, hasta el mes siguiente
    o hasta su fecha de fin (`fin`). */
 function generarRepetidos(hasta) {
+  generarSeries(movimientos, 'movimientos', hasta);
+  generarSeries(metas, 'metas', hasta);
+}
+
+function generarSeries(lista, store, hasta) {
   const series = new Map();
-  movimientos.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
+  lista.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
   const nuevos = [];
   series.forEach((items, serie) => {
     items.sort(byFecha);
@@ -96,9 +101,9 @@ function generarRepetidos(hasta) {
     }
   });
   if (!nuevos.length) return;
-  movimientos.push(...nuevos);
-  movimientos.sort(byFecha);
-  db.batch({ movimientos: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
+  lista.push(...nuevos);
+  lista.sort(byFecha);
+  db.batch({ [store]: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
 }
 
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
@@ -845,12 +850,12 @@ function openForm(kind, id) {
       <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}"></label>
       <div class="two-col">
         <label class="fld" for="f-imp"><span>${isMeta ? 'Monto' : 'Importe'}</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
-        <label class="fld" for="f-fecha"><span>${isMeta ? 'Límite' : 'Vence'}</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}"></label>
+        <label class="fld" for="f-fecha"><span>${isMeta ? 'Hasta' : 'Vence'}</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}"></label>
       </div>
       <div class="cat-grid" role="radiogroup" aria-label="Categoría">
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
       </div>
-      ${isMeta ? '' : `<div class="rep-card">
+      ${`<div class="rep-card">
         <label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
         <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
           <label class="fin-row" for="f-fin"><span>Termina</span><input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}"></label>
@@ -877,8 +882,8 @@ function actualizarFin() {
   const fecha = $('#f-fecha').value, fin = $('#f-fin').value, hint = $('#f-fin-hint');
   if (!fin || !fecha) { hint.textContent = 'Se repite hasta que lo detengas.'; return; }
   /* Calendario completo de la serie desde su primer pago; los ya pagados no cuentan como pendientes. */
-  const id = sheet.ctx.id, prev = id ? movimientos.find(m => m.id === id) : null;
-  const otros = prev && prev.serie ? movimientos.filter(m => m.serie === prev.serie && m.id !== id).sort(byFecha) : [];
+  const lista = listOf(sheet.ctx.kind), id = sheet.ctx.id, prev = id ? lista.find(m => m.id === id) : null;
+  const otros = prev && prev.serie ? lista.filter(m => m.serie === prev.serie && m.id !== id).sort(byFecha) : [];
   const inicio = otros.length && otros[0].fecha < fecha ? otros[0].fecha : fecha;
   const d = parseDate(inicio);
   const pagado = new Map(otros.map(m => [m.fecha, m.abo >= m.imp]));
@@ -903,7 +908,7 @@ function submitForm() {
   const list = listOf(kind);
   const prev = id ? list.find(m => m.id === id) : null;
   if (id && !prev) return;
-  const fin = isMeta || !$('#f-rep').checked ? '' : $('#f-fin').value;
+  const fin = !$('#f-rep').checked ? '' : $('#f-fin').value;
   const err = !fecha ? (isMeta ? 'Selecciona la fecha límite.' : 'Selecciona una fecha.')
     : fin && fin < fecha ? 'La fecha de fin no puede ser anterior al vencimiento.'
     : imp < 0 ? 'El monto no puede ser negativo.'
@@ -914,11 +919,11 @@ function submitForm() {
   let item;
   if (prev) {
     item = Object.assign(prev, { fecha, cat, conc, imp });
-    if (!isMeta) {
+    {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
       if (fin) item.fin = fin; else delete item.fin;
       /* Repetir y fin valen para toda la serie. */
-      if (item.serie) movimientos.filter(m => m.serie === item.serie && m !== item).forEach(m => {
+      if (item.serie) list.filter(m => m.serie === item.serie && m !== item).forEach(m => {
         if (item.repite) m.repite = true; else delete m.repite;
         if (item.fin) m.fin = item.fin; else delete m.fin;
         persist(kind, m);
@@ -926,7 +931,7 @@ function submitForm() {
     }
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
-    if (!isMeta && $('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; }
+    if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
@@ -1369,8 +1374,8 @@ document.addEventListener('click', async e => {
       if (!item) break;
       /* Si se elimina el último pago de una serie mensual, la serie deja de repetirse. */
       let previo = null;
-      if (kind !== 'meta' && item.serie && item.repite) {
-        const resto = movimientos.filter(m => m.serie === item.serie && m.id !== id).sort(byFecha);
+      if (item.serie && item.repite) {
+        const resto = listOf(kind).filter(m => m.serie === item.serie && m.id !== id).sort(byFecha);
         const p = resto[resto.length - 1];
         if (p && p.fecha <= item.fecha && p.repite) { previo = p; delete p.repite; await persist(kind, p); }
       }
