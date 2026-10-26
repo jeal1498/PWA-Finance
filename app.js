@@ -1051,6 +1051,9 @@ function renderApartar() {
   const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
   const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
+  const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
+  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
+  const pctVentana = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
   const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = APARTAR.map(([k, l, len]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${l}</span><span><span class="kpi-lg-m">${fmtMoney(tot(len))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
@@ -1059,7 +1062,7 @@ function renderApartar() {
       <span class="kpi-main"><span class="kpi-sec">PAGAR YA</span><span class="kpi-alert-v">${ya.length ? `${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))} · ${plural(ya.length, 'pago', 'pagos')}` : 'Nada atrasado'}</span>${nota ? `<span class="kpi-alert-note">${nota}</span>` : ''}</span>
     </div>
     <div class="kpi-pair">
-      <div class="kpi-lg"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></div>
+      <button type="button" class="kpi-lg" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></button>
       <div class="kpi-lg kpi-total"><span class="kpi-sec">PENDIENTE</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${plural(all.length, 'pago', 'pagos')} · 30 días</span></span></div>
     </div>
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
@@ -1172,7 +1175,7 @@ async function shareMonth() {
 
 /* Fondo de pantalla 9:16 con la meta diaria al centro (al tocar el mosaico «Meta diaria»). */
 async function shareFondo(d) {
-  if (!isCurrentMonth()) { toast('La meta diaria es del mes actual'); return; }
+  if (!d.apartar && !isCurrentMonth()) { toast('La meta diaria es del mes actual'); return; }
   const meta = +d.meta || 0, dias = +d.dias || 1, pct = Math.min(100, +d.pct || 0), porv = +d.porv || 0;
   try {
     await Promise.all(['800 40px "Bricolage Grotesque"', '500 20px "DM Sans"', '600 20px "JetBrains Mono"'].map(f => document.fonts.load(f)));
@@ -1184,7 +1187,7 @@ async function shareFondo(d) {
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.textAlign = 'center'; x.textBaseline = 'alphabetic';
     if ('letterSpacing' in x) x.letterSpacing = '12px';
-    x.fillStyle = 'rgba(244,244,239,.55)'; x.font = '600 34px "JetBrains Mono"'; x.fillText('META DIARIA', 546, 740);
+    x.fillStyle = 'rgba(244,244,239,.55)'; x.font = '600 34px "JetBrains Mono"'; x.fillText(d.label || 'META DIARIA', 546, 740);
     x.letterSpacing = '-10px';
     const num = meta.toLocaleString('es-MX'), nf = '800 250px "Bricolage Grotesque"';
     x.font = nf; const nw = x.measureText(num).width;
