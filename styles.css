@@ -822,3 +822,5 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .header { display: none; }
 .app { padding-top: calc(14px + env(safe-area-inset-top)); }
 .pt-mes { display: flex; align-items: center; justify-content: center; width: 100%; height: 44px; padding: 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font-family: var(--font-title); font-size: 17px; font-weight: 800; letter-spacing: -.02em; touch-action: pan-y pinch-zoom; }
+
+.kpi-legend.ap4 .lg-p { align-items: center; text-align: center; }
