@@ -1,5 +1,5 @@
 // Service worker: Finanzas funciona offline. Sube CACHE en cada cambio o el teléfono no se actualiza.
-const CACHE = 'finanzas-v76';
+const CACHE = 'finanzas-v77';
 const ASSETS = [
   './',
   'index.html',
@@ -38,7 +38,16 @@ self.addEventListener('activate', (e) => {
   })());
 });
 
-// Primero la red (con 4 s de espera); sin internet o muy lenta, responde lo guardado.
+// Una respuesta solo se guarda (y solo vale) si es de verdad el archivo: 2xx, sin redirección y del tipo esperado
+// (un portal de wifi o un error del servidor devuelven HTML y no deben quedar como si fueran el JS o el CSS).
+const valida = (req, res) => {
+  if (!res.ok || res.redirected) return false;
+  const tipo = (res.headers.get('content-type') || '').toLowerCase();
+  const html = tipo.includes('text/html');
+  return req.mode === 'navigate' || req.destination === 'document' ? html : !html;
+};
+
+// Primero la red (con 4 s de espera); sin internet, lenta o con una respuesta inválida, responde lo guardado.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
@@ -46,7 +55,8 @@ self.addEventListener('fetch', (e) => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req, { ignoreSearch: true });
     const net = fetch(req, { cache: 'no-cache' }).then((res) => {
-      if (res.ok) cache.put(req, res.clone());
+      if (valida(req, res)) { cache.put(req, res.clone()); return res; }
+      if (cached) throw new Error('respuesta no válida');
       return res;
     });
     if (!cached) return net.catch(() => (req.mode === 'navigate' ? cache.match('index.html') : Response.error()));
