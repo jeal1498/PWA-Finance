@@ -1199,7 +1199,9 @@ function renderPerfil() {
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
    (pagos y planes con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
-const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quincena', 'Quincena', 15], ['mes', 'Mes', 30]];
+const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7]];
+/* Semana = la del calendario (lunes a domingo): suma el monto completo de lo que vence de hoy al domingo; «Día» reparte entre los días que faltan. */
+const diasHastaDomingo = () => (7 - HOY.getDay()) % 7;
 function apartarItems() {
   const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
   const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
@@ -1214,17 +1216,20 @@ const desglose = lista => { const pl = lista.filter(m => m.kind === 'meta').leng
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
-  const tot = len => fut.reduce((t, m) => t + apartarMonto(m, len), 0);
+  const enSemana = m => m.d <= diasHastaDomingo();
+  const lista = per[0] === 'semana' ? fut.filter(enSemana) : fut;
+  const monto = m => per[0] === 'semana' ? m.pend : apartarMonto(m, 1);
+  const totPer = k => k === 'semana' ? fut.filter(enSemana).reduce((t, m) => t + m.pend, 0) : fut.reduce((t, m) => t + apartarMonto(m, 1), 0);
   const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
   const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
   const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
   const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
   const pctVentana = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
-  const tiles = APARTAR.map(([k, l, len]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${len === 1 ? '1 Día' : `${len} Días`}</span><span><span class="kpi-lg-m">${fmtMoney(tot(len))}</span></span></button>`).join('');
+  const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : 'Semana'}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
     <div class="kpi-split">
-      <button type="button" class="kpi-half" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${desglose(fut)}</span></button>
+      <button type="button" class="kpi-half" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : 'SEMANAL'}" data-meta="${totPer(per[0])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span class="kpi-pv">${fmtMoney(totPer(per[0]))}</span><span class="kpi-s">${desglose(lista)}</span></button>
       <span class="kpi-div" aria-hidden="true"></span>
       <div class="kpi-half"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${desglose(all)}</span></div>
     </div>
@@ -1233,20 +1238,20 @@ function renderApartar() {
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
-  if (!fut.length) { $('#list').innerHTML = '<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>'; return; }
+  if (!lista.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'semana' ? 'Nada más vence esta semana.' : 'No hay pagos pendientes con fecha futura.'}</div>`; return; }
   const head = [['Fecha', ''], ['Est.', ''], ['Cat.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
-  const rows = fut.map(m => {
+  const rows = lista.map(m => {
     const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
-    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(apartarMonto(m, per[2]))} de ${fmtMoney(m.pend)}`)}">
+    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.kind === 'meta' ? '<em class="pt-tag">Plan</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
-    <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b></span>
+    <span class="pt-amt"><b>${fmtMoney(monto(m))}</b></span>
   </button>`;
   }).join('');
-  const cats = [...new Map(fut.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(fut.length, 'pago', 'pagos')} · por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}</span><b>${fmtMoney(tot(per[2]))}</b></div></div>
+  const cats = [...new Map(lista.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : 'esta semana (lun–dom)'}</span><b>${fmtMoney(totPer(per[0]))}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
