@@ -1230,12 +1230,7 @@ function renderApartar() {
   const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
     <div class="kpi-ya${ya.length ? '' : ' ok'}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></div>
-    <div class="kpi-split">
-      <button type="button" class="kpi-half" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}" data-meta="${totPer(per[0])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">${per[0] === 'quince' ? 'A 15 DÍAS' : `POR ${pLabel}`}</span><span class="kpi-pv">${fmtMoney(totPer(per[0]))}</span><span class="kpi-s">${desglose(lista)}</span></button>
-      <span class="kpi-div" aria-hidden="true"></span>
-      <div class="kpi-half"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${desglose(all)}</span></div>
-    </div>
-    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
+    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}<button type="button" class="kpi-lg lg-p kpi-fondo" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}" data-meta="${totPer(per[0])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}" aria-label="Generar fondo de pantalla">${ICO.upload}</button></div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
@@ -1252,7 +1247,7 @@ function renderApartar() {
   </button>`;
   }).join('');
   const cats = [...new Map(lista.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div></div>
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total 30 días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
