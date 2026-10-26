@@ -63,6 +63,8 @@ const TAG_ICON = '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6
 const catIcon = c => c.mono ? `<span class="mono" aria-hidden="true">${c.mono}</span>` : svg(c.icon || TAG_ICON);
 const catString = c => `${c.emoji} ${c.id}`;
 const catLabelOf = str => { const s = String(str); const i = s.indexOf(' '); return i >= 0 ? s.slice(i + 1) : s; };
+/* Conceptos con el mismo nombre se relacionan (sin importar mayúsculas, acentos ni espacios dobles). */
+const llave = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelOf(str), emoji: '•' };
 
 /* =========================================================
@@ -547,7 +549,7 @@ function pagoRow(m) {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
+    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${!m.esProximo && enMes(m.date) && (chipMes.get(llave(m.conc)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llave(m.conc))} pagos con este nombre este mes">×${chipMes.get(llave(m.conc))}</em>` : ''}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : `<small class="pt-ap"><span class="w">apartar </span><i>${fmtMoney(Math.ceil(i.pend / daysFromToday(m.date)))}</i>/día</small>`)}</span>
   </button>`;
 }
@@ -555,7 +557,15 @@ function pagoRow(m) {
 /* El mes va dentro de la tabla de Pagos: se toca para elegir mes o se desliza para cambiarlo. */
 const mesBar = () => `<button type="button" class="pt-mes" data-action="month-picker" aria-haspopup="dialog">${MESES[state.month.month]} ${state.month.year}</button>`;
 
+/* «×N»: cuántos pagos con ese nombre hay en el mes que se ve (no cuenta los 30 días siguientes ni los atrasados de otros meses). */
+let chipMes = new Map();
+function calcularChips() {
+  chipMes = new Map();
+  for (const x of movimientos) if (enMes(parseDate(x.fecha))) { const k = llave(x.conc); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
+}
+
 function pagosTable(b) {
+  calcularChips();
   const { col, asc } = state.sort;
   const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
   const head = COLS.map(([k, l, sh]) => {
@@ -820,6 +830,21 @@ function submitAbonoEdit() {
   finish(kind, m, kind === 'meta' ? 'Ahorro actualizado' : 'Abono actualizado');
 }
 
+function conceptoHTML(m) {
+  const k = llave(m.conc), anio = m.fecha.slice(0, 4);
+  const grupo = movimientos.filter(x => llave(x.conc) === k && x.fecha.slice(0, 4) === anio).sort(byFecha);
+  if (grupo.length < 2) return '';
+  const total = sum(grupo, 'imp');
+  const ult = grupo.filter(x => x.id !== m.id && x.abo >= x.imp).pop();
+  const sig = grupo.find(x => x.id !== m.id && x.fecha > m.fecha && x.abo < x.imp);
+  const fila = (t, v) => `<div class="hist-row"><span>${t}</span><b>${v}</b></div>`;
+  return `<div class="hist concepto">
+    <div class="hist-head"><h3>Historial de «${esc(m.conc)}» · ${anio}</h3><span>${plural(grupo.length, 'pago', 'pagos')}</span></div>
+    ${fila('Total del año', fmtMoney(total))}${fila('Promedio por pago', fmtMoney(Math.round(total / grupo.length * 100) / 100))}
+    ${ult ? fila('Último pagado', `${fmtDate(ult.fecha)} · ${fmtMoney(ult.imp)}`) : ''}${sig ? fila('Siguiente', `${fmtDate(sig.fecha)} · ${fmtMoney(sig.imp)}`) : ''}
+  </div>`;
+}
+
 function openDetail(kind, id) {
   const isMeta = kind === 'meta';
   const raw = listOf(kind).find(m => m.id === id);
@@ -838,6 +863,7 @@ function openDetail(kind, id) {
 
   sheet.ctx = { type: 'detail', kind, id };
   openSheet(m.conc, `${summaryHTML(m, i, isMeta)}
+    ${isMeta ? '' : conceptoHTML(m)}
     ${action}
     ${historialHTML(m, isMeta)}
     <div class="btn-row">
@@ -974,6 +1000,30 @@ function defaultDate(isMeta) {
   return toISO(new Date(state.month.year, state.month.month, 1));
 }
 
+/* Conceptos que ya existen (por nombre): categoría y importe más usados para sugerirlos al escribir. */
+function sugerencias(texto, kind) {
+  const q = llave(texto);
+  if (!q) return [];
+  const g = new Map();
+  for (const x of listOf(kind).slice().sort(byFecha)) {
+    const k = llave(x.conc);
+    if (!k.includes(q)) continue;
+    const e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, imps: new Map() };
+    e.nombre = x.conc; e.cat = x.cat; e.n++;
+    e.imps.set(x.imp, { n: ((e.imps.get(x.imp) || {}).n || 0) + 1, ult: e.n });
+    g.set(k, e);
+  }
+  return [...g.values()].map(e => ({ ...e, imp: [...e.imps.entries()].sort((a, b) => b[1].n - a[1].n || b[1].ult - a[1].ult)[0][0] })).sort((a, b) => b.n - a.n).slice(0, 4);
+}
+function pintarSugerencias() {
+  const box = $('#f-sug'), inp = $('#f-conc');
+  if (!box || !inp || !sheet.ctx || sheet.ctx.id) return;
+  const lista = sugerencias(inp.value, sheet.ctx.kind);
+  sheet.sug = lista;
+  box.hidden = !lista.length;
+  box.innerHTML = lista.map((s, i) => `<button type="button" class="sug-i" data-action="sug-pick" data-i="${i}"><span class="dot" data-cat="${esc(catLabelOf(s.cat))}"></span><span class="sug-t"><b>${esc(s.nombre)}</b><small>${esc(catLabelOf(s.cat))} · ${plural(s.n, 'pago', 'pagos')} · suele ser ${fmtMoney(s.imp)}</small></span><i>USAR</i></button>`).join('');
+}
+
 function openForm(kind, id) {
   const isMeta = kind === 'meta';
   const editing = id ? listOf(kind).find(m => m.id === id) : null;
@@ -987,6 +1037,7 @@ function openForm(kind, id) {
     ${editing ? '' : addTabs(kind, 'new')}
     <form id="form" class="fform" novalidate>
       <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}"></label>
+      ${editing ? '' : '<div class="sug" id="f-sug" hidden></div>'}
       <div class="two-col">
         <label class="fld" for="f-imp"><span>${isMeta ? 'Monto' : 'Importe'}</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
         <label class="fld" for="f-fecha"><span>${isMeta ? 'Hasta' : 'Vence'}</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}"></label>
@@ -1110,9 +1161,32 @@ function openMonthPicker() {
    Más opciones: tema, importar y exportar
    ========================================================= */
 const ICO = {
+  list: svg('<path d="M4 6h16M4 12h16M4 18h10"/>'),
   upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>'),
   download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>')
 };
+
+/* Resumen por concepto: cuánto suma cada nombre en el mes, el año o todo. */
+function openConceptos() {
+  const per = state.conceptoPer || 'mes';
+  const dentro = x => per === 'todo' || (per === 'mes' ? enMes(parseDate(x.fecha)) : parseDate(x.fecha).getFullYear() === state.month.year);
+  const g = new Map();
+  for (const x of movimientos.slice().sort(byFecha)) {
+    if (!dentro(x)) continue;
+    const k = llave(x.conc), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
+    e.nombre = x.conc; e.cat = x.cat; e.n++; e.total += x.imp;
+    g.set(k, e);
+  }
+  const lista = [...g.values()].sort((a, b) => b.total - a.total);
+  const max = lista.length ? lista[0].total : 1;
+  const chips = [['mes', MESES[state.month.month]], ['anio', String(state.month.year)], ['todo', 'Todo']].map(([k, l]) => `<button type="button" class="pchip" data-action="conc-per" data-per="${k}" aria-pressed="${k === per}">${l}</button>`).join('');
+  sheet.ctx = { type: 'conceptos' };
+  const html = `<div class="cp-chips">${chips}</div>
+    ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
+    ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
+      : '<div class="empty"><strong>Sin pagos</strong>No hay pagos en este periodo.</div>'}`;
+  if (sheet.el.hidden) openSheet('Por concepto', html); else { sheet.body.innerHTML = html; sheet.body.scrollTop = 0; }
+}
 
 function renderPerfil() {
   const cfg = sync.getCfg();
@@ -1121,6 +1195,7 @@ function renderPerfil() {
     <div class="menu">
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
+      <button type="button" class="menu-row" data-action="open-conceptos">${ICO.list}<span><b>Resumen por concepto</b><small>Cuánto suma cada nombre</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
     </div>`;
@@ -1682,6 +1757,19 @@ document.addEventListener('click', async e => {
       if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
       break;
     }
+    case 'sug-pick': {
+      const s = (sheet.sug || [])[+t.dataset.i];
+      if (!s) break;
+      $('#f-conc').value = s.nombre;
+      const c = CATS.find(x => x.id === catLabelOf(s.cat)), r = c && $(`input[name=f-cat][value="${c.id}"]`);
+      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+      if (!$('#f-imp').value) $('#f-imp').value = s.imp;
+      $('#f-sug').hidden = true;
+      $('#f-imp').focus();
+      break;
+    }
+    case 'open-conceptos': state.conceptoPer = state.conceptoPer || 'mes'; openConceptos(); break;
+    case 'conc-per': state.conceptoPer = t.dataset.per; openConceptos(); break;
     case 'sync-quick': syncRapido(t); break;
     case 'abono-edit': openAbonoEdit(sheet.ctx.kind, sheet.ctx.id, +t.dataset.idx); break;
     case 'abono-back': openDetail(sheet.ctx.kind, sheet.ctx.id); break;
@@ -1721,6 +1809,8 @@ document.addEventListener('click', async e => {
     }
   }
 });
+
+document.addEventListener('input', e => { if (e.target.id === 'f-conc') pintarSugerencias(); });
 
 document.addEventListener('change', e => {
   if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();

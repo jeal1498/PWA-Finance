@@ -851,3 +851,22 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .nav-sync.err::after { content: ""; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }
 @keyframes gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .nav-sync.girando .ic { animation: none; opacity: .5; } }
+
+/* Conceptos con el mismo nombre: sugerencias al crear, historial en el detalle y resumen por concepto. */
+.sug { margin: -2px 0 8px; background: var(--surface-2); border: 1px solid rgba(244, 244, 239, .25); border-radius: 14px; overflow: hidden; }
+.sug-i { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; border: 0; border-bottom: 1px solid rgba(244, 244, 239, .1); background: none; color: var(--ink); text-align: left; font-family: inherit; }
+.sug-i:last-child { border-bottom: 0; }
+.sug-i .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: rgb(var(--cc, 244 244 239)); }
+.sug-t { flex: 1; min-width: 0; }
+.sug-t b { display: block; font-size: 14.5px; font-weight: 600; }
+.sug-t small { display: block; font-size: 12px; color: var(--muted); }
+.sug-i i { font-style: normal; font-family: var(--font-data); font-size: 11px; font-weight: 600; color: var(--muted); }
+.cp-chips { display: flex; gap: 6px; margin-bottom: 12px; }
+.cp-total { font-family: var(--font-data); font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--muted); margin-bottom: 4px; }
+.cp-row { padding: 10px 0; border-top: 1px solid var(--line); }
+.cp-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cp-n { font-weight: 600; font-size: 15px; min-width: 0; }
+.cp-top b { font-family: var(--font-data); font-size: 15px; font-weight: 600; }
+.cp-bar { height: 6px; border-radius: 3px; background: rgba(244, 244, 239, .1); margin-top: 7px; overflow: hidden; }
+.cp-bar i { display: block; height: 100%; background: rgb(var(--cc, 244 244 239)); }
+.cp-chips .pchip[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); box-shadow: none; }
