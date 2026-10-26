@@ -12,7 +12,17 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const sum = (arr, k) => arr.reduce((t, m) => t + (m[k] || 0), 0);
 
 const MS_DAY = 86400000;
-const HOY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+const hoyLocal = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+let HOY = hoyLocal();
+/* «Hoy» se recalcula en cada pantalla, al volver a la app y a medianoche (si no, un día abierto la app queda con las fechas corridas). */
+function refrescarHoy() {
+  const h = hoyLocal();
+  if (toISO(h) === toISO(HOY)) return false;
+  const eraActual = isCurrentMonth();
+  HOY = h;
+  if (eraActual) state.month = { year: h.getFullYear(), month: h.getMonth() };
+  return true;
+}
 const parseDate = s => new Date(s + 'T00:00:00');
 const daysFromToday = d => Math.round((d - HOY) / MS_DAY);
 const toISO = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -97,6 +107,8 @@ function generarSeries(lista, store, hasta, soloSerie) {
   lista.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
   const nuevos = [];
   const limite = toISO(new Date(Math.floor(hasta / 12), hasta % 12 + 1, 0));
+  /* No se crean copias de más de 3 meses atrás (una fecha vieja no llena la lista de vencidos). */
+  const limitePasado = toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - 92));
   const crear = (serie, ult, f, id) => {
     const now = Date.now();
     nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.freq ? { freq: ult.freq } : {}), ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
@@ -107,6 +119,7 @@ function generarSeries(lista, store, hasta, soloSerie) {
     const ult = items[items.length - 1];
     if (!ult.repite) return;
     const fr = FREQS[freqOf(ult)];
+    const omit = new Set(items.flatMap(m => m.omitidos || []));
     if (fr.dias) {
       /* Por días: desde el último pago, cada N días, solo fechas de hoy en adelante. */
       const hoy = toISO(HOY);
@@ -115,7 +128,7 @@ function generarSeries(lista, store, hasta, soloSerie) {
         d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + fr.dias);
         const f = toISO(d);
         if (f > limite || (ult.fin && f > ult.fin)) break;
-        if (f < hoy || items.some(m => m.fecha === f)) continue;
+        if (f < hoy || omit.has(f) || items.some(m => m.fecha === f)) continue;
         crear(serie, ult, f, `${serie}-${f.replace(/-/g, '')}`);
       }
       return;
@@ -130,6 +143,7 @@ function generarSeries(lista, store, hasta, soloSerie) {
       const y = Math.floor(idx / 12), mo = idx % 12;
       const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
       if (ult.fin && f > ult.fin) break;
+      if (f < limitePasado || omit.has(f)) continue;
       const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
       if (items.some(m => m.id === id) || (soloSerie && ocupado.has(f.slice(0, 7)))) continue;
       crear(serie, ult, f, id);
@@ -138,7 +152,7 @@ function generarSeries(lista, store, hasta, soloSerie) {
   if (!nuevos.length) return;
   lista.push(...nuevos);
   lista.sort(byFecha);
-  db.batch({ [store]: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
+  dbBatch({ [store]: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
 }
 
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
@@ -153,11 +167,28 @@ function autoSync() {
     catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); }
   }, 4000);
 }
+/* Varias pestañas: cada cambio avisa a las demás para que vuelvan a leer la base (si no, la que quedó vieja pisaría los abonos). */
+const canal = typeof BroadcastChannel === 'function' ? new BroadcastChannel('finanzas-datos') : null;
+const avisar = () => { try { canal && canal.postMessage(1); } catch (e) { /* sin canal */ } };
+let recargaPendiente = false;
+async function recargarDatos() {
+  if (!sheet.el.hidden) { recargaPendiente = true; return; }
+  try {
+    const [mov, met] = await Promise.all([db.all('movimientos'), db.all('metas')]);
+    movimientos = mov.sort(byFecha); metas = met.sort(byFecha);
+    recargaPendiente = false;
+    render();
+  } catch (e) { /* se queda con lo que hay */ }
+}
+if (canal) canal.onmessage = () => recargarDatos();
+const dbBatch = async ops => { await db.batch(ops); avisar(); };
+
 async function persist(kind, item) {
   try {
     item.updatedAt = Date.now();
     if (!item.createdAt) item.createdAt = item.updatedAt;
     await db.put(storeOf(kind), item);
+    avisar();
     autoSync();
     return true;
   } catch (e) { return false; }
@@ -165,6 +196,7 @@ async function persist(kind, item) {
 async function unpersist(kind, id) {
   try {
     await db.remove(storeOf(kind), id);
+    avisar();
     autoSync();
     return true;
   } catch (e) { return false; }
@@ -287,7 +319,7 @@ function monthItems() {
   const inicio = new Date(state.month.year, state.month.month, 1);
   const prox30 = m => isCurrentMonth() && !enMes(m.date) && m.date > inicio && daysFromToday(m.date) <= 30;
   const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio) || prox30(m));
-  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date) || prox30(m));
+  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date) || prox30(m) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
   return [...pagos, ...proximos];
 }
 
@@ -596,6 +628,7 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
    Render maestro
    ========================================================= */
 function render() {
+  refrescarHoy();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
   const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
@@ -658,6 +691,7 @@ function closeSheet() {
   if (sheet.last && document.contains(sheet.last)) { try { sheet.last.focus({ preventScroll: true }); } catch (e) {} }
   if (state.view === 'perfil') renderPerfil();
   if (state.view === 'apartar') renderApartar();
+  if (recargaPendiente) recargarDatos();
 }
 
 let toastTimer;
@@ -1009,6 +1043,7 @@ function submitForm() {
   const fin = !$('#f-rep').checked ? '' : $('#f-fin').value;
   const freq = $('#f-rep').checked && $('input[name=f-freq]:checked') ? $('input[name=f-freq]:checked').value : 'mensual';
   const err = !fecha ? (isMeta ? 'Selecciona la fecha límite.' : 'Selecciona una fecha.')
+    : (+fecha.slice(0, 4) < 2000 || +fecha.slice(0, 4) > 2100) ? 'Revisa el año de la fecha.'
     : fin && fin < fecha ? 'La fecha de fin no puede ser anterior al vencimiento.'
     : imp < 0 ? 'El monto no puede ser negativo.'
     : (!isMeta && imp <= 0) ? 'El importe debe ser mayor a 0.'
@@ -1021,6 +1056,10 @@ function submitForm() {
     {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
       if (fin) item.fin = fin; else delete item.fin;
+      if (item.serie && fin) {
+        const sobran = list.filter(m => m.serie === item.serie && m.fecha > fin && !(m.abo > 0));
+        for (const m of sobran) { list.splice(list.indexOf(m), 1); unpersist(kind, m.id); }
+      }
       if (item.repite && freq !== 'mensual') item.freq = freq; else delete item.freq;
       /* Repetir, frecuencia y fin valen para toda la serie. */
       if (item.serie) list.filter(m => m.serie === item.serie && m !== item).forEach(m => {
@@ -1375,7 +1414,7 @@ async function syncPull() {
     const msg = `La hoja trae ${plural(mov.length, 'pago', 'pagos')} y ${plural(met.length, 'plan', 'planes')}${omitidos ? ` (${omitidos} no válidos se omiten)` : ''}.\nAquí hay ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}.\n\n¿Reemplazar lo que hay en este teléfono por la copia de la hoja?`;
     if (!window.confirm(msg)) return;
     const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
-    await db.batch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
+    await dbBatch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
     closeSheet();
@@ -1461,7 +1500,7 @@ async function applyImport() {
       const conservar = ya.abo >= x.abo;
       return stamp({ ...(conservar ? { ...x, pagos: ya.pagos, abo: ya.abo } : x), ...(ya.serie && !x.serie ? { serie: ya.serie, repite: ya.repite, freq: ya.freq, fin: ya.fin } : {}), createdAt: ya.createdAt });
     });
-    await db.batch({ movimientos: { clear: replace, put: unir(p.movimientos, movimientos) }, metas: { clear: replace, put: unir(p.metas, metas) } });
+    await dbBatch({ movimientos: { clear: replace, put: unir(p.movimientos, movimientos) }, metas: { clear: replace, put: unir(p.metas, metas) } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
     autoSync();
@@ -1474,7 +1513,7 @@ async function applyImport() {
 
 async function undoImport(snap) {
   try {
-    await db.batch({ movimientos: { clear: true, put: snap.mov }, metas: { clear: true, put: snap.met } });
+    await dbBatch({ movimientos: { clear: true, put: snap.mov }, metas: { clear: true, put: snap.met } });
   } catch (e) {
     return toast('No se pudo deshacer');
   }
@@ -1627,21 +1666,18 @@ document.addEventListener('click', async e => {
       const { kind, id } = sheet.ctx;
       const item = listOf(kind).find(m => m.id === id);
       if (!item) break;
-      /* Si se elimina el último pago de una serie mensual, la serie deja de repetirse. */
-      let previo = null;
-      if (item.serie && item.repite) {
-        const resto = listOf(kind).filter(m => m.serie === item.serie && m.id !== id).sort(byFecha);
-        const p = resto[resto.length - 1];
-        if (p && p.fecha <= item.fecha && p.repite) { previo = p; delete p.repite; await persist(kind, p); }
-      }
+      /* Eliminar una copia solo salta ese mes: la serie sigue (para detenerla se apaga «Se repite» al editar o se pone «Termina»). */
+      const hermanos = item.serie ? listOf(kind).filter(m => m.serie === item.serie && m.id !== id) : [];
+      const previo = hermanos.length && item.repite ? hermanos : null;
+      if (previo) for (const h of previo) { h.omitidos = [...new Set([...(h.omitidos || []), item.fecha])]; await persist(kind, h); }
       if (kind === 'meta') metas = metas.filter(m => m.id !== id); else movimientos = movimientos.filter(m => m.id !== id);
       await unpersist(kind, id);
       closeSheet(); render();
-      toast(previo ? 'Eliminado · ya no se repite' : 'Eliminado', { label: 'Deshacer', run: async () => {
+      toast(previo ? 'Eliminado · se salta ese mes' : 'Eliminado', { label: 'Deshacer', run: async () => {
         const list = listOf(kind);
         list.push(item);
         list.sort(byFecha);
-        if (previo) { previo.repite = true; await persist(kind, previo); }
+        if (previo) for (const h of previo) { h.omitidos = (h.omitidos || []).filter(f => f !== item.fecha); if (!h.omitidos.length) delete h.omitidos; await persist(kind, h); }
         await persist(kind, item); reveal(kind, item); render();
         toast('Restaurado');
       } });
@@ -1719,10 +1755,11 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Inicio
    ========================================================= */
-
-/* =========================================================
-   Inicio
-   ========================================================= */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); } });
+(function programarMedianoche() {
+  const sig = new Date(); sig.setHours(24, 0, 5, 0);
+  setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
+})();
 render();
 if (!dbOk) toast('No se pudo abrir el almacenamiento de este dispositivo');
 

@@ -62,12 +62,13 @@ function makeId(kind, fecha, conc, imp, cat, seen) {
   return id;
 }
 
-const item = ({ id, fecha, cat, conc, imp, pagos, createdAt, repite, serie, fin, freq }) => {
+const item = ({ id, fecha, cat, conc, imp, pagos, createdAt, repite, serie, fin, freq, omitidos }) => {
   const out = { id, fecha, cat, conc, imp: r2(imp), abo: r2(pagos.reduce((t, p) => t + p.monto, 0)), pagos };
   if (typeof createdAt === 'number') out.createdAt = createdAt;
   if (repite === true) out.repite = true;
   if (['semanal', 'quincenal', 'bimestral', 'anual'].includes(freq)) out.freq = freq;
   if (typeof serie === 'string' && serie) out.serie = serie;
+  if (Array.isArray(omitidos)) { const om = omitidos.filter((f) => typeof f === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f)); if (om.length) out.omitidos = om; }
   if (typeof fin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fin)) out.fin = fin;
   return out;
 };
@@ -101,7 +102,7 @@ function fromJSON(text, cats) {
     let id = typeof x.id === 'string' && x.id.trim() ? x.id.trim() : null;
     if (id && seen.has(id)) return out.skipped.push({ where: `${where} (${conc})`, reason: 'Id repetido en el archivo' });
     if (id) seen.add(id); else id = makeId(kind, fecha, conc, imp, cat, seen);
-    target.push(item({ id, fecha, cat, conc, imp, pagos, createdAt: x.createdAt, repite: x.repite, serie: x.serie, fin: x.fin, freq: x.freq }));
+    target.push(item({ id, fecha, cat, conc, imp, pagos, createdAt: x.createdAt, repite: x.repite, serie: x.serie, fin: x.fin, freq: x.freq, omitidos: x.omitidos }));
   });
   run(data.movimientos, 'pago', out.movimientos);
   run(data.metas, 'meta', out.metas);
