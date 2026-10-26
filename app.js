@@ -78,30 +78,61 @@ function generarRepetidos(hasta) {
   generarSeries(metas, 'metas', hasta);
 }
 
+/* Frecuencias: por días (semanal, quincenal) o por meses (mensual, bimestral, anual). `repite: true` + `freq` (sin `freq` = mensual). */
+const FREQS = {
+  semanal:   { label: 'Semanal',   dias: 7 },
+  quincenal: { label: 'Quincenal', dias: 15 },
+  mensual:   { label: 'Mensual',   meses: 1 },
+  bimestral: { label: 'Bimestral', meses: 2 },
+  anual:     { label: 'Anual',     meses: 12 }
+};
+const freqOf = m => FREQS[m.freq] ? m.freq : 'mensual';
+const REP_PATH = '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>';
+const repIcon = m => m.repite && m.serie ? `<svg class="rep-ic" viewBox="0 0 24 24" role="img" aria-label="Se repite: ${FREQS[freqOf(m)].label.toLowerCase()}"><title>Se repite: ${FREQS[freqOf(m)].label.toLowerCase()}</title>${REP_PATH}</svg>` : '';
+
 /* `soloSerie`: al guardar un pago que se repite, rellena también los meses que falten entre el primero y `hasta`
-   (p. ej. una copia que se eliminó mientras ya existían meses posteriores). */
+   (p. ej. una copia que se eliminó mientras ya existían meses posteriores). `hasta` = mes (año*12+mes) hasta el que se crean copias. */
 function generarSeries(lista, store, hasta, soloSerie) {
   const series = new Map();
   lista.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
   const nuevos = [];
+  const limite = toISO(new Date(Math.floor(hasta / 12), hasta % 12 + 1, 0));
+  const crear = (serie, ult, f, id) => {
+    const now = Date.now();
+    nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.freq ? { freq: ult.freq } : {}), ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
+  };
   series.forEach((items, serie) => {
     if (soloSerie && serie !== soloSerie) return;
     items.sort(byFecha);
     const ult = items[items.length - 1];
     if (!ult.repite) return;
-    const dia = parseDate(items[0].fecha).getDate();
-    const d = parseDate((soloSerie ? items[0] : ult).fecha);
-    const ocupado = new Set(items.map(m => m.fecha.slice(0, 7)));
-    let y = d.getFullYear(), mo = d.getMonth() + 1;
-    for (;; mo++) {
-      if (mo > 11) { mo = 0; y++; }
-      if (y * 12 + mo > hasta) break;
+    const fr = FREQS[freqOf(ult)];
+    if (fr.dias) {
+      /* Por días: desde el último pago, cada N días, solo fechas de hoy en adelante. */
+      const hoy = toISO(HOY);
+      let d = parseDate(ult.fecha);
+      for (let k = 0; k < 400; k++) {
+        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + fr.dias);
+        const f = toISO(d);
+        if (f > limite || (ult.fin && f > ult.fin)) break;
+        if (f < hoy || items.some(m => m.fecha === f)) continue;
+        crear(serie, ult, f, `${serie}-${f.replace(/-/g, '')}`);
+      }
+      return;
+    }
+    /* Por meses: el mismo día del primero, cada N meses. */
+    const base = parseDate(items[0].fecha), dia = base.getDate(), ocupado = new Set(items.map(m => m.fecha.slice(0, 7)));
+    const ultIdx = parseDate(ult.fecha).getFullYear() * 12 + parseDate(ult.fecha).getMonth();
+    for (let k = 1; k < 600; k++) {
+      const idx = base.getFullYear() * 12 + base.getMonth() + k * fr.meses;
+      if (idx > hasta) break;
+      if (!soloSerie && idx <= ultIdx) continue;
+      const y = Math.floor(idx / 12), mo = idx % 12;
       const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
       if (ult.fin && f > ult.fin) break;
       const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
       if (items.some(m => m.id === id) || (soloSerie && ocupado.has(f.slice(0, 7)))) continue;
-      const now = Date.now();
-      nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
+      crear(serie, ult, f, id);
     }
   });
   if (!nuevos.length) return;
@@ -470,12 +501,12 @@ function juntarSeries(items) {
 }
 
 function pagoRow(m) {
-  const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} meses · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
+  const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} ${freqOf(m) === 'mensual' ? 'meses' : 'pagos'} · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
   return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.esProximo ? '<em class="pt-tag">Próximo</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${repIcon(m)}${m.esProximo ? '<em class="pt-tag">Próximo</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.partial || m.meses ? `<small>de ${fmtMoney(m.cuota || m.imp)}</small>` : ''}</span>
   </button>`;
 }
@@ -515,7 +546,7 @@ function metaPagoRow(m) {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}${yr}</small></span>
     <span class="pt-est ${tone}" role="img" aria-label="${aria}" title="${aria}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(icon)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}</span>${i.done ? '' : `<span class="pt-nota ${i.tone}">${i.text}</span>`}</span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${repIcon(m)}</span>${i.done ? '' : `<span class="pt-nota ${i.tone}">${i.text}</span>`}</span>
     <span class="pt-amt${i.done || i.sinMonto ? ' done' : ''}"><b>${amount}</b>${i.partial ? `<small>de ${fmtMoney(m.imp)}</small>` : ''}</span>
   </button>`;
 }
@@ -661,6 +692,7 @@ function summaryHTML(m, i, isMeta) {
     <div class="detail-top">
       <span class="pill">${catIcon(c)}${esc(c.id)}</span>
       <span>${fmtDateFull(m.fecha)}</span>
+      ${m.repite && m.serie ? `<span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${REP_PATH}</svg>${FREQS[freqOf(m)].label}</span>` : ''}
       <span class="detail-st t-${i.tone}">${i.text}</span>
     </div>
     <div class="figbox">
@@ -874,8 +906,9 @@ function openForm(kind, id) {
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
       </div>
       ${`<div class="rep-card">
-        <label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
+        <label class="switch-row" for="f-rep"><span>Se repite</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
         <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
+          <div class="freq-row" role="radiogroup" aria-label="Frecuencia">${Object.entries(FREQS).map(([k, v]) => `<label class="freq-opt"><input type="radio" name="f-freq" value="${k}"${k === (editing ? freqOf(editing) : 'mensual') ? ' checked' : ''}><span>${v.label}</span></label>`).join('')}</div>
           <label class="fin-row" for="f-fin"><span>Termina</span><input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}"></label>
           <p class="note" id="f-fin-hint"></p>
         </div>
@@ -892,7 +925,7 @@ function openForm(kind, id) {
   if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });
 }
 
-/* Campo «Termina»: solo con «Se repite cada mes»; el texto dice cuántos pagos serán. */
+/* Frecuencia y «Termina»: solo con «Se repite»; el texto dice cuántos pagos serán. */
 function actualizarFin() {
   const wrap = $('#f-fin-wrap');
   if (!wrap) return;
@@ -906,12 +939,14 @@ function actualizarFin() {
   const d = parseDate(inicio);
   const pagado = new Map(otros.map(m => [m.fecha, m.abo >= m.imp]));
   pagado.set(fecha, prev ? prev.abo >= (parseFloat($('#f-imp').value) || prev.imp) : !!($('#f-paid') && $('#f-paid').checked));
-  let n = 0, q = 0, ult = null;
-  for (let k = 0; k < 600; k++) {
-    const y = d.getFullYear(), mo = d.getMonth() + k;
-    const f = new Date(y, mo, Math.min(d.getDate(), new Date(y, mo + 1, 0).getDate()));
+  let n = 0, q = 0;
+  const fr = FREQS[$('input[name=f-freq]:checked') ? $('input[name=f-freq]:checked').value : 'mensual'];
+  for (let k = 0; k < 2000; k++) {
+    const f = fr.dias
+      ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + k * fr.dias)
+      : new Date(d.getFullYear(), d.getMonth() + k * fr.meses, Math.min(d.getDate(), new Date(d.getFullYear(), d.getMonth() + k * fr.meses + 1, 0).getDate()));
     if (toISO(f) > fin) break;
-    n++; ult = f;
+    n++;
     if (!pagado.get(toISO(f))) q++;
   }
   hint.textContent = !n ? 'La fecha de fin es anterior al vencimiento.' : q === 0 ? (n === 1 ? "Ya está pagado." : `Los ${n} pagos ya están pagados.`) : `${q === 1 ? 'Queda 1 pago' : `Quedan ${q} pagos`} de ${n}`;
@@ -927,6 +962,7 @@ function submitForm() {
   const prev = id ? list.find(m => m.id === id) : null;
   if (id && !prev) return;
   const fin = !$('#f-rep').checked ? '' : $('#f-fin').value;
+  const freq = $('#f-rep').checked && $('input[name=f-freq]:checked') ? $('input[name=f-freq]:checked').value : 'mensual';
   const err = !fecha ? (isMeta ? 'Selecciona la fecha límite.' : 'Selecciona una fecha.')
     : fin && fin < fecha ? 'La fecha de fin no puede ser anterior al vencimiento.'
     : imp < 0 ? 'El monto no puede ser negativo.'
@@ -940,16 +976,18 @@ function submitForm() {
     {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
       if (fin) item.fin = fin; else delete item.fin;
-      /* Repetir y fin valen para toda la serie. */
+      if (item.repite && freq !== 'mensual') item.freq = freq; else delete item.freq;
+      /* Repetir, frecuencia y fin valen para toda la serie. */
       if (item.serie) list.filter(m => m.serie === item.serie && m !== item).forEach(m => {
         if (item.repite) m.repite = true; else delete m.repite;
         if (item.fin) m.fin = item.fin; else delete m.fin;
+        if (item.freq) m.freq = item.freq; else delete m.freq;
         persist(kind, m);
       });
     }
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
-    if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; }
+    if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
@@ -1036,7 +1074,7 @@ function renderApartar() {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${repIcon(m)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
     <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b><small>de ${fmtMoney(m.pend)}</small></span>
   </button>`;
   }).join('');
@@ -1530,7 +1568,7 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('change', e => {
-  if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id)) actualizarFin();
+  if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
   if (e.target.name === 'f-cat' && sheet.ctx) { const c = CATS.find(x => x.id === e.target.value); if (c) sheet.ctx.cat = catString(c); }
   if (e.target.id === 'imp-file') readImportFile(e.target.files[0]);
   if (e.target.name === 'imp-mode') {
