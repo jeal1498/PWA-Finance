@@ -789,15 +789,15 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .freq-opt input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* Color por categoría: la fila de la tabla se pinta con el tono de su categoría (rojo, amarillo y verde quedan solo para estatus). */
-[data-cat="Finanzas"] { --cc: 123 176 245; }
-[data-cat="Vehículo"] { --cc: 127 214 208; }
-[data-cat="Yo"] { --cc: 154 163 245; }
-[data-cat="Karen"] { --cc: 240 168 200; }
-[data-cat="Julieta"] { --cc: 201 168 240; }
-[data-cat="Servicios"] { --cc: 174 182 196; }
-[data-cat="Familia"] { --cc: 224 201 166; }
+[data-cat="Finanzas"] { --cc: 96 165 250; --ca: .22; }
+[data-cat="Vehículo"] { --cc: 34 211 238; --ca: .20; }
+[data-cat="Yo"] { --cc: 167 139 250; --ca: .22; }
+[data-cat="Karen"] { --cc: 244 114 182; --ca: .22; }
+[data-cat="Julieta"] { --cc: 232 121 249; --ca: .22; }
+[data-cat="Servicios"] { --cc: 148 163 184; --ca: .20; }
+[data-cat="Familia"] { --cc: 45 212 191; --ca: .20; }
 .pt-row.v { background: none; }
-.pt-row[data-cat] { background: rgb(var(--cc, 244 244 239) / .14); border-top-color: rgba(12, 12, 16, .6); }
+.pt-row[data-cat] { background: rgb(var(--cc, 244 244 239) / var(--ca, .2)); border-top-color: rgba(12, 12, 16, .6); }
 .pt-row[data-cat]:not([data-cat="Finanzas"],[data-cat="Vehículo"],[data-cat="Yo"],[data-cat="Karen"],[data-cat="Julieta"],[data-cat="Servicios"],[data-cat="Familia"]) { background: none; border-top-color: rgba(244, 244, 239, .12); }
 .pt-row[data-cat]:active { filter: brightness(1.3); }
 .pt-row[data-cat] .pt-cat { color: rgb(var(--cc, 244 244 239)); }
