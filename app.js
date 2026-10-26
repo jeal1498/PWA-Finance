@@ -559,6 +559,7 @@ function render() {
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
   const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
+  document.body.dataset.view = state.view;
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP || isA; });
   $('#perfil').hidden = !isP;
   $('#apartar').hidden = !isA;
