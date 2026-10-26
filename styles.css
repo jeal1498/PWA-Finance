@@ -885,6 +885,3 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-ya b { font-family: var(--font-title); font-weight: 800; font-size: 17px; }
 .kpi-ya > span:last-child { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .kpi-ya.ok .kpi-ya-t { color: var(--muted); }
-
-.menu > .cp-chips { padding: 0 14px 14px; margin: 0; }
-.menu > .cp-chips .pchip { flex: 1; }

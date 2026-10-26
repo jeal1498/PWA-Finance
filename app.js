@@ -73,7 +73,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Persistencia: IndexedDB de SecondBrain (stores "movimientos" y "metas").
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
-const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat', diasTrab: 'finanzas_dias_trab' };
+const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 
@@ -370,7 +370,7 @@ function renderHeroMetas(b) {
   const pend = base.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
   const faltante = m => m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0;
   /* Meta diaria de los planes: lo que hay que ahorrar hoy para llegar a la fecha de cada plan con saldo (redondeado hacia arriba por plan). */
-  const metaDiaPlanes = base.filter(m => faltante(m) > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(faltante(m) / diasHab(daysFromToday(m.date))), 0);
+  const metaDiaPlanes = base.filter(m => faltante(m) > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(faltante(m) / daysFromToday(m.date)), 0);
   const alcanzadas = base.filter(m => plazoKey(m) === 'alcanzada');
   const vencidas = base.filter(m => plazoKey(m) === 'vencida');
   const enCurso = base.filter(m => ['proxima', 'largo'].includes(plazoKey(m)));
@@ -389,7 +389,7 @@ function renderHeroMetas(b) {
 
   $('#kpi-dash').innerHTML = `
     <div class="kpi-split">
-      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">${diasTrab() < 7 ? `por día · ${diasTrab()} días/sem` : 'por día'}</span></div>
+      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">por día</span></div>
       <span class="kpi-div" aria-hidden="true"></span>
       <button type="button" class="kpi-half" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span class="kpi-pv">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></button>
     </div>
@@ -1193,11 +1193,6 @@ function renderPerfil() {
       <button type="button" class="menu-row" data-action="open-conceptos">${ICO.list}<span><b>Resumen por concepto</b><small>Cuánto suma cada nombre</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
-    </div>
-    <h2 class="perfil-h">Meta diaria</h2>
-    <div class="menu">
-      <div class="menu-row"><span><b>Días que trabajo por semana</b><small>La meta por día se reparte solo entre esos días</small></span></div>
-      <div class="cp-chips" role="group" aria-label="Días que trabajo por semana">${[1, 2, 3, 4, 5, 6, 7].map(n => `<button type="button" class="pchip" data-action="dias-trab" data-n="${n}" aria-pressed="${n === diasTrab()}">${n}</button>`).join('')}</div>
     </div>`;
 }
 
@@ -1209,10 +1204,7 @@ function apartarItems() {
   const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
   return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= 30).sort((a, c) => a.date - c.date);
 }
-/* Días que se trabajan por semana (Ajustes; 5 por defecto): la meta DIARIA se reparte solo entre los días de trabajo que faltan (d × días/7, hacia arriba). */
-const diasTrab = () => { const n = parseInt(lsGet(KEYS.diasTrab), 10); return n >= 1 && n <= 7 ? n : 5; };
-const diasHab = d => Math.max(1, Math.ceil(d * diasTrab() / 7));
-const apartarMonto = (m, len) => Math.ceil(m.pend / (len === 1 ? diasHab(m.d) : Math.max(1, Math.ceil(m.d / len))));
+const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
 /* Misma distribución que Pagos y Planes: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
 /* «12 pagos · 3 planes» (omite los planes si no hay). */
@@ -1253,7 +1245,7 @@ function renderApartar() {
   </button>`;
   }).join('');
   const cats = [...new Map(fut.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(fut.length, 'pago', 'pagos')} · por ${per[0] === 'dia' ? `día (${diasTrab()} días/sem)` : per[1].toLowerCase()}</span><b>${fmtMoney(tot(per[2]))}</b></div></div>
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(fut.length, 'pago', 'pagos')} · por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}</span><b>${fmtMoney(tot(per[2]))}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
@@ -1693,7 +1685,6 @@ document.addEventListener('click', async e => {
       else if (state.search) { state.search = ''; $('#search').value = ''; render(); }
       break;
     }
-    case 'dias-trab': lsSet(KEYS.diasTrab, t.dataset.n); renderPerfil(); break;
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
