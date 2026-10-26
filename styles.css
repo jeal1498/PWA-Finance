@@ -828,3 +828,6 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 /* Mosaicos con el texto centrado en todas las pantallas. */
 .kpi-lg { align-items: center; text-align: center; }
 .kpi-lg > span { text-align: center; }
+
+/* Tarjeta amarilla centrada. */
+.kpi-alert { justify-content: center; text-align: center; }
