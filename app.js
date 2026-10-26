@@ -319,11 +319,10 @@ function plazoKey(m) {
 /* Pagos del mes: los movimientos con fecha en el mes y los «Planes» (metas con monto) que caen en él. */
 const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
 function monthItems() {
-  /* Solo el mes que se ve; en el mes actual también salen los atrasados de meses anteriores (siguen sin pagarse). */
+  /* Solo pagos (los planes viven en Planear y en Apartar), del mes que se ve; en el mes actual también salen los atrasados de meses anteriores (siguen sin pagarse). */
   const inicio = new Date(state.month.year, state.month.month, 1);
   const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
-  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
-  return [...pagos, ...proximos];
+  return pagos;
 }
 
 /* Mosaicos de Pagar: «Pagado» = con algún abono; «Pagar ya» = pendiente que venció o vence hoy; «Por vencer» = pendiente de mañana en adelante. */
@@ -1215,6 +1214,9 @@ function apartarItems() {
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
 /* Misma distribución que Pagos y Planes: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
+/* «12 pagos · 3 planes» (omite los planes si no hay). */
+const desglose = lista => { const pl = lista.filter(m => m.kind === 'meta').length; return plural(lista.length - pl, 'pago', 'pagos') + (pl ? ` · ${plural(pl, 'plan', 'planes')}` : ''); };
+
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
@@ -1233,8 +1235,8 @@ function renderApartar() {
       <span class="kpi-main"><span class="kpi-sec">PAGAR YA</span><span class="kpi-alert-v">${ya.length ? `${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))} · ${plural(ya.length, 'pago', 'pagos')}` : 'Nada atrasado'}</span>${nota ? `<span class="kpi-alert-note">${nota}</span>` : ''}</span>
     </div>
     <div class="kpi-pair">
-      <button type="button" class="kpi-lg" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></button>
-      <div class="kpi-lg kpi-total"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">próx. 30 días</span></span></div>
+      <button type="button" class="kpi-lg" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${desglose(fut)}</span></span></button>
+      <div class="kpi-lg kpi-total"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${desglose(all)}</span></span></div>
     </div>
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
