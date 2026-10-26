@@ -590,7 +590,8 @@ function metaPagoRow(m) {
   const [label, tone, icon] = META_BADGE[k] || [i.sinMonto ? 'Monto por definir' : 'En curso', i.tone === 'warn' ? 'warn' : 'muted', BADGE_ICON.Pendiente];
   const yr = m.date.getFullYear() !== HOY.getFullYear() ? ` ’${String(m.date.getFullYear()).slice(-2)}` : '';
   const aria = `${label}${i.partial ? `, ahorrado ${i.pct}%` : ''}`;
-  const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.pend);
+  /* Un plan es ahorro: con abono parcial se muestra lo ahorrado y «de» la meta (en Pagar es al revés: lo que falta). */
+  const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.partial ? m.abo : i.pend);
   return `<button type="button" class="pt-cols pt-row${k === 'vencida' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="meta" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${label}${i.done ? '' : ', ' + i.text}, ${amount}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}${yr}</small></span>
     <span class="pt-est ${tone}" role="img" aria-label="${aria}" title="${aria}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(icon)}</span>
