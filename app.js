@@ -365,7 +365,7 @@ function renderHeroMetas(b) {
 
 function renderMonthControls() {
   const urg = state.grouping === 'urgencia';
-  $('#month-text').textContent = `${isCurrentMonth() ? HOY.getDate() + ' ' : ''}${MESES[state.month.month]} ${state.month.year}`;
+  $('#month-text').textContent = `${MESES[state.month.month]} ${state.month.year}`;
   $('#g-cat').setAttribute('aria-pressed', String(!urg));
   $('#g-urg').setAttribute('aria-pressed', String(urg));
 }
