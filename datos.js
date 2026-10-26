@@ -41,6 +41,7 @@ export function parseAmount(v, decimalComma = false) {
   let neg = false;
   if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
   if (decimalComma || /^-?\d{1,3}(\.\d{3})+,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d+,\d{1,2}$/.test(s)) s = s.replace(',', '.'); // «12,50» = 12.50 (con 3 dígitos, «1,200», la coma es de miles)
   else s = s.replace(/,/g, '');
   if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
   const n = parseFloat(s);

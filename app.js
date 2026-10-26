@@ -149,7 +149,7 @@ function autoSync() {
   if (!cfg.auto || !sync.connection()) return;
   clearTimeout(autoTimer);
   autoTimer = setTimeout(async () => {
-    try { await sync.push(movimientos, metas); }
+    try { await sync.push(movimientos, metas, { dbOk }); }
     catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); }
   }, 4000);
 }
@@ -1339,7 +1339,11 @@ async function syncPush() {
   const btn = $('#sync-push');
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
   try {
-    await sync.push(movimientos, metas);
+    try { await sync.push(movimientos, metas, { dbOk }); }
+    catch (e) {
+      if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
+      await sync.push(movimientos, metas, { dbOk, force: true });
+    }
     openSync('Listo: tus pagos y planes ya están en la hoja.');
   } catch (e) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
@@ -1347,23 +1351,39 @@ async function syncPush() {
   }
 }
 
+/* Deja solo registros completos (id, fecha, concepto, importe); así uno malo nunca vacía la base a medias. */
+function sanear(list) {
+  const ids = new Set(), ok = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    if (!x || typeof x !== 'object' || typeof x.id !== 'string' || !x.id || ids.has(x.id)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x.fecha)) || typeof x.conc !== 'string' || !Number.isFinite(+x.imp) || +x.imp < 0) continue;
+    const pagos = Array.isArray(x.pagos) ? x.pagos.filter(p => p && Number.isFinite(+p.monto) && +p.monto > 0).map(p => ({ fecha: p.fecha || null, monto: +p.monto })) : [];
+    ids.add(x.id);
+    ok.push({ ...x, imp: +x.imp, pagos, abo: r2(pagos.reduce((t, p) => t + p.monto, 0)) });
+  }
+  return ok;
+}
+
 async function syncPull() {
-  if (!window.confirm('Esto reemplaza lo que hay en este teléfono por la última copia de la hoja. ¿Continuar?')) return;
-  const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
   try {
     const data = await sync.pull();
     if (!data) return openSync('La hoja aún no tiene una copia. Sincroniza primero.');
-    const mov = Array.isArray(data && data.movimientos) ? data.movimientos : [];
-    const met = Array.isArray(data && data.metas) ? data.metas : [];
+    const recibidos = (Array.isArray(data.movimientos) ? data.movimientos.length : 0) + (Array.isArray(data.metas) ? data.metas.length : 0);
+    const mov = sanear(data.movimientos), met = sanear(data.metas);
+    if (!mov.length && !met.length) return openSync('La copia de la hoja no trae registros válidos; no se cambió nada.');
+    const omitidos = recibidos - mov.length - met.length;
+    const msg = `La hoja trae ${plural(mov.length, 'pago', 'pagos')} y ${plural(met.length, 'plan', 'planes')}${omitidos ? ` (${omitidos} no válidos se omiten)` : ''}.\nAquí hay ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}.\n\n¿Reemplazar lo que hay en este teléfono por la copia de la hoja?`;
+    if (!window.confirm(msg)) return;
+    const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
     await db.batch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
+    closeSheet();
+    setView(state.view);
+    toast('Copia traída de la hoja', { label: 'Deshacer', run: () => undoImport(snap) });
   } catch (e) {
     return openSync(e.message || 'No se pudo traer la copia');
   }
-  closeSheet();
-  setView(state.view);
-  toast('Copia traída de la hoja', { label: 'Deshacer', run: () => undoImport(snap) });
 }
 
 function download(name, text, type) {
@@ -1414,7 +1434,7 @@ function showImportPreview(name, p) {
     ${p.skipped.length ? `<details class="imp-skip"><summary>${plural(p.skipped.length, 'renglón omitido', 'renglones omitidos')}</summary><ul>${p.skipped.slice(0, 10).map(s => `<li>${esc(s.where)}: ${esc(s.reason)}</li>`).join('')}${p.skipped.length > 10 ? `<li>…y ${p.skipped.length - 10} más</li>` : ''}</ul></details>` : ''}
     ${total && have ? `<div role="radiogroup" aria-labelledby="imp-mode-l">
       <span class="label" id="imp-mode-l">¿Cómo lo importo?</span>
-      <label class="opt"><input type="radio" name="imp-mode" value="add" checked><span>Agregar a lo que ya tengo<small>No borra nada; lo que ya existe se actualiza.</small></span></label>
+      <label class="opt"><input type="radio" name="imp-mode" value="add" checked><span>Agregar a lo que ya tengo<small>No borra nada; lo que ya existe se actualiza y conserva sus abonos.</small></span></label>
       <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')} actuales y deja solo lo del archivo.</small></span></label>
     </div>` : ''}
     <div class="btn-row">
@@ -1434,7 +1454,14 @@ async function applyImport() {
   const now = Date.now();
   const stamp = x => ({ ...x, createdAt: x.createdAt || now, updatedAt: now });
   try {
-    await db.batch({ movimientos: { clear: replace, put: p.movimientos.map(stamp) }, metas: { clear: replace, put: p.metas.map(stamp) } });
+    /* En «Agregar», si el registro ya existe se conservan los abonos y la repetición que tenga la app. */
+    const unir = (nuevos, actuales) => nuevos.map(x => {
+      const ya = replace ? null : actuales.find(m => m.id === x.id);
+      if (!ya) return stamp(x);
+      const conservar = ya.abo >= x.abo;
+      return stamp({ ...(conservar ? { ...x, pagos: ya.pagos, abo: ya.abo } : x), ...(ya.serie && !x.serie ? { serie: ya.serie, repite: ya.repite, freq: ya.freq, fin: ya.fin } : {}), createdAt: ya.createdAt });
+    });
+    await db.batch({ movimientos: { clear: replace, put: unir(p.movimientos, movimientos) }, metas: { clear: replace, put: unir(p.metas, metas) } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
     autoSync();
