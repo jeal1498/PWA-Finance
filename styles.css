@@ -803,6 +803,6 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pt-row[data-cat] .pt-cat { color: rgb(var(--cc, 244 244 239)); }
 .pt-key > span[data-cat] .ic, .pt-key > span[data-cat] .mono { color: rgb(var(--cc, 244 244 239)); }
 
-/* Atrasados: borde rojo en la fila; el mes de la fecha no lleva rojo. */
-.pt-row.v { box-shadow: inset 0 0 0 1.5px var(--danger); }
+/* Atrasados: franja roja a la izquierda de la fila; el mes de la fecha no lleva rojo. */
+.pt-row.v { box-shadow: inset 4px 0 0 var(--danger); }
 .pt-row.v .pt-fecha small { color: var(--muted); }
