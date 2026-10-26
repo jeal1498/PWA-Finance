@@ -552,7 +552,7 @@ function pagoRow(m) {
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${!m.esProximo && enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
-    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : `<small class="pt-ap"><span class="w">apartar </span><i>${fmtMoney(Math.ceil(i.pend / daysFromToday(m.date)))}</i>/día</small>`)}</span>
+    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : `<small class="pt-ap">${fmtMoney(m.abo)}/${fmtMoney(m.imp)}</small>`)}</span>
   </button>`;
 }
 
@@ -1406,11 +1406,6 @@ function kpiDashboard(base) {
   const atrasado = sum(yaL, 'pendiente');
   const porVencer = sum(porVencerL, 'pendiente');
 
-  const dias = 30; /* ventana: hoy + 30 días (lo mismo que muestra la lista) */
-  /* Meta diaria = lo que hay que separar hoy para llegar a cada fecha de lo que muestra esta pantalla (el mes). */
-  const metaDia = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(m.pendiente / daysFromToday(m.date)), 0);
-  const meta = isCurrentMonth() ? fmtMoney(metaDia) : '—';
-
   const futuros = [...porV].sort((a, c) => a.date - c.date);
   const grupo = futuros.length ? futuros.filter(m => m.fecha === futuros[0].fecha) : [];
   const dprox = grupo.length ? daysFromToday(grupo[0].date) : 0;
@@ -1431,7 +1426,7 @@ function kpiDashboard(base) {
       <span class="kpi-main"><span class="kpi-sec">ATENCIÓN INMEDIATA</span><span class="kpi-alert-v">${grupo.length ? `Próximo: ${fmtDate(grupo[0].fecha)} · ${fmtMoney(sum(grupo, 'pendiente'))}` : (venc.length ? 'Solo hay pagos vencidos' : 'Sin pagos pendientes')}</span>${grupo.length ? `<span class="kpi-alert-note">${dprox <= 0 ? 'Vence hoy' : `Vence en ${plural(dprox, 'día', 'días')}`}</span>` : ''}</span>
     </div>
     <div class="kpi-pair">
-      <button type="button" class="kpi-lg" data-action="fondo" data-texto="para lo que resta del mes" data-meta="${metaDia}" data-dias="${dias}" data-pct="${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}" data-porv="${porV.length}"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo mes actual'}</span></span></button>
+      <div class="kpi-lg" aria-label="Abonado de total del mes"><span class="kpi-sec">ABONADO / TOTAL</span><span><span class="kpi-pv">${fmtMoney(totalAbo)}/${fmtMoney(totalImp)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}% del mes</span></span></div>
       <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">este mes</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
