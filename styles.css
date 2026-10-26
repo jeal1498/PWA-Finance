@@ -806,3 +806,6 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 /* Atrasados: franja roja a la izquierda de la fila; el mes de la fecha no lleva rojo. */
 .pt-row.v { box-shadow: inset 4px 0 0 var(--danger); }
 .pt-row.v .pt-fecha small { color: var(--muted); }
+
+/* Misma separación (8 px) entre los mosaicos y la tabla que entre los mosaicos. */
+.hero { margin-bottom: 8px; }
