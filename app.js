@@ -339,8 +339,8 @@ function renderHeroMetas(b) {
   const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
     { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo, sub: `${pct}% del total` },
-    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'próximo', 'próximos') },
-    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado, sub: plural(vencidas.length, 'próximo', 'próximos') }
+    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'plan', 'planes') },
+    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado, sub: plural(vencidas.length, 'plan', 'planes') }
   ].map(t => {
     const on = state.filter === t.filter;
     return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todas' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span><span class="kpi-s">${t.sub}</span></span></button>`;
@@ -352,8 +352,8 @@ function renderHeroMetas(b) {
       <span class="kpi-main"><span class="kpi-sec">SIGUIENTE</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
     </div>
     <div class="kpi-pair">
-      <div class="kpi-lg"><span class="kpi-sec">TE FALTA AHORRAR</span><span><span class="kpi-pv sm">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)}` : 'sin monto'}</span></span></div>
-      <button type="button" class="kpi-lg kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">TOTAL OBJETIVO</span><span><span class="kpi-pv sm">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span></button>
+      <div class="kpi-lg"><span class="kpi-sec">POR AHORRAR</span><span><span class="kpi-pv sm">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)}` : 'sin monto'}</span></span></div>
+      <button type="button" class="kpi-lg kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span><span class="kpi-pv sm">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
@@ -563,7 +563,7 @@ function metasTable(b) {
   }).join('');
   const falta = items.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'próximo', 'próximos')} · falta ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
+  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'plan', 'planes')} · por ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
@@ -588,8 +588,8 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
   if (groups.length) { $('#list').innerHTML = groups.map(groupHTML).join(''); return; }
   const isMeta = state.view === 'metas';
   $('#list').innerHTML = baseEmpty
-    ? `<div class="empty"><strong>${isMeta ? 'Aún no hay próximos' : `Nada en ${MESES[state.month.month].toLowerCase()}`}</strong>${isMeta ? 'Agrega el primero: frenos, mantenimiento…' : 'Agrega el primer movimiento de este mes.'}<button type="button" class="btn btn-primary" data-action="add" data-mode="new">${isMeta ? 'Nuevo próximo' : 'Nuevo movimiento'}</button></div>`
-    : `<div class="empty"><strong>Sin resultados</strong>Prueba con otro filtro o con otra búsqueda.</div>`;
+    ? `<div class="empty"><strong>${isMeta ? 'Aún no hay planes' : `Nada en ${MESES[state.month.month].toLowerCase()}`}</strong>${isMeta ? 'Agrega el primero: frenos, mantenimiento…' : 'Agrega el primer pago de este mes.'}<button type="button" class="btn btn-primary" data-action="add" data-mode="new">${isMeta ? 'Nuevo plan' : 'Nuevo pago'}</button></div>`
+    : `<div class="empty"><strong>Sin resultados</strong>Prueba con otro filtro.</div>`;
 }
 
 /* =========================================================
@@ -719,7 +719,7 @@ function abonoFormHTML(isMeta, pend) {
           <input id="abono-fecha" type="date" value="${toISO(HOY)}">
         </div>
       </div>
-      <p class="hint">Máximo lo que falta: ${fmtMoney(pend)}</p>
+      <p class="hint">Máximo: ${fmtMoney(pend)}</p>
       <button type="button" class="btn btn-soft" data-action="abono-all">${isMeta ? 'Completar' : 'Pagar todo'} · ${fmtMoney(pend)}</button>
       <p class="form-error" id="abono-error" role="alert"></p>
       <button type="submit" class="btn btn-primary">${isMeta ? 'Registrar ahorro' : 'Registrar abono'}</button>
@@ -744,7 +744,7 @@ function openDetail(kind, id) {
 
   let action;
   if (isMeta && i.sinMonto) {
-    action = '<p class="note">Este próximo todavía no tiene monto. Defínelo para empezar a ahorrar.</p>';
+    action = '<p class="note">Este plan todavía no tiene monto. Defínelo para empezar a ahorrar.</p>';
   } else if (i.done) {
     action = isMeta ? '<p class="note">Ya lo tienes completo.</p>' : '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>';
   } else {
@@ -823,7 +823,7 @@ function requestClose() { askDiscard(closeSheet); }
 function addTabs(kind, mode) {
   const isMeta = kind === 'meta';
   return `<div class="mode" role="group" aria-label="Tipo de movimiento">
-    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">${isMeta ? 'Nuevo próximo' : 'Nuevo pago'}</button>
+    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">${isMeta ? 'Nuevo plan' : 'Nuevo pago'}</button>
     <button type="button" data-action="add-mode" data-mode="pay" aria-pressed="${mode === 'pay'}">${isMeta ? 'Registrar ahorro' : 'Abonar o pagar'}</button>
   </div>`;
 }
@@ -837,7 +837,7 @@ function payListHTML(kind, q, f = 'todos') {
     .filter(m => m.imp > 0 && m.abo < m.imp && (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q)))
     .filter(m => f === 'todos' || ((isMeta ? metaInfo(m) : gastoInfo(m)).tone === 'danger') === (f === 'atrasado'))
     .sort(porFechaYMonto);
-  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay próximos por completar.' : 'No hay pagos pendientes.')}</p>`;
+  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay planes por completar.' : 'No hay pagos pendientes.')}</p>`;
   return arr.map(m => {
     const i = isMeta ? metaInfo(m) : gastoInfo(m);
     const extra = m.abo > 0 ? ` · ${isMeta ? 'ahorrado' : 'abonado'} ${fmtMoney(m.abo)}` : '';
@@ -852,7 +852,7 @@ function payListHTML(kind, q, f = 'todos') {
 function openPay(kind) {
   const isMeta = kind === 'meta';
   sheet.ctx = { type: 'add', kind };
-  openSheet('Agregar movimiento', `${addTabs(kind, 'pay')}
+  openSheet(isMeta ? 'Nuevo plan' : 'Nuevo pago', `${addTabs(kind, 'pay')}
     <div class="pay-chips" id="pay-chips">
       ${[['todos', 'Todos'], ['atrasado', isMeta ? 'Atrasadas' : 'Atrasados'], ['porvencer', isMeta ? 'En curso' : 'Por vencer']].map(([k, l]) => `<button type="button" class="pchip${k === 'todos' ? ' on' : ''}" data-action="pay-filter" data-f="${k}" aria-pressed="${k === 'todos'}">${l}</button>`).join('')}
       <button type="button" class="pchip pchip-ic" data-action="pay-search-toggle" aria-label="Buscar concepto o categoría" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
@@ -873,7 +873,7 @@ function openPayDetail(kind, id) {
   const m = isMeta ? procesarMeta(raw) : procesar(raw);
   const i = isMeta ? metaInfo(m) : gastoInfo(m);
   sheet.ctx = { type: 'detail', kind, id };
-  openSheet('Agregar movimiento', `${addTabs(kind, 'pay')}
+  openSheet(isMeta ? 'Nuevo plan' : 'Nuevo pago', `${addTabs(kind, 'pay')}
     <button type="button" class="back" data-action="pay-back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Cambiar concepto</button>
     <h3 class="pay-name">${esc(m.conc)}</h3>
     ${summaryHTML(m, i, isMeta)}
@@ -898,7 +898,7 @@ function openForm(kind, id) {
   const selected = catLabelOf(catStr);
 
   sheet.ctx = { type: 'form', kind, id: id || null, cat: catStr };
-  openSheet(editing ? (isMeta ? 'Editar próximo' : 'Editar movimiento') : 'Agregar movimiento', `
+  openSheet(editing ? (isMeta ? 'Editar plan' : 'Editar pago') : (isMeta ? 'Nuevo plan' : 'Nuevo pago'), `
     ${editing ? '' : addTabs(kind, 'new')}
     <form id="form" class="fform" novalidate>
       <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}"></label>
@@ -1010,7 +1010,7 @@ function openMonthPicker() {
   sheet.ctx = { type: 'months' };
   openSheet('Ir a otro mes', `
     <button type="button" class="month-opt today" data-action="pick-today">Ir a hoy<small>${MESES[HOY.getMonth()]} ${HOY.getFullYear()}</small></button>
-    ${list.map(x => `<button type="button" class="month-opt" data-action="pick-month" data-year="${x.y}" data-month="${x.mo}" aria-current="${x.y === state.month.year && x.mo === state.month.month}">${MESES[x.mo]} ${x.y}<small>${plural(count(x.y, x.mo), 'movimiento', 'movimientos')}</small></button>`).join('')}`);
+    ${list.map(x => `<button type="button" class="month-opt" data-action="pick-month" data-year="${x.y}" data-month="${x.mo}" aria-current="${x.y === state.month.year && x.mo === state.month.month}">${MESES[x.mo]} ${x.y}<small>${plural(count(x.y, x.mo), 'pago', 'pagos')}</small></button>`).join('')}`);
   const cur = $('.month-opt[aria-current="true"]', sheet.body);
   if (cur) cur.scrollIntoView({ block: 'center' });
   sheet.panel.focus({ preventScroll: true });
@@ -1027,9 +1027,9 @@ const ICO = {
 function renderPerfil() {
   const cfg = sync.getCfg();
   $('#perfil').innerHTML = `
-    <h2 class="perfil-h">Respaldo y datos</h2>
+    <h2 class="perfil-h">Respaldo</h2>
     <div class="menu">
-      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de Pagos de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
+      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
@@ -1067,7 +1067,7 @@ function renderApartar() {
     </div>
     <div class="kpi-pair">
       <button type="button" class="kpi-lg" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></button>
-      <div class="kpi-lg kpi-total"><span class="kpi-sec">PENDIENTE</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${plural(all.length, 'pago', 'pagos')} · 30 días</span></span></div>
+      <div class="kpi-lg kpi-total"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">próx. 30 días</span></span></div>
     </div>
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
@@ -1111,7 +1111,7 @@ function monthMarkup() {
   const box = document.createElement('div');
   box.innerHTML = `<div class="app"><header class="header"><div class="header-title-row"><span class="hp-label"><span>${titulo}</span></span></div></header>
     <main><section class="hero"><div id="kpi-dash">${kpiDashboard(base)}</div></section>
-    <div class="list-head"><div class="list-title"><span id="list-caption">Pagos</span><span id="list-count">${plural(base.length, 'movimiento', 'movimientos')}</span></div></div>
+    <div class="list-head"><div class="list-title"><span id="list-caption">Pagos</span><span id="list-count">${plural(base.length, 'pago', 'pagos')}</span></div></div>
     <div id="list">${list}</div></main></div>`;
   box.style.cssText = `width:${IMG_W}px;padding-bottom:28px;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.35;-webkit-font-smoothing:antialiased`;
   box.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
@@ -1179,7 +1179,7 @@ async function shareMonth() {
 
 /* Fondo de pantalla 9:16 con la meta diaria al centro (al tocar el mosaico «Meta diaria»). */
 async function shareFondo(d) {
-  if (!d.apartar && !isCurrentMonth()) { toast('La meta diaria es del mes actual'); return; }
+  if (!d.apartar && !isCurrentMonth()) { toast('Vuelve al mes actual para generar el fondo'); return; }
   const meta = +d.meta || 0, dias = +d.dias || 1, pct = Math.min(100, +d.pct || 0), porv = +d.porv || 0;
   try {
     await Promise.all(['800 40px "Bricolage Grotesque"', '500 20px "DM Sans"', '600 20px "JetBrains Mono"'].map(f => document.fonts.load(f)));
@@ -1260,7 +1260,7 @@ function kpiDashboard(base) {
     </div>
     <div class="kpi-pair">
       <button type="button" class="kpi-lg" data-action="fondo" data-meta="${metaDia}" data-dias="${dias}" data-pct="${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}" data-porv="${porV.length}"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo mes actual'}</span></span></button>
-      <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">FALTA 30 DÍAS</span><span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">de ${fmtMoney(totalImp)}</span></span></button>
+      <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">próx. 30 días</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
 }
@@ -1273,7 +1273,7 @@ function openSync(note) {
   const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
   const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : (cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : '');
   openSheet('Respaldo en Google Sheets', `
-    ${conn ? `<p class="note">Tus pagos y metas van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
+    ${conn ? `<p class="note">Tus pagos y planes van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
     <form id="sync-form" autocomplete="off">
       <label for="sync-url">URL de la aplicación web</label>
       <input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required>
@@ -1284,7 +1284,7 @@ function openSync(note) {
     </form>
     ${conn ? `<div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-push" id="sync-push">Sincronizar ahora</button></div>
     <div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-pull">Traer de la hoja</button></div>
-    <p class="hint">«Traer de la hoja» reemplaza tus pagos y metas de este teléfono por la última copia guardada en la hoja.</p>` : ''}`);
+    <p class="hint">«Traer de la hoja» reemplaza lo que hay en este teléfono por la última copia.</p>` : ''}`);
   sheet.panel.focus({ preventScroll: true });
 }
 
@@ -1299,7 +1299,7 @@ async function syncPush() {
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
   try {
     await sync.push(movimientos, metas);
-    openSync('Listo: tus pagos y metas ya están en la hoja.');
+    openSync('Listo: tus pagos y planes ya están en la hoja.');
   } catch (e) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
     openSync();
@@ -1307,7 +1307,7 @@ async function syncPush() {
 }
 
 async function syncPull() {
-  if (!window.confirm('Esto reemplaza tus pagos y metas de este teléfono por la última copia de la hoja. ¿Continuar?')) return;
+  if (!window.confirm('Esto reemplaza lo que hay en este teléfono por la última copia de la hoja. ¿Continuar?')) return;
   const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
   try {
     const data = await sync.pull();
@@ -1369,12 +1369,12 @@ function showImportPreview(name, p) {
       <div class="fig"><span>Próximos</span><b>${p.metas.length}</b></div>
       <div class="fig"><span>Importe</span><b>${fmtMoney(sum(p.movimientos, 'imp'))}</b></div>
     </div>
-    <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos ni metas en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>
+    <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos ni planes en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>
     ${p.skipped.length ? `<details class="imp-skip"><summary>${plural(p.skipped.length, 'renglón omitido', 'renglones omitidos')}</summary><ul>${p.skipped.slice(0, 10).map(s => `<li>${esc(s.where)}: ${esc(s.reason)}</li>`).join('')}${p.skipped.length > 10 ? `<li>…y ${p.skipped.length - 10} más</li>` : ''}</ul></details>` : ''}
     ${total && have ? `<div role="radiogroup" aria-labelledby="imp-mode-l">
       <span class="label" id="imp-mode-l">¿Cómo lo importo?</span>
       <label class="opt"><input type="radio" name="imp-mode" value="add" checked><span>Agregar a lo que ya tengo<small>No borra nada; lo que ya existe se actualiza.</small></span></label>
-      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')} actuales y deja solo lo del archivo.</small></span></label>
+      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')} actuales y deja solo lo del archivo.</small></span></label>
     </div>` : ''}
     <div class="btn-row">
       <button type="button" class="btn btn-soft" data-action="open-import">Otro archivo</button>
@@ -1401,7 +1401,7 @@ async function applyImport() {
     return toast('No se pudo importar en este dispositivo');
   }
   setView(state.view);
-  toast(`Importado: ${plural(p.movimientos.length, 'pago', 'pagos')} y ${plural(p.metas.length, 'próximo', 'próximos')}`, { label: 'Deshacer', run: () => undoImport(snap) });
+  toast(`Importado: ${plural(p.movimientos.length, 'pago', 'pagos')} y ${plural(p.metas.length, 'plan', 'planes')}`, { label: 'Deshacer', run: () => undoImport(snap) });
 }
 
 async function undoImport(snap) {
@@ -1438,7 +1438,7 @@ function setGrouping(g) {
   /* Aviso de una sola vez: ya no hay flechas, el mes se cambia deslizando. */
   if (!lsGet(KEYS.hint)) {
     lsSet(KEYS.hint, '1');
-    toast('Desliza sobre el mes para cambiar de mes');
+    toast('Desliza sobre el mes para cambiarlo');
   }
 }
 
@@ -1472,11 +1472,11 @@ document.addEventListener('click', async e => {
     case 'open-import': openImport(); break;
     case 'export-json':
       download(`finanzas-${toISO(HOY)}.json`, exportJSON(movimientos, metas), 'application/json');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}`);
       break;
     case 'export-csv':
       download(`finanzas-${toISO(HOY)}.csv`, '\uFEFF' + exportCSV(movimientos, metas), 'text/csv');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'próximo', 'próximos')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}`);
       break;
     case 'template': download('plantilla-finanzas.csv', '\uFEFF' + templateCSV(), 'text/csv'); break;
     case 'import-go': await applyImport(); break;
