@@ -831,3 +831,10 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 
 /* Tarjeta amarilla centrada. */
 .kpi-alert { justify-content: center; text-align: center; }
+
+/* Híbrido Pagar + Apartar: bajo el monto, cuánto apartar por día (o «pagar ya»). */
+.pt-ap { white-space: nowrap; }
+.pt-ap i { font-style: normal; color: var(--ink); }
+.pt-ap.ya { color: var(--danger); }
+.pt-ap .w { display: none; }
+@media (min-width: 430px) { .pt-ap .w { display: inline; } }
