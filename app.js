@@ -534,7 +534,7 @@ function juntarSeries(items) {
 
 function pagoRow(m) {
   const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} ${freqOf(m) === 'mensual' ? 'meses' : 'pagos'} · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
-  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}">
+  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
@@ -577,7 +577,7 @@ function metaPagoRow(m) {
   const yr = m.date.getFullYear() !== HOY.getFullYear() ? ` ’${String(m.date.getFullYear()).slice(-2)}` : '';
   const aria = `${label}${i.partial ? `, ahorrado ${i.pct}%` : ''}`;
   const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.pend);
-  return `<button type="button" class="pt-cols pt-row${k === 'vencida' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="meta" data-id="${esc(m.id)}">
+  return `<button type="button" class="pt-cols pt-row${k === 'vencida' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="meta" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${label}${i.done ? '' : ', ' + i.text}, ${amount}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}${yr}</small></span>
     <span class="pt-est ${tone}" role="img" aria-label="${aria}" title="${aria}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(icon)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
@@ -1157,7 +1157,7 @@ function renderApartar() {
   const head = [['Fecha', ''], ['Est.', ''], ['Cat.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
   const rows = fut.map(m => {
     const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
-    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}">
+    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(apartarMonto(m, per[2]))} de ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
