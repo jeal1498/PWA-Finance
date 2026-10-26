@@ -809,3 +809,11 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 
 /* Misma separación (8 px) entre los mosaicos y la tabla que entre los mosaicos. */
 .hero { margin-bottom: 8px; }
+
+/* Filas de 48 px fijas; el nombre va en una sola línea (con «…») y la etiqueta y el ícono ↻ no se parten. */
+.pt-row { height: 48px; padding-block: 0; }
+.pt-cc { min-width: 0; }
+.pt-conc { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.pt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pt-conc .rep-ic, .pt-conc .pt-tag { flex: none; }
+.pt-nota { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
