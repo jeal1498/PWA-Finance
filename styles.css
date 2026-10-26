@@ -897,9 +897,7 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-legend.ap4 .lg-p .kpi-lg-t, .kpi-legend.ap4 .lg-p .kpi-lg-m { line-height: 1.25; }
 
 /* Apartar: sin tarjeta partida; el fondo 9:16 sale del botón cuadrado junto a los periodos y el total de 30 días, del pie de la tabla. */
-.kpi-legend.ap4 { grid-template-columns: repeat(3, minmax(0, 1fr)) 54px; }
-.kpi-legend.ap4 .kpi-fondo { padding: 0; align-items: center; justify-content: center; }
-.kpi-fondo .ic, .kpi-fondo svg { width: 22px; height: 22px; }
+.kpi-legend.ap4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pt-foot2 { border-top: 1px solid var(--line, #2A2A33); color: var(--muted); font-size: 13px; }
 .pt-foot2 b { font-size: 15px; color: var(--ink); }
-@media (min-width: 768px) { .kpi-legend.ap4 { grid-template-columns: minmax(0, 1fr); } .kpi-legend.ap4 .kpi-fondo { height: 44px; min-height: 44px; } }
+@media (min-width: 768px) { .kpi-legend.ap4 { grid-template-columns: minmax(0, 1fr); } }
