@@ -511,6 +511,9 @@ function pagoRow(m) {
   </button>`;
 }
 
+/* El mes va dentro de la tabla de Pagos: se toca para elegir mes o se desliza para cambiarlo. */
+const mesBar = () => `<button type="button" class="pt-mes" data-action="month-picker" aria-haspopup="dialog">${MESES[state.month.month]} ${state.month.year}</button>`;
+
 function pagosTable(b) {
   const { col, asc } = state.sort;
   const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
@@ -520,7 +523,7 @@ function pagosTable(b) {
   }).join('');
   const pend = sum(items, 'pendiente');
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
+  return `<div class="pt">${mesBar()}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
@@ -576,6 +579,7 @@ function renderPagos(b) {
   $('#list-count').textContent = '';
   if (b.items.length) { $('#list').innerHTML = pagosTable(b); return; }
   renderList([], '', '', 'gastos', b.base.length === 0);
+  $('#list').insertAdjacentHTML('afterbegin', `<div class="pt">${mesBar()}</div>`);
 }
 
 function renderList(groups, caption, countText, emptyKind, baseEmpty) {
@@ -1618,7 +1622,7 @@ document.addEventListener('keydown', e => {
 /* Swipe horizontal para cambiar de mes (gastos agrupados por categoría) */
 (() => {
   let sx = 0, sy = 0, t0 = 0, tracking = false;
-  const zone = el => el && el.closest && el.closest('.header-title-row');
+  const zone = el => el && el.closest && el.closest('.header-title-row, .pt-mes');
   document.addEventListener('touchstart', e => {
     tracking = e.touches.length === 1 && !!zone(e.target);
     if (!tracking) return;
