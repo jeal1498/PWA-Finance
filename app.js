@@ -1402,28 +1402,31 @@ async function shareFondo(d) {
    y resumen operativo (total cartera; vuelve a mostrar todo). */
 function kpiDashboard(base) {
   const totalAbo = sum(base, 'abo'), totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
-  const conAbono = base.filter(m => m.abo > 0); /* «Pagado» = dinero abonado: el importe y el conteo son de los mismos pagos (liquidados o a medias) */
   const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const porVencerL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const atrasado = sum(yaL, 'pendiente');
   const porVencer = sum(porVencerL, 'pendiente');
 
   const tiles = [
-    { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo, n: conAbono.length },
-    { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer, n: porVencerL.length },
-    { k: 'b', filter: 'vencido', label: 'Pagar ya', v: atrasado, n: yaL.length }
+    { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo },
+    { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer },
+    { k: 'b', filter: 'vencido', label: 'Pagar ya', v: atrasado }
   ].map(t => {
     const on = state.filter === t.filter;
-    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todos' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span><span class="kpi-s">${plural(t.n, 'pago', 'pagos')}</span></span></button>`;
+    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todos' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span></span></button>`;
   }).join('');
+  /* Barra al borde de la tarjeta: del total del mes, lo pagado (verde), lo que vence después (amarillo) y lo que hay que pagar ya (rojo). */
+  const tramos = [['a', totalAbo, 'pagado'], ['c', porVencer, 'por vencer'], ['b', atrasado, 'pagar ya']].filter(t => t[1] > 0);
+  const barra = `<div class="kpi-bar" role="img" aria-label="${tramos.map(t => `${Math.round(t[1] / totalImp * 100)}% ${t[2]}`).join(', ') || 'sin pagos'}">${tramos.map(t => `<i class="bar-${t[0]}" style="flex:${t[1]}"></i>`).join('')}</div>`;
 
   return `
     <div class="kpi-split">
-      <div class="kpi-half" aria-label="Total del mes"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}% pagado</span></div>
+      <div class="kpi-half" aria-label="Total del mes"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></div>
       <span class="kpi-div" aria-hidden="true"></span>
-      <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(pend / totalImp * 100) : 0}% del mes</span></button>
+      <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(pend)}</span></button>
+      ${barra}
     </div>
-    <div class="kpi-legend">${tiles}</div>`;
+    <div class="kpi-legend sin-sub">${tiles}</div>`;
 }
 
 /* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
