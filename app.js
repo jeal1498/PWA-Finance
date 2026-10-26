@@ -371,29 +371,27 @@ function renderHeroMetas(b) {
   const faltante = m => m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0;
   /* Meta diaria de los planes: lo que hay que ahorrar hoy para llegar a la fecha de cada plan con saldo (redondeado hacia arriba por plan). */
   const metaDiaPlanes = base.filter(m => faltante(m) > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(faltante(m) / daysFromToday(m.date)), 0);
-  const alcanzadas = base.filter(m => plazoKey(m) === 'alcanzada');
   const vencidas = base.filter(m => plazoKey(m) === 'vencida');
   const enCurso = base.filter(m => ['proxima', 'largo'].includes(plazoKey(m)));
   const atrasado = vencidas.reduce((t, m) => t + faltante(m), 0);
   const porLograr = enCurso.reduce((t, m) => t + faltante(m), 0);
-  const pct = totalObj > 0 ? Math.round(totalAbo / totalObj * 100) : 0;
 
   const tiles = [
-    { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo, sub: `${pct}% del total` },
-    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'plan', 'planes') },
-    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado, sub: plural(vencidas.length, 'plan', 'planes') }
+    { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo },
+    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr },
+    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado }
   ].map(t => {
     const on = state.filter === t.filter;
-    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todas' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span><span class="kpi-s">${t.sub}</span></span></button>`;
+    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todas' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span></span></button>`;
   }).join('');
 
   $('#kpi-dash').innerHTML = `
-    <div class="kpi-split">
-      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">por día</span></div>
+    <div class="kpi-legend sin-sub">${tiles}</div>
+    <div class="kpi-split pagar">
+      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span></div>
       <span class="kpi-div" aria-hidden="true"></span>
-      <button type="button" class="kpi-half" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span class="kpi-pv">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></button>
-    </div>
-    <div class="kpi-legend">${tiles}</div>`;
+      <button type="button" class="kpi-half" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span class="kpi-pv">${fmtMoney(totalObj)}</span></button>
+    </div>`;
   $('#kpi-dash').hidden = false;
 }
 
@@ -1419,7 +1417,7 @@ function kpiDashboard(base) {
   return `
     <div class="kpi-legend sin-sub">${tiles}</div>
     <div class="kpi-split pagar">
-      <div class="kpi-half" aria-label="Total del mes"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></div>
+      <button type="button" class="kpi-half" data-action="resumen" aria-label="Total del mes: mostrar todo" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></button>
       <span class="kpi-div" aria-hidden="true"></span>
       <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(pend)}</span></button>
     </div>`;

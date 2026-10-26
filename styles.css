@@ -916,3 +916,8 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-split.pagar .kpi-div { margin: 10px 0; }
 /* Pagar: primero los tres mosaicos de estado y debajo la tarjeta Total | Por pagar. */
 .kpi-legend.sin-sub { margin-top: 8px; }
+
+/* Apartar: los tres periodos con la misma tipografía y medidas que los mosaicos de Pagar (sin color de estatus). */
+.kpi-legend.ap4 .lg-p { gap: 2px; }
+.kpi-legend.ap4 .lg-p .kpi-lg-t { font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; line-height: 1.2; color: var(--ink); }
+.kpi-legend.ap4 .lg-p .kpi-lg-m { font-family: var(--font-data); font-size: 19px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; color: var(--ink); }
