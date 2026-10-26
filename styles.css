@@ -921,3 +921,6 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-legend.ap4 .lg-p { gap: 2px; }
 .kpi-legend.ap4 .lg-p .kpi-lg-t { font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; line-height: 1.2; color: var(--ink); }
 .kpi-legend.ap4 .lg-p .kpi-lg-m { font-family: var(--font-data); font-size: 19px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; color: var(--ink); }
+/* Apartar: los tres periodos arriba y «Pagar ya» debajo (54 px), igual que Pagar. */
+.kpi-legend.ap4 { margin-top: 8px; }
+.kpi-ya { height: 54px; min-height: 54px; margin-top: 8px; }
