@@ -65,6 +65,8 @@ const catString = c => `${c.emoji} ${c.id}`;
 const catLabelOf = str => { const s = String(str); const i = s.indexOf(' '); return i >= 0 ? s.slice(i + 1) : s; };
 /* Conceptos con el mismo nombre se relacionan (sin importar mayúsculas, acentos ni espacios dobles). */
 const llave = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+/* Clave de relación: mismo nombre Y misma categoría (un «Gym» de Yo y uno de Karen no se mezclan). */
+const llaveC = x => llave(x.conc) + '|' + llave(catLabelOf(x.cat));
 const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelOf(str), emoji: '•' };
 
 /* =========================================================
@@ -549,7 +551,7 @@ function pagoRow(m) {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${!m.esProximo && enMes(m.date) && (chipMes.get(llave(m.conc)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llave(m.conc))} pagos con este nombre este mes">×${chipMes.get(llave(m.conc))}</em>` : ''}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
+    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${!m.esProximo && enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : `<small class="pt-ap"><span class="w">apartar </span><i>${fmtMoney(Math.ceil(i.pend / daysFromToday(m.date)))}</i>/día</small>`)}</span>
   </button>`;
 }
@@ -561,7 +563,7 @@ const mesBar = () => `<button type="button" class="pt-mes" data-action="month-pi
 let chipMes = new Map();
 function calcularChips() {
   chipMes = new Map();
-  for (const x of movimientos) if (enMes(parseDate(x.fecha))) { const k = llave(x.conc); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
+  for (const x of movimientos) if (enMes(parseDate(x.fecha))) { const k = llaveC(x); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
 }
 
 function pagosTable(b) {
@@ -831,15 +833,15 @@ function submitAbonoEdit() {
 }
 
 function conceptoHTML(m) {
-  const k = llave(m.conc), anio = m.fecha.slice(0, 4);
-  const grupo = movimientos.filter(x => llave(x.conc) === k && x.fecha.slice(0, 4) === anio).sort(byFecha);
+  const k = llaveC(m), anio = m.fecha.slice(0, 4);
+  const grupo = movimientos.filter(x => llaveC(x) === k && x.fecha.slice(0, 4) === anio).sort(byFecha);
   if (grupo.length < 2) return '';
   const total = sum(grupo, 'imp');
   const ult = grupo.filter(x => x.id !== m.id && x.abo >= x.imp).pop();
   const sig = grupo.find(x => x.id !== m.id && x.fecha > m.fecha && x.abo < x.imp);
   const fila = (t, v) => `<div class="hist-row"><span>${t}</span><b>${v}</b></div>`;
   return `<div class="hist concepto">
-    <div class="hist-head"><h3>Historial de «${esc(m.conc)}» · ${anio}</h3><span>${plural(grupo.length, 'pago', 'pagos')}</span></div>
+    <div class="hist-head"><h3>Historial de «${esc(m.conc)}» · ${esc(catLabelOf(m.cat))} · ${anio}</h3><span>${plural(grupo.length, 'pago', 'pagos')}</span></div>
     ${fila('Total del año', fmtMoney(total))}${fila('Promedio por pago', fmtMoney(Math.round(total / grupo.length * 100) / 100))}
     ${ult ? fila('Último pagado', `${fmtDate(ult.fecha)} · ${fmtMoney(ult.imp)}`) : ''}${sig ? fila('Siguiente', `${fmtDate(sig.fecha)} · ${fmtMoney(sig.imp)}`) : ''}
   </div>`;
@@ -1006,8 +1008,8 @@ function sugerencias(texto, kind) {
   if (!q) return [];
   const g = new Map();
   for (const x of listOf(kind).slice().sort(byFecha)) {
-    const k = llave(x.conc);
-    if (!k.includes(q)) continue;
+    if (!llave(x.conc).includes(q)) continue;
+    const k = llaveC(x);
     const e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, imps: new Map() };
     e.nombre = x.conc; e.cat = x.cat; e.n++;
     e.imps.set(x.imp, { n: ((e.imps.get(x.imp) || {}).n || 0) + 1, ult: e.n });
@@ -1173,7 +1175,7 @@ function openConceptos() {
   const g = new Map();
   for (const x of movimientos.slice().sort(byFecha)) {
     if (!dentro(x)) continue;
-    const k = llave(x.conc), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
+    const k = llaveC(x), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
     e.nombre = x.conc; e.cat = x.cat; e.n++; e.total += x.imp;
     g.set(k, e);
   }
@@ -1183,7 +1185,7 @@ function openConceptos() {
   sheet.ctx = { type: 'conceptos' };
   const html = `<div class="cp-chips">${chips}</div>
     ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
-    ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
+    ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
       : '<div class="empty"><strong>Sin pagos</strong>No hay pagos en este periodo.</div>'}`;
   if (sheet.el.hidden) openSheet('Por concepto', html); else { sheet.body.innerHTML = html; sheet.body.scrollTop = 0; }
 }
