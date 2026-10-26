@@ -59,7 +59,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Persistencia: IndexedDB de SecondBrain (stores "movimientos" y "metas").
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
-const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', cat: 'finanzas_ultima_cat' };
+const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 
@@ -141,9 +141,11 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
 
+const VISTAS = ['gastos', 'metas', 'apartar', 'perfil'];
+const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
-  view: 'gastos',
-  filter: 'todos',
+  view: vista0,
+  filter: vista0 === 'metas' ? 'todas' : 'todos',
   grouping: lsGet(KEYS.group) === 'urgencia' ? 'urgencia' : 'categoria',
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
   open: {},
@@ -1347,6 +1349,7 @@ async function undoImport(snap) {
 function setView(v) {
   closeSheet();
   state.view = v;
+  lsSet(KEYS.view, v);
   state.filter = v === 'gastos' ? 'todos' : 'todas';
   state.search = '';
   $('#search').value = '';
