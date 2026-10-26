@@ -520,7 +520,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url('fonts/jetbrains.woff2') format('woff2'); }
 
 .pt { --sans: var(--font); --mono: var(--font-data); font-family: var(--sans); background: var(--surface); border: 1px solid var(--line); border-radius: 22px; overflow: clip; }
-.pt-cols { display: grid; grid-template-columns: 40px 40px 50px minmax(0, 1fr) minmax(54px, max-content); column-gap: 4px; padding-inline: 8px; width: 100%; }
+.pt-cols { display: grid; grid-template-columns: 40px 30px 30px minmax(0, 1fr) minmax(54px, max-content); column-gap: 4px; padding-inline: 8px; width: 100%; }
 .pt-th { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .pt-h { display: flex; }
 .pt-h.r { justify-content: flex-end; }
