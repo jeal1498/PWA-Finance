@@ -902,24 +902,17 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .pt-foot2 b { font-size: 15px; color: var(--ink); }
 @media (min-width: 768px) { .kpi-legend.ap4 { grid-template-columns: minmax(0, 1fr); } }
 
-/* Pagar: sin tercera línea en los mosaicos; barra de estado pegada al borde inferior de la tarjeta partida. */
+/* Pagar: sin tercera línea en los mosaicos. */
 .kpi-split { position: relative; }
-.kpi-split .kpi-half { padding-bottom: 6px; }
-.kpi-split .kpi-div { margin-bottom: 20px; }
-.kpi-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; display: flex; background: #2A2A33; }
-.kpi-bar i { display: block; height: 100%; min-width: 2px; }
-.kpi-bar .bar-a { background: var(--ok); }
-.kpi-bar .bar-c { background: var(--warn); }
-.kpi-bar .bar-b { background: var(--danger); }
 .kpi-legend.sin-sub .kpi-lg { justify-content: center; gap: 4px; }
 /* Pagar: mosaicos de estado con la misma altura que los de Apartar (54 px). */
 .kpi-legend.sin-sub .kpi-lg { height: 54px; min-height: 54px; padding: 0 6px; gap: 2px; border-radius: 16px; }
 .kpi-legend.sin-sub .kpi-lg-t { font-size: 14px; line-height: 1.2; }
 .kpi-legend.sin-sub .kpi-lg-m { font-size: 19px; line-height: 1.2; }
-/* Pagar: la tarjeta Total | Por pagar también a 54 px (la barra de estado va dentro de esa altura). */
+/* Pagar: la tarjeta Total | Por pagar también a 54 px . */
 .kpi-split.pagar { height: 54px; }
 .kpi-split.pagar .kpi-sec { font-size: 11px; line-height: 1.2; }
 .kpi-split.pagar .kpi-pv { font-size: 22px; line-height: 1.15; }
-.kpi-split.pagar .kpi-div { margin: 10px 0 16px; }
+.kpi-split.pagar .kpi-div { margin: 10px 0; }
 /* Pagar: primero los tres mosaicos de estado y debajo la tarjeta Total | Por pagar. */
 .kpi-legend.sin-sub { margin-top: 8px; }
