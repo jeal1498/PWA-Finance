@@ -1190,6 +1190,7 @@ function renderPerfil() {
     <h2 class="perfil-h">Respaldo</h2>
     <div class="menu">
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
+      <button type="button" class="menu-row" data-action="fondo-apartar">${ICO.upload}<span><b>Fondo de pantalla</b><small>Imagen 9:16 con la meta del periodo elegido en Apartar</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-conceptos">${ICO.list}<span><b>Resumen por concepto</b><small>Cuánto suma cada nombre</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
@@ -1213,6 +1214,18 @@ const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / 
 /* «12 pagos · 3 planes» (omite los planes si no hay). */
 const desglose = lista => { const pl = lista.filter(m => m.kind === 'meta').length; return plural(lista.length - pl, 'pago', 'pagos') + (pl ? ` · ${plural(pl, 'plan', 'planes')}` : ''); };
 
+/* Datos del fondo 9:16 con el periodo que está elegido en Apartar (se genera desde Ajustes). */
+function datosFondoApartar() {
+  const all = apartarItems(), fut = all.filter(m => m.d > 0);
+  const k = (APARTAR.find(p => p[0] === state.apartar) || APARTAR[0])[0];
+  const lim = k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : 30;
+  const meta = k === 'dia' ? fut.reduce((t, m) => t + apartarMonto(m, 1), 0) : fut.filter(m => m.d <= lim).reduce((t, m) => t + m.pend, 0);
+  const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
+  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
+  const pct = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
+  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}`, meta, dias: 30, pct, porv: all.filter(m => m.d >= 0).length };
+}
+
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
@@ -1224,13 +1237,10 @@ function renderApartar() {
   const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
   const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
-  const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
-  const pctVentana = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
   const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
     <div class="kpi-ya${ya.length ? '' : ' ok'}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></div>
-    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}<button type="button" class="kpi-lg lg-p kpi-fondo" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}" data-meta="${totPer(per[0])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}" aria-label="Generar fondo de pantalla">${ICO.upload}</button></div>`;
+    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
@@ -1665,6 +1675,7 @@ document.addEventListener('click', async e => {
     case 'close-sheet': requestClose(); break;
     case 'share-month': shareMonth(); break;
     case 'fondo': shareFondo(t.dataset); break;
+    case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
     case 'open-sync': openSync(); break;
     case 'sync-push': syncPush(); break;
     case 'sync-pull': syncPull(); break;
