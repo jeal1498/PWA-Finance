@@ -560,9 +560,8 @@ function render() {
   generarRepetidos(hoyIdx + 1);
   const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
   document.body.dataset.view = state.view;
-  ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP || isA; });
+  ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
-  $('#apartar').hidden = !isA;
   $$('#view-switch .nav-btn').forEach(b => { if (b.dataset.view === state.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   $('#month-label').disabled = !isG;
   $('.controls').hidden = true;
@@ -999,39 +998,45 @@ function apartarItems() {
 }
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
+/* Misma distribución que Pagos y Próximos: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
   const tot = len => fut.reduce((t, m) => t + apartarMonto(m, len), 0);
-  const chips = APARTAR.map(([k, l, len]) => `<button type="button" class="ap-chip" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span>${l.toUpperCase()}</span><b>${fmtMoney(tot(len))}</b></button>`).join('');
+  const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
   const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
-  const rows = fut.map(m => `<button type="button" class="pt-row ap-row" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}">
-      <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
-      <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota ap-nota">${plural(m.d, 'día', 'días')} · ${fmtMoney(m.pend)}</span></span>
-      <span class="ap-x">${plural(m.d, 'día', 'días')}</span><span class="ap-x">${fmtMoney(m.pend)}</span>
-      <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b></span>
-    </button>`).join('');
-  $('#apartar').innerHTML = `
-    <div class="ap-side">
-      <div class="ap-hero"><span class="kpi-sec">APARTAR POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span><span class="ap-big">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">para llegar a cada fecha de pago</span></div>
-      <div class="ap-chips" role="group" aria-label="Periodo">${chips}</div>
-      ${ya.length ? `<button type="button" class="ap-ya" data-action="resumen-ya"><span><span class="kpi-sec">PAGAR YA</span><span class="kpi-s">${nota}</span></span><b>${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))}</b></button>` : ''}
+  const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  const tiles = APARTAR.map(([k, l, len]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${l}</span><span><span class="kpi-lg-m">${fmtMoney(tot(len))}</span></span></button>`).join('');
+  $('#kpi-dash').innerHTML = `
+    <div class="kpi-alert">
+      <span class="kpi-alert-ico">${ic('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>')}</span>
+      <span class="kpi-main"><span class="kpi-sec">PAGAR YA</span><span class="kpi-alert-v">${ya.length ? `${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))} · ${plural(ya.length, 'pago', 'pagos')}` : 'Nada atrasado'}</span>${nota ? `<span class="kpi-alert-note">${nota}</span>` : ''}</span>
     </div>
-    <div class="ap-main">
-      ${fut.length ? `<h2 class="perfil-h">Por concepto · ${per[1].toLowerCase()}</h2><div class="ap-tbl"><div class="ap-th" aria-hidden="true"><span></span><span>CONCEPTO</span><span>FALTAN</span><span>PENDIENTE</span><span>POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span></div>${rows}</div>` : `<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>`}
-    </div>`;
-  fitApartar();
+    <div class="kpi-pair">
+      <div class="kpi-lg"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></div>
+      <div class="kpi-lg kpi-total"><span class="kpi-sec">PENDIENTE</span><span><span class="kpi-pv">${fmtMoney(sum(fut, 'pend'))}</span><span class="kpi-s">próximos 30 días</span></span></div>
+    </div>
+    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
+  $('#kpi-dash').hidden = false;
+  $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
+  $('#list-count').textContent = '';
+  if (!fut.length) { $('#list').innerHTML = '<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>'; return; }
+  const head = [['Fecha', ''], ['Est.', ''], ['Cat.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
+  const rows = fut.map(m => {
+    const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
+    return `<button type="button" class="pt-cols pt-row" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}">
+    <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
+    <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
+    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
+    <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
+    <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b><small>de ${fmtMoney(m.pend)}</small></span>
+  </button>`;
+  }).join('');
+  const cats = [...new Map(fut.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(fut.length, 'pago', 'pagos')} · por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}</span><b>${fmtMoney(tot(per[2]))}</b></div></div>
+    <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span>${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
-
-/* La lista de Apartar ocupa el alto que queda en pantalla (hasta la barra inferior) y se desplaza por dentro. */
-function fitApartar() {
-  const t = $('.ap-tbl'), nav = $('.bottom-nav');
-  if (!t || $('#apartar').hidden) return;
-  const room = nav.getBoundingClientRect().top - t.getBoundingClientRect().top - 14;
-  t.style.maxHeight = Math.max(160, room) + 'px';
-}
-window.addEventListener('resize', fitApartar);
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
    y completa hasta el último pago. Se dibuja como SVG con foreignObject; fuentes e iconos van embebidos. */
@@ -1431,7 +1436,6 @@ document.addEventListener('click', async e => {
       else if (state.search) { state.search = ''; $('#search').value = ''; render(); }
       break;
     }
-    case 'resumen-ya': state.filter = 'todos'; setView('gastos'); break;
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
