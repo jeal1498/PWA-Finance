@@ -818,10 +818,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pt-conc .rep-ic, .pt-conc .pt-tag { flex: none; }
 .pt-nota { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Sin título arriba: solo Pagar lleva una pastilla con el mes (se toca o se desliza); las demás pantallas no tienen encabezado. */
-.header { padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 0; }
-.header-title-row { min-height: 40px; margin-top: 0; justify-content: center; }
-#month-label { width: auto; min-height: 0; padding: 7px 14px; border-radius: 99px; background: rgba(244, 244, 239, .08); box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .25); font-family: var(--font); font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--ink); }
-#month-label::after { content: "▾"; margin-left: 6px; opacity: .6; }
-body:not([data-view="gastos"]) .header { display: none; }
-body:not([data-view="gastos"]) .app { padding-top: calc(14px + env(safe-area-inset-top)); }
+/* Sin encabezado arriba: el mes de Pagar va dentro de la tabla, centrado. */
+.header { display: none; }
+.app { padding-top: calc(14px + env(safe-area-inset-top)); }
+.pt-mes { display: flex; align-items: center; justify-content: center; width: 100%; height: 44px; padding: 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font-family: var(--font-title); font-size: 17px; font-weight: 800; letter-spacing: -.02em; touch-action: pan-y pinch-zoom; }
