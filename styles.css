@@ -753,3 +753,6 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pay-row small { color: var(--muted); margin-top: 0; font-size: 12.5px; }
 .pay-main b, .pay-amt b { font-size: 15px; }
 .pay-amt b { font-family: var(--font-data); font-weight: 500; font-size: 14px; }
+
+.kpi-bar { display: block; height: 5px; margin: 3px 0 2px; border-radius: 3px; background: rgba(244, 244, 239, .14); overflow: hidden; }
+.kpi-bar i { display: block; height: 100%; background: var(--ok); }
