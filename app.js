@@ -1149,7 +1149,7 @@ function kpiDashboard(base) {
     </div>
     <div class="kpi-pair">
       <button type="button" class="kpi-lg" data-action="fondo" data-meta="${Math.round(pend / dias)}" data-dias="${dias}" data-pct="${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}" data-porv="${porV.length}"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo mes actual'}</span></span></button>
-      <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">TODO EL MES</span><span><span class="kpi-pv">${fmtMoney(totalImp)}</span><span class="kpi-s">${plural(base.length, 'pago', 'pagos')}</span></span></button>
+      <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">TODO EL MES</span><span><span class="kpi-pv">${fmtMoney(totalImp)}</span><span class="kpi-bar" aria-hidden="true"><i style="width:${totalImp > 0 ? Math.min(100, Math.round(totalAbo / totalImp * 100)) : 0}%"></i></span><span class="kpi-s">Faltan ${fmtMoney(pend)}</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
 }
