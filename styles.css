@@ -885,3 +885,13 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-ya b { font-family: var(--font-title); font-weight: 800; font-size: 17px; }
 .kpi-ya > span:last-child { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .kpi-ya.ok .kpi-ya-t { color: var(--muted); }
+
+/* Mismo estilo que la franja «Pagar ya» en toda la cabecera de Apartar: fondo tablero, borde fino de 1 px, esquinas de 16 px,
+   etiqueta en mono y cifra en Bricolage. El seleccionado lleva borde hueso de 2 px. */
+.kpi-split { border-radius: 16px; }
+.kpi-half[aria-pressed="true"] { background: none; }
+.kpi-legend.ap4 .lg-p { padding: 0 6px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; border-radius: 16px; height: 54px; min-height: 54px; justify-content: center; gap: 2px; }
+.kpi-legend.ap4 .lg-p[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.kpi-legend.ap4 .lg-p .kpi-lg-t { font-family: var(--font-data); font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.kpi-legend.ap4 .lg-p .kpi-lg-m { font-family: var(--font-title); font-weight: 800; font-size: 17px; letter-spacing: 0; color: var(--ink); }
+.kpi-legend.ap4 .lg-p .kpi-lg-t, .kpi-legend.ap4 .lg-p .kpi-lg-m { line-height: 1.25; }
