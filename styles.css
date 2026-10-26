@@ -729,3 +729,27 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .kpi-alert .kpi-main { min-width: 0; }
 .kpi-alert .kpi-sec, .kpi-alert-v, .kpi-alert-note, .kpi-lg-t, .kpi-lg-m, .kpi-pv, .kpi-s { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-lg > span:last-child { min-width: 0; max-width: 100%; }
+
+/* Detalle: cifras en una caja centrada, sin barra de progreso; lista «Abonar o pagar» con chips y franja */
+.detail-top { gap: 8px; font-size: 14px; }
+.detail-st { font-weight: 700; }
+.detail-st.t-danger { color: var(--danger); } .detail-st.t-warn { color: var(--warn); } .detail-st.t-ok { color: var(--ok); } .detail-st.t-muted { color: var(--muted); }
+.figbox { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 8px 0; padding: 8px 0; border-radius: 18px; background: rgba(244, 244, 239, .08); box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
+.figbox > div { min-width: 0; padding: 0 6px; text-align: center; border-left: 1px solid rgba(244, 244, 239, .35); }
+.figbox > div:first-child { border-left: 0; }
+.figbox span { display: block; font-size: 12px; color: var(--muted); }
+.figbox b { display: block; font-family: var(--font-data); font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist { margin-top: 10px; }
+.hist-row { min-height: 36px; font-size: 14px; }
+.hist-head h3 { font-size: 13px; }
+.pay-chips { display: flex; gap: 6px; margin-top: 10px; }
+.pchip { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border: 0; border-radius: 99px; background: none; color: var(--ink); font-size: 13px; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
+.pchip.on { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.pchip-ic .ic { width: 15px; height: 15px; }
+.pay-row { position: relative; min-height: 50px; padding: 6px 4px 6px 12px; gap: 10px; }
+.pay-row::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: transparent; }
+.pay-row.tone-danger::before { background: var(--danger); }
+.pay-row.tone-warn::before { background: var(--warn); }
+.pay-row small { color: var(--muted); margin-top: 0; font-size: 12.5px; }
+.pay-main b, .pay-amt b { font-size: 15px; }
+.pay-amt b { font-family: var(--font-data); font-weight: 500; font-size: 14px; }

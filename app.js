@@ -647,14 +647,13 @@ function summaryHTML(m, i, isMeta) {
     <div class="detail-top">
       <span class="pill">${catIcon(c)}${esc(c.id)}</span>
       <span>${fmtDateFull(m.fecha)}</span>
+      <span class="detail-st t-${i.tone}">${i.text}</span>
     </div>
-    <p class="detail-status t-${i.tone}">${i.text}</p>
-    <div class="figs">
-      <div class="fig"><span>${labels[0]}</span><b>${fmtMoney(i.pend)}</b></div>
-      <div class="fig"><span>${labels[1]}</span><b>${fmtMoney(m.abo)}</b></div>
-      <div class="fig"><span>${labels[2]}</span><b>${m.imp > 0 ? fmtMoney(m.imp) : '—'}</b></div>
+    <div class="figbox">
+      <div><span>${labels[0]}</span><b>${fmtMoney(i.pend)}</b></div>
+      <div><span>${labels[1]}</span><b>${fmtMoney(m.abo)}</b></div>
+      <div><span>${labels[2]}</span><b>${m.imp > 0 ? fmtMoney(m.imp) : '—'}</b></div>
     </div>
-    <div class="meter" aria-hidden="true"><span style="width:${i.pct}%"></span></div>
     ${i.plan ? `<p class="plan">Para llegar a tiempo: ${i.plan}.</p>` : ''}`;
 }
 
@@ -781,20 +780,21 @@ function addTabs(kind, mode) {
 
 function openAdd(kind, mode) { if (mode === 'pay') openPay(kind); else openForm(kind, null); }
 
-function payListHTML(kind, q) {
+function payListHTML(kind, q, f = 'todos') {
   const isMeta = kind === 'meta';
   q = q.trim().toLowerCase();
   const arr = (isMeta ? metas.map(procesarMeta) : movimientos.map(procesar))
     .filter(m => m.imp > 0 && m.abo < m.imp && (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q)))
+    .filter(m => f === 'todos' || ((isMeta ? metaInfo(m) : gastoInfo(m)).tone === 'danger') === (f === 'atrasado'))
     .sort(porFechaYMonto);
   if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay próximos por completar.' : 'No hay pagos pendientes.')}</p>`;
   return arr.map(m => {
     const i = isMeta ? metaInfo(m) : gastoInfo(m);
     const extra = m.abo > 0 ? ` · ${isMeta ? 'ahorrado' : 'abonado'} ${fmtMoney(m.abo)}` : '';
-    return `<button type="button" class="pay-row" data-action="pay-pick" data-id="${esc(m.id)}">
+    return `<button type="button" class="pay-row tone-${i.tone}" data-action="pay-pick" data-id="${esc(m.id)}">
       <span class="pay-ic" aria-hidden="true">${catIcon(catOf(m.cat))}</span>
-      <span class="pay-main"><b>${esc(m.conc)}</b><small class="t-${i.tone}">${i.text}${extra}</small></span>
-      <span class="pay-amt"><b>${fmtMoney(i.pend)}</b><small>${isMeta ? 'falta' : 'pendiente'}</small></span>
+      <span class="pay-main"><b>${esc(m.conc)}</b><small>${i.text}${extra}</small></span>
+      <span class="pay-amt"><b>${fmtMoney(i.pend)}</b></span>
     </button>`;
   }).join('');
 }
@@ -803,12 +803,16 @@ function openPay(kind) {
   const isMeta = kind === 'meta';
   sheet.ctx = { type: 'add', kind };
   openSheet('Agregar movimiento', `${addTabs(kind, 'pay')}
-    <div class="pay-search">
+    <div class="pay-chips" id="pay-chips">
+      ${[['todos', 'Todos'], ['atrasado', isMeta ? 'Atrasadas' : 'Atrasados'], ['porvencer', isMeta ? 'En curso' : 'Por vencer']].map(([k, l]) => `<button type="button" class="pchip${k === 'todos' ? ' on' : ''}" data-action="pay-filter" data-f="${k}" aria-pressed="${k === 'todos'}">${l}</button>`).join('')}
+      <button type="button" class="pchip pchip-ic" data-action="pay-search-toggle" aria-label="Buscar concepto o categoría" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    </div>
+    <div class="pay-search" id="pay-search-wrap" hidden>
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="pay-search" type="search" autocomplete="off" aria-label="Buscar concepto o categoría" placeholder="Buscar concepto o categoría">
     </div>
-    <p class="label pay-cap">${isMeta ? 'Por completar, la más próxima primero' : 'Por pagar, de lo más urgente'}</p>
     <div id="pay-list">${payListHTML(kind, '')}</div>`);
+  sheet.ctx.payF = 'todos';
   sheet.panel.focus({ preventScroll: true });
 }
 
@@ -1339,6 +1343,19 @@ document.addEventListener('click', async e => {
     case 'discard-yes': { const go = sheet.discard; $('#discard').remove(); if (go) go(); break; }
     case 'pay-pick': openPayDetail(sheet.ctx.kind, t.dataset.id); break;
     case 'pay-back': openPay(sheet.ctx.kind); break;
+    case 'pay-filter': {
+      sheet.ctx.payF = t.dataset.f;
+      $$('#pay-chips [data-f]').forEach(c => { const on = c === t; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); });
+      $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, $('#pay-search').value, sheet.ctx.payF);
+      break;
+    }
+    case 'pay-search-toggle': {
+      const w = $('#pay-search-wrap');
+      w.hidden = !w.hidden;
+      t.setAttribute('aria-expanded', String(!w.hidden));
+      if (!w.hidden) $('#pay-search').focus(); else { $('#pay-search').value = ''; $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, '', sheet.ctx.payF); }
+      break;
+    }
     case 'group': setGrouping(t.dataset.group); break;
     case 'month-picker': openMonthPicker(); break;
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
@@ -1414,7 +1431,7 @@ document.addEventListener('submit', e => {
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
 document.addEventListener('input', e => {
-  if (e.target.id === 'pay-search') $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, e.target.value);
+  if (e.target.id === 'pay-search') $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, e.target.value, sheet.ctx.payF);
   if (e.target.getAttribute('aria-invalid')) {
     e.target.removeAttribute('aria-invalid');
     const m = $('#' + e.target.getAttribute('aria-describedby'));
