@@ -629,6 +629,7 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
    ========================================================= */
 function render() {
   refrescarHoy();
+  marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
   const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
@@ -1374,6 +1375,29 @@ async function syncSave(form) {
   await syncPush();
 }
 
+/* Botón de sincronizar (arriba del «+»): envía de una vez; sin conexión a la hoja abre la pantalla para conectarla. */
+function marcaSync() {
+  const b = $('#nav-sync');
+  if (b) b.classList.toggle('err', !!(sync.connection() && sync.getCfg().error));
+}
+async function syncRapido(btn) {
+  if (!sync.connection()) { openSync(); return; }
+  btn.classList.add('girando'); btn.disabled = true;
+  try {
+    try { await sync.push(movimientos, metas, { dbOk }); }
+    catch (e) {
+      if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
+      await sync.push(movimientos, metas, { dbOk, force: true });
+    }
+    toast('Sincronizado con Google Sheets');
+  } catch (e) {
+    sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
+    toast(e.message || 'No se pudo sincronizar');
+  } finally {
+    btn.classList.remove('girando'); btn.disabled = false; marcaSync();
+  }
+}
+
 async function syncPush() {
   const btn = $('#sync-push');
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
@@ -1647,6 +1671,7 @@ document.addEventListener('click', async e => {
       if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
       break;
     }
+    case 'sync-quick': syncRapido(t); break;
     case 'abono-edit': openAbonoEdit(sheet.ctx.kind, sheet.ctx.id, +t.dataset.idx); break;
     case 'abono-back': openDetail(sheet.ctx.kind, sheet.ctx.id); break;
     case 'abono-del': {
