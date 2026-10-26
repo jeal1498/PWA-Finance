@@ -1420,13 +1420,13 @@ function kpiDashboard(base) {
   const barra = `<div class="kpi-bar" role="img" aria-label="${tramos.map(t => `${Math.round(t[1] / totalImp * 100)}% ${t[2]}`).join(', ') || 'sin pagos'}">${tramos.map(t => `<i class="bar-${t[0]}" style="flex:${t[1]}"></i>`).join('')}</div>`;
 
   return `
+    <div class="kpi-legend sin-sub">${tiles}</div>
     <div class="kpi-split pagar">
       <div class="kpi-half" aria-label="Total del mes"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></div>
       <span class="kpi-div" aria-hidden="true"></span>
       <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(pend)}</span></button>
       ${barra}
-    </div>
-    <div class="kpi-legend sin-sub">${tiles}</div>`;
+    </div>`;
 }
 
 /* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
