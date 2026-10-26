@@ -8,7 +8,7 @@ PWA de uso propio para llevar **pagos con abonos y metas de ahorro**. Antes viv�
 
 ## Reglas
 - **Identidad familia Checa** (igual que Garaje y Clientela): solo oscuro, asfalto `#0C0C10` / tablero `#16161C` / hueso `#F4F4EF`; títulos y cifras grandes en Bricolage 800, texto DM Sans, cifras de tabla JetBrains Mono. El color solo significa estado (verde pagado `#22C55E`, amarillo por vencer `#FACC15`, rojo atrasado `#EF4444`). «Atención inmediata» es tarjeta amarilla llena. Ya no hay modo claro ni interruptor de tema.
-- **Densidad compacta** en toda la app (bloque final de `styles.css`): campos de 38 px con fondo y borde hueso tenue, botones de 44 px, interruptor de 44×26, hojas con 16 px de margen. No volver a alturas de 50–52 px.
+- **Densidad compacta** en toda la app (bloque final de `styles.css`): campos de 38 px con fondo y borde hueso tenue, botones de 44 px, interruptor de 44×26, hojas con 16 px de margen. No volver a alturas de 50–52 px. Pantallas principales (Pagos y Próximos) compactas y con las mismas medidas: mosaicos y tarjetas de 78 px, fila de tabla ~44 px, barra inferior de 56 px.
 - **Sin build ni dependencias**: HTML + CSS + JS (ES modules) puros. Se sirve tal cual en GitHub Pages desde `main`: https://jeal1498.github.io/PWA-Finance/
 - **Sube `CACHE` en `sw.js` en cada cambio** (`finanzas-vN`) o el teléfono no se actualiza; `ASSETS` debe listar todos los archivos.
 - **El repo es público: no van pagos, nombres reales ni datos personales en el código** (la app arranca vacía). Los datos se entregan por chat como archivo para ⋯ Importar.

@@ -527,7 +527,7 @@ function metasTable(b) {
 
 function renderMetasList(b) {
   $('#list-caption').textContent = 'Próximos';
-  $('#list-count').textContent = `${plural(b.items.length, 'próximo', 'próximos')} · toca una columna para ordenar`;
+  $('#list-count').textContent = '';
   if (b.items.length) { $('#list').innerHTML = metasTable(b); return; }
   renderList([], '', '', 'metas', b.base.length === 0);
 }
