@@ -370,6 +370,8 @@ function renderHeroMetas(b) {
   const totalObj = sum(base, 'imp'), totalAbo = sum(base, 'abo');
   const pend = base.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
   const faltante = m => m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0;
+  /* Meta diaria de los planes: lo que hay que ahorrar hoy para llegar a la fecha de cada plan con saldo (redondeado hacia arriba por plan). */
+  const metaDiaPlanes = base.filter(m => faltante(m) > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(faltante(m) / daysFromToday(m.date)), 0);
   const alcanzadas = base.filter(m => plazoKey(m) === 'alcanzada');
   const vencidas = base.filter(m => plazoKey(m) === 'vencida');
   const enCurso = base.filter(m => ['proxima', 'largo'].includes(plazoKey(m)));
@@ -396,7 +398,7 @@ function renderHeroMetas(b) {
       <span class="kpi-main"><span class="kpi-sec">SIGUIENTE</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
     </div>
     <div class="kpi-pair">
-      <div class="kpi-lg"><span class="kpi-sec">POR AHORRAR</span><span><span class="kpi-pv sm">${fmtMoney(pend)}</span><span class="kpi-s">${totalObj > 0 ? `de ${fmtMoney(totalObj)}` : 'sin monto'}</span></span></div>
+      <div class="kpi-lg"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv sm">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">por día</span></span></div>
       <button type="button" class="kpi-lg kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span><span class="kpi-pv sm">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
