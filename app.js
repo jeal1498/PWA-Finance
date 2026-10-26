@@ -378,10 +378,6 @@ function renderHeroMetas(b) {
   const porLograr = enCurso.reduce((t, m) => t + faltante(m), 0);
   const pct = totalObj > 0 ? Math.round(totalAbo / totalObj * 100) : 0;
 
-  const siguiente = base
-    .filter(m => m.imp > 0 && m.abo < m.imp && daysFromToday(m.date) >= 0)
-    .sort((a, c) => a.date - c.date)[0];
-  const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
     { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo, sub: `${pct}% del total` },
     { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr, sub: plural(enCurso.length, 'plan', 'planes') },
@@ -392,13 +388,10 @@ function renderHeroMetas(b) {
   }).join('');
 
   $('#kpi-dash').innerHTML = `
-    <div class="kpi-alert kpi-alert-meta">
-      <span class="kpi-alert-ico">${ic('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>')}</span>
-      <span class="kpi-main"><span class="kpi-sec">SIGUIENTE</span><span class="kpi-alert-v">${siguiente ? `${esc(siguiente.conc)} · ${fmtDate(siguiente.fecha)} · ${fmtMoney(faltante(siguiente))}` : 'Sin metas en curso'}</span></span>
-    </div>
-    <div class="kpi-pair">
-      <div class="kpi-lg"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv sm">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">por día</span></span></div>
-      <button type="button" class="kpi-lg kpi-total" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span><span class="kpi-pv sm">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></span></button>
+    <div class="kpi-split">
+      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span><span class="kpi-s">por día</span></div>
+      <span class="kpi-div" aria-hidden="true"></span>
+      <button type="button" class="kpi-half" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span class="kpi-pv">${fmtMoney(totalObj)}</span><span class="kpi-s">${plural(alcanzadas.length, 'alcanzada', 'alcanzadas')}</span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
@@ -1227,17 +1220,14 @@ function renderApartar() {
   const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
   const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
   const pctVentana = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
-  const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = APARTAR.map(([k, l, len]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${len === 1 ? '1 Día' : `${len} Días`}</span><span><span class="kpi-lg-m">${fmtMoney(tot(len))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
-    <div class="kpi-alert">
-      <span class="kpi-alert-ico">${ic('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>')}</span>
-      <span class="kpi-main"><span class="kpi-sec">PAGAR YA</span><span class="kpi-alert-v">${ya.length ? `${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))} · ${plural(ya.length, 'pago', 'pagos')}` : 'Nada atrasado'}</span>${nota ? `<span class="kpi-alert-note">${nota}</span>` : ''}</span>
+    <div class="kpi-split">
+      <button type="button" class="kpi-half" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${desglose(fut)}</span></button>
+      <span class="kpi-div" aria-hidden="true"></span>
+      <div class="kpi-half"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${desglose(all)}</span></div>
     </div>
-    <div class="kpi-pair">
-      <button type="button" class="kpi-lg" data-action="fondo" data-apartar="1" data-label="META ${per[0] === 'dia' ? 'DIARIA' : per[0] === 'semana' ? 'SEMANAL' : per[0] === 'quincena' ? 'QUINCENAL' : 'MENSUAL'}" data-meta="${tot(per[2])}" data-dias="30" data-pct="${pctVentana}" data-porv="${all.filter(m => m.d >= 0).length}"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${desglose(fut)}</span></span></button>
-      <div class="kpi-lg kpi-total"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${desglose(all)}</span></span></div>
-    </div>
+    <div class="kpi-ya${ya.length ? '' : ' ok'}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></div>
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;

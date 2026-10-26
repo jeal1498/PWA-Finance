@@ -878,3 +878,10 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-half .kpi-pv { font-size: 26px; line-height: 1.1; }
 .kpi-half[aria-pressed="true"] { background: rgba(244, 244, 239, .08); }
 .kpi-div { background: #3A3A45; margin: 14px 0; }
+
+/* Apartar: «Pagar ya» como franja delgada (sin tarjeta amarilla); el rojo solo va en el texto. */
+.kpi-ya { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 8px; min-height: 44px; padding: 0 14px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; align-items: center; }
+.kpi-ya-t { font-family: var(--font-data); font-weight: 600; font-size: 11px; letter-spacing: .14em; color: var(--danger-text); }
+.kpi-ya b { font-family: var(--font-title); font-weight: 800; font-size: 17px; }
+.kpi-ya > span:last-child { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.kpi-ya.ok .kpi-ya-t { color: var(--muted); }
