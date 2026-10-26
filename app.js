@@ -329,7 +329,7 @@ function buildGastos() {
   const base = monthItems();
   const q = state.search.trim().toLowerCase();
   const items = base.filter(m =>
-    (state.filter === 'todos' || m.estado.toLowerCase() === state.filter) &&
+    (state.filter === 'todos' || (state.filter === 'pagado' ? m.abo > 0 : m.estado.toLowerCase() === state.filter)) &&
     (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q))
   );
   return { all, base, items, isUrg, q };
@@ -1312,7 +1312,7 @@ function kpiDashboard(base) {
   const totalAbo = sum(base, 'abo'), totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
   const venc = base.filter(m => m.estado === 'Vencido');
   const porV = base.filter(m => m.estado === 'Pendiente');
-  const pagados = base.filter(m => m.estado === 'Pagado');
+  const conAbono = base.filter(m => m.abo > 0); /* «Pagado» = dinero abonado: el importe y el conteo son de los mismos pagos (liquidados o a medias) */
   const atrasado = sum(venc, 'pendiente');
   const porVencer = sum(porV, 'pendiente');
 
@@ -1326,7 +1326,7 @@ function kpiDashboard(base) {
 
   const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
-    { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo, n: pagados.length },
+    { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo, n: conAbono.length },
     { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer, n: porV.length },
     { k: 'b', filter: 'vencido', label: 'Atrasado', v: atrasado, n: venc.length }
   ].map(t => {
