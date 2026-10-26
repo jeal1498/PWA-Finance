@@ -1200,13 +1200,15 @@ function renderPerfil() {
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
    (pagos y planes con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
+/* Apartar mira los próximos 15 días corridos (pagos y planes). */
+const APARTAR_DIAS = 15;
 const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quince', '15 Días', 15]];
 /* Semana = la del calendario (lunes a domingo) y «15 Días» = 15 días corridos desde hoy: suman el monto completo de lo que vence en ese lapso; «Día» reparte entre los días que faltan. */
 const diasHastaDomingo = () => (7 - HOY.getDay()) % 7;
 function apartarItems() {
   const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
   const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
-  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= 30).sort((a, c) => a.date - c.date);
+  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= APARTAR_DIAS).sort((a, c) => a.date - c.date);
 }
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
@@ -1218,18 +1220,18 @@ const desglose = lista => { const pl = lista.filter(m => m.kind === 'meta').leng
 function datosFondoApartar() {
   const all = apartarItems(), fut = all.filter(m => m.d > 0);
   const k = (APARTAR.find(p => p[0] === state.apartar) || APARTAR[0])[0];
-  const lim = k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : 30;
+  const lim = k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : APARTAR_DIAS;
   const meta = k === 'dia' ? fut.reduce((t, m) => t + apartarMonto(m, 1), 0) : fut.filter(m => m.d <= lim).reduce((t, m) => t + m.pend, 0);
   const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= 30) || m.estado === 'Vencido');
+  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= APARTAR_DIAS) || m.estado === 'Vencido');
   const pct = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
-  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}`, meta, dias: 30, pct, porv: all.filter(m => m.d >= 0).length };
+  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}`, meta, dias: APARTAR_DIAS, pct, porv: all.filter(m => m.d >= 0).length };
 }
 
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
-  const limite = k => k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : 30;
+  const limite = k => k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : APARTAR_DIAS;
   const enPer = (m, k) => m.d <= limite(k);
   const lista = fut.filter(m => enPer(m, per[0]));
   const monto = m => per[0] === 'dia' ? apartarMonto(m, 1) : m.pend;
@@ -1257,7 +1259,7 @@ function renderApartar() {
   </button>`;
   }).join('');
   const cats = [...new Map(lista.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total 30 días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${APARTAR_DIAS} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
