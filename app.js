@@ -323,13 +323,22 @@ function monthItems() {
   return [...pagos, ...proximos];
 }
 
+/* Mosaicos de Pagar: «Pagado» = con algún abono; «Pagar ya» = pendiente que venció o vence hoy; «Por vencer» = pendiente de mañana en adelante. */
+function pasaFiltro(m, f) {
+  const d = daysFromToday(m.date);
+  if (f === 'pagado') return m.abo > 0;
+  if (f === 'vencido') return m.pendiente > 0 && d <= 0;
+  if (f === 'pendiente') return m.pendiente > 0 && d > 0;
+  return m.estado.toLowerCase() === f;
+}
+
 function buildGastos() {
   const all = movimientos.map(procesar);
   const isUrg = state.grouping === 'urgencia';
   const base = monthItems();
   const q = state.search.trim().toLowerCase();
   const items = base.filter(m =>
-    (state.filter === 'todos' || (state.filter === 'pagado' ? m.abo > 0 : m.estado.toLowerCase() === state.filter)) &&
+    (state.filter === 'todos' || pasaFiltro(m, state.filter)) &&
     (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q))
   );
   return { all, base, items, isUrg, q };
@@ -1313,8 +1322,10 @@ function kpiDashboard(base) {
   const venc = base.filter(m => m.estado === 'Vencido');
   const porV = base.filter(m => m.estado === 'Pendiente');
   const conAbono = base.filter(m => m.abo > 0); /* «Pagado» = dinero abonado: el importe y el conteo son de los mismos pagos (liquidados o a medias) */
-  const atrasado = sum(venc, 'pendiente');
-  const porVencer = sum(porV, 'pendiente');
+  const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
+  const porVencerL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
+  const atrasado = sum(yaL, 'pendiente');
+  const porVencer = sum(porVencerL, 'pendiente');
 
   const dias = 30; /* ventana: hoy + 30 días (lo mismo que muestra la lista) */
   const metaDia = apartarDia(); /* misma cifra que «Por día» en Apartar */
@@ -1327,8 +1338,8 @@ function kpiDashboard(base) {
   const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
     { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo, n: conAbono.length },
-    { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer, n: porV.length },
-    { k: 'b', filter: 'vencido', label: 'Atrasado', v: atrasado, n: venc.length }
+    { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer, n: porVencerL.length },
+    { k: 'b', filter: 'vencido', label: 'Pagar ya', v: atrasado, n: yaL.length }
   ].map(t => {
     const on = state.filter === t.filter;
     return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todos' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span><span class="kpi-s">${plural(t.n, 'pago', 'pagos')}</span></span></button>`;
