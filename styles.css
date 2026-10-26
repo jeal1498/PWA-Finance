@@ -774,3 +774,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 
 /* Sin encabezado sobre la tabla (Movimientos, Próximos, Por periodo). */
 .list-head { display: none; }
+
+/* Barra de 4 secciones y botón «+» como burbuja flotante. */
+.bottom-nav-inner { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.nav-add { position: fixed; right: 16px; bottom: calc(56px + 16px + env(safe-area-inset-bottom)); z-index: 30; width: 56px; height: 56px; margin: 0; border: 0; box-shadow: 0 8px 22px rgba(0, 0, 0, .55), 0 0 0 1px rgba(244, 244, 239, .12); }
