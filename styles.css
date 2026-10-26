@@ -921,3 +921,5 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-split.pagar .kpi-sec { font-size: 11px; line-height: 1.2; }
 .kpi-split.pagar .kpi-pv { font-size: 22px; line-height: 1.15; }
 .kpi-split.pagar .kpi-div { margin: 10px 0 16px; }
+/* Pagar: primero los tres mosaicos de estado y debajo la tarjeta Total | Por pagar. */
+.kpi-legend.sin-sub { margin-top: 8px; }
