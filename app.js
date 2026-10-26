@@ -896,7 +896,7 @@ function actualizarFin() {
     n++; ult = f;
     if (!pagado.get(toISO(f))) q++;
   }
-  hint.textContent = n ? `${plural(n, 'pago', 'pagos')} en total, ${q === 1 ? 'queda 1' : q ? `quedan ${q}` : 'ninguno pendiente'}. El último vence el ${ult.getDate()} ${MESES_CORTO[ult.getMonth()]} ${ult.getFullYear()}.` : 'La fecha de fin es anterior al vencimiento.';
+  hint.textContent = !n ? 'La fecha de fin es anterior al vencimiento.' : q === 0 ? (n === 1 ? "Ya está pagado." : `Los ${n} pagos ya están pagados.`) : `${q === 1 ? 'Queda 1 pago' : `Quedan ${q} pagos`} de ${n}`;
 }
 
 function submitForm() {
