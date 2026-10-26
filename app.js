@@ -248,10 +248,11 @@ function plazoKey(m) {
 /* Pagos del mes: los movimientos con fecha en el mes y los «Próximos» (metas con monto) que caen en él. */
 const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
 function monthItems() {
-  /* En el mes actual también salen los atrasados de meses anteriores. */
+  /* En el mes actual también salen los atrasados de meses anteriores y lo que vence en los próximos 30 días (aunque sea del mes siguiente). */
   const inicio = new Date(state.month.year, state.month.month, 1);
-  const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
-  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date));
+  const prox30 = m => isCurrentMonth() && !enMes(m.date) && m.date > inicio && daysFromToday(m.date) <= 30;
+  const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio) || prox30(m));
+  const proximos = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esProximo: true })).filter(m => enMes(m.date) || prox30(m));
   return [...pagos, ...proximos];
 }
 
@@ -1176,7 +1177,9 @@ async function shareFondo(d) {
 /* Dashboard de Gastos: atención inmediata, meta diaria, tres mosaicos de estado (filtran la lista)
    y resumen operativo (total cartera; vuelve a mostrar todo). */
 function kpiDashboard(base) {
-  const totalImp = sum(base, 'imp'), totalAbo = sum(base, 'abo'), pend = sum(base, 'pendiente');
+  const totalAbo = sum(base, 'abo');
+  const delMes = base.filter(m => m.date <= new Date(HOY.getFullYear(), HOY.getMonth() + 1, 0) || !isCurrentMonth());
+  const totalImp = sum(delMes, 'imp'), pend = sum(delMes, 'pendiente');
   const venc = base.filter(m => m.estado === 'Vencido');
   const porV = base.filter(m => m.estado === 'Pendiente');
   const pagados = base.filter(m => m.estado === 'Pagado');
@@ -1207,7 +1210,7 @@ function kpiDashboard(base) {
       <span class="kpi-main"><span class="kpi-sec">ATENCIÓN INMEDIATA</span><span class="kpi-alert-v">${grupo.length ? `Próximo: ${fmtDate(grupo[0].fecha)} · ${fmtMoney(sum(grupo, 'pendiente'))}` : (venc.length ? 'Solo hay pagos vencidos' : 'Sin pagos pendientes')}</span>${grupo.length ? `<span class="kpi-alert-note">${dprox <= 0 ? 'Vence hoy' : `Vence en ${plural(dprox, 'día', 'días')}`}</span>` : ''}</span>
     </div>
     <div class="kpi-pair">
-      <button type="button" class="kpi-lg" data-action="fondo" data-meta="${Math.round(pend / dias)}" data-dias="${dias}" data-pct="${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}" data-porv="${porV.length}"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo mes actual'}</span></span></button>
+      <button type="button" class="kpi-lg" data-action="fondo" data-meta="${Math.round(pend / dias)}" data-dias="${dias}" data-pct="${totalImp > 0 ? Math.round(sum(delMes, 'abo') / totalImp * 100) : 0}" data-porv="${porV.length}"><span class="kpi-sec">META DIARIA</span><span><span class="kpi-pv">${meta}</span><span class="kpi-s">${isCurrentMonth() ? 'por día' : 'solo mes actual'}</span></span></button>
       <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">FALTA DEL MES</span><span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">de ${fmtMoney(totalImp)}</span></span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
