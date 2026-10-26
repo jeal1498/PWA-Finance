@@ -1015,7 +1015,17 @@ function renderApartar() {
     <div class="ap-chips" role="group" aria-label="Periodo">${chips}</div>
     ${ya.length ? `<button type="button" class="ap-ya" data-action="resumen-ya"><span><span class="kpi-sec">PAGAR YA</span><span class="kpi-s">${nota}</span></span><b>${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))}</b></button>` : ''}
     ${fut.length ? `<h2 class="perfil-h">Por concepto · ${per[1].toLowerCase()}</h2><div class="ap-tbl">${rows}</div>` : `<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>`}`;
+  fitApartar();
 }
+
+/* La lista de Apartar ocupa el alto que queda en pantalla (hasta la barra inferior) y se desplaza por dentro. */
+function fitApartar() {
+  const t = $('.ap-tbl'), nav = $('.bottom-nav');
+  if (!t || $('#apartar').hidden) return;
+  const room = nav.getBoundingClientRect().top - t.getBoundingClientRect().top - 14;
+  t.style.maxHeight = Math.max(160, room) + 'px';
+}
+window.addEventListener('resize', fitApartar);
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
    y completa hasta el último pago. Se dibuja como SVG con foreignObject; fuentes e iconos van embebidos. */
