@@ -149,7 +149,8 @@ const state = {
   open: {},
   search: '',
   sort: { col: 'fecha', asc: true },
-  sortMetas: { col: 'fecha', asc: true }
+  sortMetas: { col: 'fecha', asc: true },
+  apartar: 'dia'
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
 
@@ -555,20 +556,25 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
 function render() {
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
-  const isG = state.view === 'gastos', isP = state.view === 'perfil';
-  ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
+  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
+  ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP || isA; });
   $('#perfil').hidden = !isP;
+  $('#apartar').hidden = !isA;
   $$('#view-switch .nav-btn').forEach(b => { if (b.dataset.view === state.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   $('#month-label').disabled = !isG;
   $('.controls').hidden = true;
   $('#seg').hidden = true;
-  const addBtn = $('.nav-add'), addLabel = isG ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
+  const addBtn = $('.nav-add'), addLabel = isG || isA ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
   addBtn.setAttribute('aria-label', addLabel); addBtn.title = addLabel;
 
   if (isP) {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Perfil';
     renderPerfil();
+  } else if (isA) {
+    $('#search-bar').hidden = true;
+    $('#month-text').textContent = 'Apartar';
+    renderApartar();
   } else if (isG) {
     const b = buildGastos();
     renderHeroGastos(b);
@@ -609,6 +615,7 @@ function closeSheet() {
   setInert(false);
   if (sheet.last && document.contains(sheet.last)) { try { sheet.last.focus({ preventScroll: true }); } catch (e) {} }
   if (state.view === 'perfil') renderPerfil();
+  if (state.view === 'apartar') renderApartar();
 }
 
 let toastTimer;
@@ -977,6 +984,35 @@ function renderPerfil() {
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
     </div>`;
+}
+
+/* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
+   (pagos y próximos con monto, hasta 90 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
+const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quincena', 'Quincena', 15], ['mes', 'Mes', 30]];
+function apartarItems() {
+  const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
+  const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
+  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= 90).sort((a, c) => a.date - c.date);
+}
+const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
+
+function renderApartar() {
+  const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
+  const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
+  const tot = len => fut.reduce((t, m) => t + apartarMonto(m, len), 0);
+  const chips = APARTAR.map(([k, l, len]) => `<button type="button" class="ap-chip" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span>${l.toUpperCase()}</span><b>${fmtMoney(tot(len))}</b></button>`).join('');
+  const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
+  const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
+  const rows = fut.map(m => `<button type="button" class="pt-row ap-row" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}">
+      <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
+      <span class="pt-cc"><span class="pt-conc">${esc(m.conc)}${m.kind === 'meta' ? '<em class="pt-tag">Próximo</em>' : ''}</span><span class="pt-nota">${plural(m.d, 'día', 'días')} · ${fmtMoney(m.pend)}</span></span>
+      <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b></span>
+    </button>`).join('');
+  $('#apartar').innerHTML = `
+    <div class="ap-hero"><span class="kpi-sec">APARTAR POR ${per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase()}</span><span class="ap-big">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">para llegar a cada fecha de pago</span></div>
+    <div class="ap-chips" role="group" aria-label="Periodo">${chips}</div>
+    ${ya.length ? `<button type="button" class="ap-ya" data-action="resumen-ya"><span><span class="kpi-sec">PAGAR YA</span><span class="kpi-s">${nota}</span></span><b>${fmtMoney(ya.reduce((t, m) => t + m.pend, 0))}</b></button>` : ''}
+    ${fut.length ? `<h2 class="perfil-h">Por concepto · ${per[1].toLowerCase()}</h2><div class="ap-tbl">${rows}</div>` : `<div class="empty"><strong>Nada por apartar</strong>No hay pagos pendientes con fecha futura.</div>`}`;
 }
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
@@ -1376,6 +1412,8 @@ document.addEventListener('click', async e => {
       else if (state.search) { state.search = ''; $('#search').value = ''; render(); }
       break;
     }
+    case 'resumen-ya': state.filter = 'todos'; setView('gastos'); break;
+    case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
       const kind = state.view === 'metas' ? 'meta' : 'gasto';
