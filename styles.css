@@ -723,3 +723,9 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pt-foot { padding: 10px 14px; }
 .bottom-nav-inner { height: 56px; }
 .nav-add { width: 52px; height: 52px; margin-top: -24px; }
+
+/* Alturas fijas de 78 px: el texto largo se corta con «…» en vez de agrandar la tarjeta */
+.kpi-alert, .kpi-lg { height: 78px; min-height: 78px; overflow: hidden; }
+.kpi-alert .kpi-main { min-width: 0; }
+.kpi-alert .kpi-sec, .kpi-alert-v, .kpi-alert-note, .kpi-lg-t, .kpi-lg-m, .kpi-pv, .kpi-s { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-lg > span:last-child { min-width: 0; max-width: 100%; }
