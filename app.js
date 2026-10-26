@@ -1394,23 +1394,16 @@ async function shareFondo(d) {
   } catch (e) { if (e.name !== 'AbortError') toast('No se pudo generar la imagen'); }
 }
 
-/* Dashboard de Gastos: atención inmediata, meta diaria, tres mosaicos de estado (filtran la lista)
+/* Dashboard de Pagar: tarjeta partida Total | Por pagar, tres mosaicos de estado (filtran la lista)
    y resumen operativo (total cartera; vuelve a mostrar todo). */
 function kpiDashboard(base) {
   const totalAbo = sum(base, 'abo'), totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
-  const venc = base.filter(m => m.estado === 'Vencido');
-  const porV = base.filter(m => m.estado === 'Pendiente');
   const conAbono = base.filter(m => m.abo > 0); /* «Pagado» = dinero abonado: el importe y el conteo son de los mismos pagos (liquidados o a medias) */
   const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const porVencerL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const atrasado = sum(yaL, 'pendiente');
   const porVencer = sum(porVencerL, 'pendiente');
 
-  const futuros = [...porV].sort((a, c) => a.date - c.date);
-  const grupo = futuros.length ? futuros.filter(m => m.fecha === futuros[0].fecha) : [];
-  const dprox = grupo.length ? daysFromToday(grupo[0].date) : 0;
-
-  const ic = d => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
   const tiles = [
     { k: 'a', filter: 'pagado', label: 'Pagado', v: totalAbo, n: conAbono.length },
     { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer, n: porVencerL.length },
@@ -1421,13 +1414,10 @@ function kpiDashboard(base) {
   }).join('');
 
   return `
-    <div class="kpi-alert">
-      <span class="kpi-alert-ico">${ic('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>')}</span>
-      <span class="kpi-main"><span class="kpi-sec">ATENCIÓN INMEDIATA</span><span class="kpi-alert-v">${grupo.length ? `Próximo: ${fmtDate(grupo[0].fecha)} · ${fmtMoney(sum(grupo, 'pendiente'))}` : (venc.length ? 'Solo hay pagos vencidos' : 'Sin pagos pendientes')}</span>${grupo.length ? `<span class="kpi-alert-note">${dprox <= 0 ? 'Vence hoy' : `Vence en ${plural(dprox, 'día', 'días')}`}</span>` : ''}</span>
-    </div>
-    <div class="kpi-pair">
-      <div class="kpi-lg" aria-label="Abonado de total del mes"><span class="kpi-sec">ABONADO / TOTAL</span><span><span class="kpi-pv">${fmtMoney(totalAbo)}/${fmtMoney(totalImp)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}% del mes</span></span></div>
-      <button type="button" class="kpi-lg kpi-total" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">este mes</span></span></button>
+    <div class="kpi-split">
+      <div class="kpi-half" aria-label="Total del mes"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(totalAbo / totalImp * 100) : 0}% pagado</span></div>
+      <span class="kpi-div" aria-hidden="true"></span>
+      <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">POR PAGAR</span><span class="kpi-pv">${fmtMoney(pend)}</span><span class="kpi-s">${totalImp > 0 ? Math.round(pend / totalImp * 100) : 0}% del mes</span></button>
     </div>
     <div class="kpi-legend">${tiles}</div>`;
 }
