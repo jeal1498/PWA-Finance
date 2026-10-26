@@ -607,7 +607,7 @@ function render() {
 
   if (isP) {
     $('#search-bar').hidden = true;
-    $('#month-text').textContent = 'Perfil';
+    $('#month-text').textContent = 'Ajustes';
     renderPerfil();
   } else if (isA) {
     $('#search-bar').hidden = true;
