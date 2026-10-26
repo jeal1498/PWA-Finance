@@ -727,12 +727,53 @@ function abonoFormHTML(isMeta, pend) {
 }
 
 function historialHTML(m, isMeta) {
-  const ps = (m.pagos || []).slice().sort((x, y) => (y.fecha ? parseDate(y.fecha) : 0) - (x.fecha ? parseDate(x.fecha) : 0));
+  const ps = (m.pagos || []).map((x, i) => ({ ...x, i })).sort((x, y) => (y.fecha ? parseDate(y.fecha) : 0) - (x.fecha ? parseDate(x.fecha) : 0));
   if (!ps.length) return '';
+  const lapiz = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   return `<div class="hist">
     <div class="hist-head"><h3>${isMeta ? 'Historial de ahorro' : 'Historial de abonos'}</h3><span>${isMeta ? plural(ps.length, 'registro', 'registros') : plural(ps.length, 'abono', 'abonos')}</span></div>
-    ${ps.map(x => `<div class="hist-row"><span>${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}</b></div>`).join('')}
+    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar ${isMeta ? 'ahorro' : 'abono'} de ${fmtMoney(x.monto)}"><span>${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
   </div>`;
+}
+
+/* Editar o eliminar un abono del historial; el pendiente y el estatus se recalculan solos. */
+function openAbonoEdit(kind, id, idx) {
+  const isMeta = kind === 'meta';
+  const m = listOf(kind).find(x => x.id === id), p = m && (m.pagos || [])[idx];
+  if (!p) return;
+  const max = r2(m.imp - (m.abo - p.monto));
+  sheet.ctx = { type: 'abono-edit', kind, id, idx };
+  openSheet(isMeta ? 'Editar ahorro' : 'Editar abono', `
+    <form id="abono-edit-form" novalidate>
+      <div class="two-col">
+        <div><label for="ae-monto">Monto</label><input id="ae-monto" type="number" inputmode="decimal" min="0" step="0.01" value="${p.monto}"></div>
+        <div><label for="ae-fecha">Fecha</label><input id="ae-fecha" type="date" value="${p.fecha || ''}"></div>
+      </div>
+      <p class="hint">Máximo: ${fmtMoney(max)}</p>
+      <p class="form-error" id="ae-error" role="alert"></p>
+      <div class="fbtns edit">
+        <button type="button" class="btn btn-soft" data-action="abono-back">Cancelar</button>
+        <button type="button" class="btn btn-danger" data-action="abono-del">Eliminar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+    </form>`);
+  sheet.panel.focus({ preventScroll: true });
+}
+
+function submitAbonoEdit() {
+  const { kind, id, idx } = sheet.ctx;
+  const m = listOf(kind).find(x => x.id === id), p = m && (m.pagos || [])[idx];
+  if (!p) return;
+  const monto = r2(parseFloat($('#ae-monto').value));
+  const fecha = $('#ae-fecha').value;
+  const max = r2(m.imp - (m.abo - p.monto));
+  const err = !(monto > 0) ? 'Escribe un monto mayor a 0.'
+    : monto > max ? `Máximo ${fmtMoney(max)}, que es lo que permite el total.`
+    : !fecha && p.fecha ? 'Selecciona la fecha.' : '';
+  if (err) { formError('ae-error', monto > 0 && monto <= max ? 'ae-fecha' : 'ae-monto', err); return; }
+  p.monto = monto; p.fecha = fecha || null;
+  syncAbo(m);
+  finish(kind, m, kind === 'meta' ? 'Ahorro actualizado' : 'Abono actualizado');
 }
 
 function openDetail(kind, id) {
@@ -1540,6 +1581,14 @@ document.addEventListener('click', async e => {
       if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
       break;
     }
+    case 'abono-edit': openAbonoEdit(sheet.ctx.kind, sheet.ctx.id, +t.dataset.idx); break;
+    case 'abono-back': openDetail(sheet.ctx.kind, sheet.ctx.id); break;
+    case 'abono-del': {
+      const { kind, id, idx } = sheet.ctx;
+      const m = listOf(kind).find(x => x.id === id);
+      if (m && m.pagos && m.pagos[idx]) { m.pagos.splice(idx, 1); syncAbo(m); finish(kind, m, kind === 'meta' ? 'Ahorro eliminado' : 'Abono eliminado'); }
+      break;
+    }
     case 'reopen': {
       const { kind, id } = sheet.ctx;
       const m = listOf(kind).find(x => x.id === id);
@@ -1588,6 +1637,7 @@ document.addEventListener('change', e => {
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
+  else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
   else if (e.target.id === 'sync-form') { e.preventDefault(); syncSave(e.target); }
 });
 

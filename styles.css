@@ -838,3 +838,8 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pt-ap.ya { color: var(--danger); }
 .pt-ap .w { display: none; }
 @media (min-width: 430px) { .pt-ap .w { display: inline; } }
+
+/* Abonos del historial: se tocan para editarlos o eliminarlos. */
+button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(--line); background: none; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+.hist-row b { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.hist-row .ic { width: 14px; height: 14px; color: var(--muted); }
