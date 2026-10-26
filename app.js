@@ -78,16 +78,20 @@ function generarRepetidos(hasta) {
   generarSeries(metas, 'metas', hasta);
 }
 
-function generarSeries(lista, store, hasta) {
+/* `soloSerie`: al guardar un pago que se repite, rellena también los meses que falten entre el primero y `hasta`
+   (p. ej. una copia que se eliminó mientras ya existían meses posteriores). */
+function generarSeries(lista, store, hasta, soloSerie) {
   const series = new Map();
   lista.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
   const nuevos = [];
   series.forEach((items, serie) => {
+    if (soloSerie && serie !== soloSerie) return;
     items.sort(byFecha);
     const ult = items[items.length - 1];
     if (!ult.repite) return;
     const dia = parseDate(items[0].fecha).getDate();
-    const d = parseDate(ult.fecha);
+    const d = parseDate((soloSerie ? items[0] : ult).fecha);
+    const ocupado = new Set(items.map(m => m.fecha.slice(0, 7)));
     let y = d.getFullYear(), mo = d.getMonth() + 1;
     for (;; mo++) {
       if (mo > 11) { mo = 0; y++; }
@@ -95,7 +99,7 @@ function generarSeries(lista, store, hasta) {
       const f = toISO(new Date(y, mo, Math.min(dia, new Date(y, mo + 1, 0).getDate())));
       if (ult.fin && f > ult.fin) break;
       const id = `${serie}-${y}${String(mo + 1).padStart(2, '0')}`;
-      if (items.some(m => m.id === id)) continue;
+      if (items.some(m => m.id === id) || (soloSerie && ocupado.has(f.slice(0, 7)))) continue;
       const now = Date.now();
       nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
     }
@@ -951,6 +955,7 @@ function submitForm() {
     lsSet(KEYS.cat, cat);
   }
   list.sort(byFecha);
+  if (item.serie && item.repite) generarSeries(list, storeOf(kind), HOY.getFullYear() * 12 + HOY.getMonth() + 1, item.serie);
   finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Próximo creado' : 'Pago guardado'));
 }
 
