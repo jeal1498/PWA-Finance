@@ -1016,7 +1016,7 @@ function renderApartar() {
     </div>
     <div class="kpi-pair">
       <div class="kpi-lg"><span class="kpi-sec">POR ${pLabel}</span><span><span class="kpi-pv">${fmtMoney(tot(per[2]))}</span><span class="kpi-s">${plural(fut.length, 'pago', 'pagos')}</span></span></div>
-      <div class="kpi-lg kpi-total"><span class="kpi-sec">PENDIENTE</span><span><span class="kpi-pv">${fmtMoney(sum(fut, 'pend'))}</span><span class="kpi-s">próximos 30 días</span></span></div>
+      <div class="kpi-lg kpi-total"><span class="kpi-sec">PENDIENTE</span><span><span class="kpi-pv">${fmtMoney(sum(all, 'pend'))}</span><span class="kpi-s">${plural(all.length, 'pago', 'pagos')} · 30 días</span></span></div>
     </div>
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
