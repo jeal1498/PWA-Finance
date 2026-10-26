@@ -1242,7 +1242,7 @@ function renderApartar() {
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.kind === 'meta' ? '<em class="pt-tag">Plan</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
-    <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b><small>de ${fmtMoney(m.pend)}</small></span>
+    <span class="pt-amt"><b>${fmtMoney(apartarMonto(m, per[2]))}</b></span>
   </button>`;
   }).join('');
   const cats = [...new Map(fut.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
