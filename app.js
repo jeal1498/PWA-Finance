@@ -987,12 +987,12 @@ function renderPerfil() {
 }
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
-   (pagos hasta 90 días; próximos con monto, solo los próximos 40 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
+   (pagos hasta 90 días; próximos con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
 const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quincena', 'Quincena', 15], ['mes', 'Mes', 30]];
 function apartarItems() {
   const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
   const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
-  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= (m.kind === 'meta' ? 40 : 90)).sort((a, c) => a.date - c.date);
+  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= (m.kind === 'meta' ? 30 : 90)).sort((a, c) => a.date - c.date);
 }
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
