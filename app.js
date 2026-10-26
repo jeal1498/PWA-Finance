@@ -280,7 +280,7 @@ function plazoKey(m) {
 /* =========================================================
    Construcción de datos por vista
    ========================================================= */
-/* Pagos del mes: los movimientos con fecha en el mes y los «Próximos» (metas con monto) que caen en él. */
+/* Pagos del mes: los movimientos con fecha en el mes y los «Planes» (metas con monto) que caen en él. */
 const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
 function monthItems() {
   /* En el mes actual también salen los atrasados de meses anteriores y lo que vence en los próximos 30 días (aunque sea del mes siguiente). */
@@ -568,7 +568,7 @@ function metasTable(b) {
 }
 
 function renderMetasList(b) {
-  $('#list-caption').textContent = 'Próximos';
+  $('#list-caption').textContent = 'Planes';
   $('#list-count').textContent = '';
   if (b.items.length) { $('#list').innerHTML = metasTable(b); return; }
   renderList([], '', '', 'metas', b.base.length === 0);
@@ -998,7 +998,7 @@ function submitForm() {
   }
   list.sort(byFecha);
   if (item.serie && item.repite) generarSeries(list, storeOf(kind), HOY.getFullYear() * 12 + HOY.getMonth() + 1, item.serie);
-  finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Próximo creado' : 'Pago guardado'));
+  finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Plan creado' : 'Pago guardado'));
 }
 
 /* ----- Selector de mes ----- */
@@ -1037,7 +1037,7 @@ function renderPerfil() {
 }
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
-   (pagos y próximos con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
+   (pagos y planes con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
 const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quincena', 'Quincena', 15], ['mes', 'Mes', 30]];
 function apartarItems() {
   const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
@@ -1047,7 +1047,7 @@ function apartarItems() {
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 const apartarDia = () => apartarItems().filter(m => m.d > 0).reduce((t, m) => t + apartarMonto(m, 1), 0);
 
-/* Misma distribución que Pagos y Próximos: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
+/* Misma distribución que Pagos y Planes: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
 function renderApartar() {
   const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
@@ -1366,7 +1366,7 @@ function showImportPreview(name, p) {
     <p class="imp-file">${esc(name)}</p>
     <div class="figs">
       <div class="fig"><span>Pagos</span><b>${p.movimientos.length}</b></div>
-      <div class="fig"><span>Próximos</span><b>${p.metas.length}</b></div>
+      <div class="fig"><span>Planes</span><b>${p.metas.length}</b></div>
       <div class="fig"><span>Importe</span><b>${fmtMoney(sum(p.movimientos, 'imp'))}</b></div>
     </div>
     <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos ni planes en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>

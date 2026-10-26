@@ -702,7 +702,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .fform .cat-in .ic { width: 14px; height: 14px; }
 .fform .cat-in .mono { width: 16px; height: 16px; font-size: 9px; }
 
-/* ---------- Pantallas principales compactas (Pagos y Próximos) ---------- */
+/* ---------- Pantallas principales compactas (Pagos y Planes) ---------- */
 .header-title-row { min-height: 36px; margin-top: 0; }
 .header-title-row h1 { font-size: 22px; }
 .kpi-alert { padding: 10px 14px; margin-top: 8px; border-radius: 22px; gap: 12px; }
@@ -754,7 +754,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .pay-main b, .pay-amt b { font-size: 15px; }
 .pay-amt b { font-family: var(--font-data); font-weight: 500; font-size: 14px; }
 
-/* Tablet: Pagos y Próximos en dos columnas (resumen fijo a la izquierda, tabla a la derecha). */
+/* Tablet: Pagos y Planes en dos columnas (resumen fijo a la izquierda, tabla a la derecha). */
 @media (min-width: 768px) {
   body:is([data-view="gastos"],[data-view="metas"],[data-view="apartar"]) .app { max-width: 1100px; }
   body:is([data-view="gastos"],[data-view="metas"],[data-view="apartar"]) main { display: grid; grid-template-columns: 290px minmax(0, 1fr); column-gap: 20px; align-content: start; grid-template-rows: auto auto 1fr; }
@@ -772,7 +772,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .lg-p { background: rgba(244, 244, 239, .05); }
 @media (min-width: 768px) { .kpi-legend.ap4 { grid-template-columns: minmax(0, 1fr); } .kpi-legend.ap4 .kpi-lg-m { font-size: 20px; } }
 
-/* Sin encabezado sobre la tabla (Movimientos, Próximos, Por periodo). */
+/* Sin encabezado sobre la tabla (Movimientos, Planes, Por periodo). */
 .list-head { display: none; }
 
 /* Barra de 4 secciones y botón «+» como burbuja flotante. */
