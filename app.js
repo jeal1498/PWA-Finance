@@ -712,7 +712,7 @@ function abonoFormHTML(isMeta, pend) {
       <div class="two-col">
         <div>
           <label for="abono">${isMeta ? 'Monto a ahorrar' : 'Monto del abono'}</label>
-          <input id="abono" type="number" inputmode="decimal" min="0" step="0.01" value="${pend}">
+          <input id="abono" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
         </div>
         <div>
           <label for="abono-fecha">${isMeta ? 'Fecha del ahorro' : 'Fecha del pago'}</label>
