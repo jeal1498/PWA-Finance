@@ -841,32 +841,29 @@ function openForm(kind, id) {
   sheet.ctx = { type: 'form', kind, id: id || null, cat: catStr };
   openSheet(editing ? (isMeta ? 'Editar próximo' : 'Editar movimiento') : 'Agregar movimiento', `
     ${editing ? '' : addTabs(kind, 'new')}
-    <form id="form" novalidate>
-      <label for="f-conc">Concepto</label>
-      <input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}">
+    <form id="form" class="fform" novalidate>
+      <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}"></label>
       <div class="two-col">
-        <div>
-          <label for="f-imp">${isMeta ? 'Monto objetivo' : 'Importe'}</label>
-          <input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}">
-        </div>
-        <div>
-          <label for="f-fecha">${isMeta ? 'Fecha límite' : 'Fecha de vencimiento'}</label>
-          <input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}">
-        </div>
+        <label class="fld" for="f-imp"><span>${isMeta ? 'Monto' : 'Importe'}</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
+        <label class="fld" for="f-fecha"><span>${isMeta ? 'Límite' : 'Vence'}</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}"></label>
       </div>
-      <span class="label" id="f-cat-label">Categoría</span>
-      <div class="cat-grid" role="radiogroup" aria-labelledby="f-cat-label">
+      <div class="cat-grid" role="radiogroup" aria-label="Categoría">
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
       </div>
-      ${isMeta ? '' : `<label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>`}
-      ${isMeta ? '' : `<div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
-        <label for="f-fin">Termina</label>
-        <input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}">
-        <p class="note" id="f-fin-hint"></p>
+      ${isMeta ? '' : `<div class="rep-card">
+        <label class="switch-row" for="f-rep"><span>Se repite cada mes</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
+        <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
+          <label class="fin-row" for="f-fin"><span>Termina</span><input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}"></label>
+          <p class="note" id="f-fin-hint"></p>
+        </div>
       </div>`}
       ${editing ? '' : `<label class="switch-row" for="f-paid"><span>${isMeta ? 'Ya tengo el dinero ahorrado' : 'Ya está pagado'}</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <p class="form-error" id="f-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : (isMeta ? 'Guardar próximo' : 'Guardar pago')}</button>
+      <div class="fbtns${editing ? ' edit' : ''}">
+        <button type="button" class="btn btn-soft" data-action="close-sheet">Cancelar</button>
+        ${editing ? '<button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>' : ''}
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
     </form>`);
   if (!isMeta) actualizarFin();
   if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });

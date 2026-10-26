@@ -619,3 +619,31 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 /* «Vence en…» va dentro de la tarjeta amarilla; el relleno se ajusta para que mida lo mismo (78 px de alto). */
 .kpi-alert { padding-block: 9px; min-height: 78px; }
 .kpi-alert-note { display: block; font-size: 13px; font-weight: 500; line-height: 1.25; margin-top: 1px; }
+
+/* Hoja de edición compacta: campos hueso con la etiqueta a la izquierda, categorías en una fila */
+.fform { display: flex; flex-direction: column; gap: 8px; }
+.fld { display: flex; align-items: center; gap: 10px; min-height: 38px; margin: 0; padding: 0 12px; border-radius: 16px; background: rgba(244, 244, 239, .08); box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); cursor: text; }
+.fld > span { flex: none; font-family: var(--font-data); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.fld input[type] { flex: 1; min-width: 0; height: 36px; padding: 0; border: 0; border-radius: 0; background: none; font-size: 15px; color: var(--ink); }
+.fld:focus-within { box-shadow: inset 0 0 0 2px var(--ink); }
+.fld:has(input[aria-invalid="true"]) { box-shadow: inset 0 0 0 1px var(--danger); }
+.fform .two-col { gap: 8px; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); }
+.fld input:focus { outline: none; }
+.fform .fld > span { letter-spacing: .04em; }
+.fform .cat-grid { flex-wrap: nowrap; overflow-x: auto; padding: 2px; margin: -2px; scrollbar-width: none; }
+.fform .cat-grid::-webkit-scrollbar { display: none; }
+.fform .cat-opt { flex: none; }
+.fform .cat-in { height: 34px; padding: 0 12px; font-size: 13.5px; }
+.rep-card, .fform > .switch-row { margin: 0; padding: 4px 12px; border-radius: 16px; background: rgba(244, 244, 239, .08); box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
+.fform > .switch-row { padding-block: 8px; }
+.rep-card .switch-row { margin: 0; padding: 6px 0; background: none; font-size: 15px; }
+.fform .switch { width: 44px; height: 26px; }
+.fform .switch::after { width: 18px; height: 18px; }
+.fform .switch:checked::after { transform: translateX(18px); }
+.fin-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 8px 0 0; border-top: 1px solid rgba(244, 244, 239, .18); font-size: 15px; font-weight: 600; color: var(--ink); }
+.fin-row input[type] { width: auto; height: 30px; padding: 0 10px; border-radius: 12px; font-family: var(--font-data); font-size: 14px; }
+.rep-card .note { margin: 4px 0 2px; font-size: 13px; }
+.fform .form-error { min-height: 0; margin: 0; }
+.fbtns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 4px; }
+.fbtns.edit { grid-template-columns: 1fr 1fr 1.4fr; }
+.fbtns .btn { height: 44px; border-radius: 16px; font-size: 15px; padding: 0 10px; }
