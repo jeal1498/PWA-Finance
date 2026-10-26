@@ -916,3 +916,8 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .kpi-legend.sin-sub .kpi-lg { height: 54px; min-height: 54px; padding: 0 6px; gap: 2px; border-radius: 16px; }
 .kpi-legend.sin-sub .kpi-lg-t { font-size: 14px; line-height: 1.2; }
 .kpi-legend.sin-sub .kpi-lg-m { font-size: 19px; line-height: 1.2; }
+/* Pagar: la tarjeta Total | Por pagar también a 54 px (la barra de estado va dentro de esa altura). */
+.kpi-split.pagar { height: 54px; }
+.kpi-split.pagar .kpi-sec { font-size: 11px; line-height: 1.2; }
+.kpi-split.pagar .kpi-pv { font-size: 22px; line-height: 1.15; }
+.kpi-split.pagar .kpi-div { margin: 10px 0 16px; }
