@@ -1189,6 +1189,7 @@ function renderPerfil() {
     <div class="menu">
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="fondo-apartar">${ICO.upload}<span><b>Fondo de pantalla</b><small>Imagen 9:16 con la meta del periodo elegido en Apartar</small></span></button>
+      <button type="button" class="menu-row" data-action="open-v2">${ICO.list}<span><b>FINANZAS V2 · Meta diaria</b><small>Calcula cuánto necesitas cubrir cada día según tus pagos y abonos</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
       <button type="button" class="menu-row" data-action="open-conceptos">${ICO.list}<span><b>Resumen por concepto</b><small>Cuánto suma cada nombre</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
@@ -1676,6 +1677,7 @@ document.addEventListener('click', async e => {
     case 'fondo': shareFondo(t.dataset); break;
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
     case 'open-sync': openSync(); break;
+    case 'open-v2': location.href = new URL('./v2/', location.href).href; break;
     case 'sync-push': syncPush(); break;
     case 'sync-pull': syncPull(); break;
     case 'open-import': openImport(); break;
