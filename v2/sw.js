@@ -1,4 +1,4 @@
-const CACHE = "finanzas-v2-pwa-v2";
+const CACHE = "finanzas-v2-pwa-v3";
 const ASSETS = ["./", "./index.html", "./v2.css", "./v2.js", "./manifest.webmanifest", "./v2-icon.svg", "../js/db.js", "../styles.css"];
 self.addEventListener("install", event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", event => { event.waitUntil((async () => { for (const key of await caches.keys()) if (key.startsWith("finanzas-v2-pwa-") && key !== CACHE) await caches.delete(key); await self.clients.claim(); })()); });
