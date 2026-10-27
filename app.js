@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v113';
+const APP_VERSION = 'v114';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -129,14 +129,13 @@ function generarSeries(lista, store, hasta, soloSerie) {
     const fr = FREQS[freqOf(ult)];
     const omit = new Set(items.flatMap(m => m.omitidos || []));
     if (fr.dias) {
-      /* Por días: desde el último pago, cada N días, solo fechas de hoy en adelante. */
-      const hoy = toISO(HOY);
-      let d = parseDate(ult.fecha);
+      /* Por días: cada N días desde el último pago (al guardar, desde el primero para rellenar huecos). */
+      let d = parseDate((soloSerie ? items[0] : ult).fecha);
       for (let k = 0; k < 400; k++) {
         d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + fr.dias);
         const f = toISO(d);
         if (f > limite || (ult.fin && f > ult.fin)) break;
-        if (f < hoy || omit.has(f) || items.some(m => m.fecha === f)) continue;
+        if (f < limitePasado || omit.has(f) || items.some(m => m.fecha === f)) continue;
         crear(serie, ult, f, `${serie}-${f.replace(/-/g, '')}`);
       }
       return;
