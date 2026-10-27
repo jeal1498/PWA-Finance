@@ -22,7 +22,7 @@ function buildRows(today) {
     const paidToday = abonosHoy(item, today);
     const delta = due ? daysBetween(today, item.fecha) : null;
     return Object.assign({}, item, {pending:pending, paidToday:paidToday, delta:delta, due:due});
-  }).filter((item) => item.pending > 0 && item.due)
+  }).filter((item) => item.due && (item.pending > 0 || item.paidToday > 0))
     .sort((a,b) => a.delta - b.delta || a.pending - b.pending);
 }
 
@@ -43,7 +43,7 @@ function renderPayment(item) {
 function render() {
   const today = todayISO();
   const allRows = buildRows(today);
-  const rows = allRows.filter((item) => item.delta <= 30);
+  const rows = allRows.filter((item) => item.pending > 0 && item.delta <= 30);
   const eligible = rows.filter((item) => item.delta >= 0);
   const urgent = rows.filter((item) => item.delta <= 0);
   const dailyTarget = allRows.reduce((total, item) => {
