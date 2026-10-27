@@ -25,3 +25,6 @@
 .v2-error{color:#F87171}
 @media(min-width:600px){.v2-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.v2-kpi{padding:17px}.v2-hero{padding:27px 26px 21px}}
 @media(prefers-reduced-motion:reduce){.v2-progress span{transition:none}}
+
+/* Navegación propia de la PWA V2 */
+.v2-body{padding-bottom:calc(78px + env(safe-area-inset-bottom))}.v2-bottom-nav{position:fixed;z-index:20;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:8px 6px calc(8px + env(safe-area-inset-bottom));border-top:1px solid #292930;background:#101015f5;backdrop-filter:blur(18px)}.v2-bottom-nav a{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#9A9AA7;text-decoration:none;font-size:10px;font-weight:700}.v2-bottom-nav a span{font-size:20px;line-height:1.1}.v2-bottom-nav a:focus,.v2-bottom-nav a:hover{color:#22C55E}.v2-calendar-anchor{scroll-margin-top:16px;height:1px}

@@ -1,0 +1,26 @@
+{
+  "name": "Finanzas V2 · Meta diaria",
+  "short_name": "Finanzas V2",
+  "description": "Organiza tus pagos, vencimientos y meta diaria.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C0C10",
+  "theme_color": "#0C0C10",
+  "icons": [
+    {
+      "src": "./v2-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./v2-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
