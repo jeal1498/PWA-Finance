@@ -18,36 +18,74 @@
 <body class="v2-body">
   <main class="v2-app">
     <header class="v2-header">
-      <a class="v2-back" href="../index.html" aria-label="Volver a FINANZAS">←</a>
-      <div><p class="v2-eyebrow">VERSIÓN MEJORADA</p><h1>FINANZAS <span>V2</span></h1></div>
+      <a class="v2-back" href="../index.html" aria-label="Volver a Finanzas original">←</a>
+      <div><p class="v2-eyebrow">TU CONTROL FINANCIERO</p><h1>FINANZAS <span>V2</span></h1></div>
       <button class="v2-refresh" id="refresh" type="button" aria-label="Actualizar datos">↻</button>
     </header>
-    <p class="v2-intro">Tu meta diaria calculada con los pagos pendientes y sus fechas de vencimiento.</p>
-    <section id="resumen" class="v2-hero" aria-labelledby="daily-label">
-      <p id="daily-label" class="v2-label">META DIARIA DE PAGOS</p>
-      <p id="daily-target" class="v2-money">$0</p>
-      <p id="daily-caption" class="v2-caption">Calculando compromisos…</p>
-      <div class="v2-progress"><span id="daily-progress"></span></div>
-      <div class="v2-progress-meta"><span id="paid-label">Abonado hoy: $0</span><strong id="remaining-label">Meta pendiente: $0</strong></div>
+
+    <section class="v2-screen is-active" data-screen="resumen" aria-labelledby="screen-title-resumen">
+      <div class="v2-screen-heading"><p class="v2-eyebrow">RESUMEN</p><h2 id="screen-title-resumen">Tu meta diaria</h2><p>Una guía para priorizar tus pagos según sus fechas y saldos pendientes.</p></div>
+      <section class="v2-hero" aria-labelledby="daily-label">
+        <p id="daily-label" class="v2-label">META DIARIA DE PAGOS</p>
+        <p id="daily-target" class="v2-money">$0</p>
+        <p id="daily-caption" class="v2-caption">Calculando compromisos…</p>
+        <div class="v2-progress"><span id="daily-progress"></span></div>
+        <div class="v2-progress-meta"><span id="paid-label">Abonado hoy: $0</span><strong id="remaining-label">Meta pendiente: $0</strong></div>
+      </section>
+      <div class="v2-kpis" aria-label="Resumen de hoy">
+        <article class="v2-kpi"><span>Abonos de hoy</span><strong id="today-paid">$0</strong><small>Pagos aplicados hoy</small></article>
+        <article class="v2-kpi"><span>Vencidos y para hoy</span><strong id="urgent-total">$0</strong><small id="urgent-count">0 compromisos</small></article>
+        <article class="v2-kpi"><span>Próximos 30 días</span><strong id="pending-total">$0</strong><small id="pending-count">0 compromisos</small></article>
+      </div>
+      <section class="v2-panel"><div class="v2-section-head"><div><p class="v2-eyebrow">PRIORIDAD</p><h3>Atiende primero</h3></div><button class="v2-text-button" data-go="pagos">Ver todos</button></div><div id="priority-payments" class="v2-payments"><p class="v2-empty">Cargando pagos…</p></div></section>
+      <p class="v2-footnote">Los abonos cuentan como avance de pagos en la fecha en que se registran; no equivalen necesariamente a ingresos generados ese día.</p>
     </section>
-    <section id="analisis" class="v2-kpis" aria-label="Resumen y análisis de hoy">
-      <article class="v2-kpi"><span>Abonos de hoy</span><strong id="today-paid">$0</strong><small>Según la fecha de cada abono</small></article>
-      <article class="v2-kpi"><span>Vencidos y para hoy</span><strong id="urgent-total">$0</strong><small id="urgent-count">0 compromisos</small></article>
-      <article class="v2-kpi"><span>Pendiente próximo a 30 días</span><strong id="pending-total">$0</strong><small id="pending-count">0 compromisos</small></article>
+
+    <section class="v2-screen" data-screen="pagos" aria-labelledby="screen-title-pagos" hidden>
+      <div class="v2-screen-heading"><p class="v2-eyebrow">TUS COMPROMISOS</p><h2 id="screen-title-pagos">Pagos</h2><p>Consulta los saldos, vencimientos y prioridades de tus obligaciones registradas.</p></div>
+      <div class="v2-filter-row"><label for="filter">Mostrar</label><select id="filter"><option value="pending">Pendientes</option><option value="all">Todos</option><option value="urgent">Vencidos y hoy</option><option value="future">Próximos</option><option value="paid">Liquidados</option></select></div>
+      <div class="v2-list-summary" id="payments-summary"></div>
+      <div id="payments" class="v2-payments"><p class="v2-empty">Cargando pagos…</p></div>
     </section>
-    <section id="pagos" class="v2-section">
-      <div class="v2-section-head"><div><p class="v2-eyebrow">PLAN DE CUMPLIMIENTO</p><h2>Qué pagos atender</h2></div><select id="filter" aria-label="Filtrar compromisos"><option value="all">Todos</option><option value="urgent">Vencidos y hoy</option><option value="future">Próximos</option></select></div>
-      <div id="calendario" class="v2-calendar-anchor" aria-hidden="true"></div><div id="payments" class="v2-payments"><p class="v2-empty">Cargando pagos…</p></div>
+
+    <section class="v2-screen" data-screen="calendario" aria-labelledby="screen-title-calendario" hidden>
+      <div class="v2-screen-heading"><p class="v2-eyebrow">FECHAS CLAVE</p><h2 id="screen-title-calendario">Calendario de pagos</h2><p>Revisa qué compromisos vencen en cada día del mes.</p></div>
+      <div class="v2-calendar-toolbar"><button class="v2-icon-button" id="month-prev" aria-label="Mes anterior">‹</button><h3 id="calendar-month">Mes</h3><button class="v2-icon-button" id="month-next" aria-label="Mes siguiente">›</button></div>
+      <div class="v2-calendar-grid" id="calendar-grid" aria-label="Calendario mensual"></div>
+      <div class="v2-calendar-legend"><span><i class="dot overdue"></i>Vencido</span><span><i class="dot today"></i>Hoy</span><span><i class="dot future"></i>Próximo</span></div>
+      <section class="v2-panel"><div class="v2-section-head"><div><p class="v2-eyebrow">FECHA SELECCIONADA</p><h3 id="selected-date-title">Pagos del día</h3></div></div><div id="calendar-payments" class="v2-payments"></div></section>
     </section>
-    <aside id="ajustes" class="v2-note"><strong>Cómo se calcula</strong><p>La meta suma el saldo pendiente de cada pago dividido entre los días disponibles hasta su vencimiento. Los pagos vencidos o que vencen hoy se consideran urgentes. Los abonos de hoy cuentan como avance del día, aunque el dinero se haya generado antes.</p><p>Los abonos son dinero aplicado a compromisos; no prueban por sí solos cuánto generaste trabajando.</p></aside>
-    <nav class="v2-bottom-nav" aria-label="Navegación de Finanzas V2">
-    <a href="#resumen"><span>⌂</span>Resumen</a>
-    <a href="#pagos"><span>▤</span>Pagos</a>
-    <a href="#calendario"><span>▦</span>Calendario</a>
-    <a href="#analisis"><span>◔</span>Análisis</a>
-    <a href="#ajustes"><span>⚙</span>Ajustes</a>
-  </nav>
-  <footer class="v2-footer"><a href="../index.html">Volver a la versión actual</a><span id="last-updated"></span></footer>
+
+    <section class="v2-screen" data-screen="analisis" aria-labelledby="screen-title-analisis" hidden>
+      <div class="v2-screen-heading"><p class="v2-eyebrow">TUS NÚMEROS</p><h2 id="screen-title-analisis">Análisis</h2><p>Una vista rápida del avance de tus compromisos registrados.</p></div>
+      <div class="v2-analysis-grid">
+        <article class="v2-analysis-card"><span>Importe total registrado</span><strong id="analysis-total">$0</strong></article>
+        <article class="v2-analysis-card"><span>Saldo pendiente total</span><strong id="analysis-pending">$0</strong></article>
+        <article class="v2-analysis-card"><span>Abonos este mes</span><strong id="analysis-month-paid">$0</strong></article>
+        <article class="v2-analysis-card"><span>Pagos liquidados</span><strong id="analysis-settled">0</strong></article>
+        <article class="v2-analysis-card"><span>Compromisos vencidos</span><strong id="analysis-overdue">0</strong></article>
+        <article class="v2-analysis-card"><span>Compromisos próximos 30 días</span><strong id="analysis-upcoming">0</strong></article>
+      </div>
+      <section class="v2-panel"><div class="v2-section-head"><div><p class="v2-eyebrow">DÓNDE ESTÁN TUS SALDOS</p><h3>Pendiente por categoría</h3></div></div><div id="category-breakdown" class="v2-breakdown"></div></section>
+      <p class="v2-footnote">Este análisis utiliza los pagos y abonos guardados en la aplicación. No calcula cuánto dinero generaste conduciendo, porque ese dato no se deduce de los abonos.</p>
+    </section>
+
+    <section class="v2-screen" data-screen="ajustes" aria-labelledby="screen-title-ajustes" hidden>
+      <div class="v2-screen-heading"><p class="v2-eyebrow">PREFERENCIAS Y AYUDA</p><h2 id="screen-title-ajustes">Ajustes</h2><p>Información sobre esta versión y sus datos.</p></div>
+      <section class="v2-settings-card"><div class="v2-settings-icon">↗</div><div><h3>Instalar Finanzas V2</h3><p>En Chrome, abre el menú ⋮ y selecciona “Instalar aplicación” o “Agregar a pantalla principal”, si aparece disponible.</p></div></section>
+      <section class="v2-settings-card"><div class="v2-settings-icon">↻</div><div><h3>Actualizar datos</h3><p>V2 lee los movimientos de la misma base de datos local que Finanzas original. Los registros no se duplican ni se reemplazan.</p><button id="settings-refresh" class="v2-secondary-button">Actualizar ahora</button></div></section>
+      <section class="v2-settings-card"><div class="v2-settings-icon">◎</div><div><h3>Cómo se calcula la meta diaria</h3><p>La meta distribuye el saldo pendiente entre los días que quedan hasta cada vencimiento. Los pagos vencidos o que vencen hoy se muestran como urgentes y se consideran para el día actual.</p><p>Los abonos registrados hoy se muestran como avance de pagos, aunque el dinero se haya generado antes.</p></div></section>
+      <a class="v2-original-link" href="../index.html">← Volver a Finanzas original</a>
+      <p class="v2-version-note">Finanzas V2 · Vista independiente · Datos compartidos con la versión original.</p>
+    </section>
+    <nav class="v2-bottom-nav" aria-label="Navegación principal">
+      <button type="button" data-screen-link="resumen" class="is-current"><span>⌂</span>Resumen</button>
+      <button type="button" data-screen-link="pagos"><span>▤</span>Pagos</button>
+      <button type="button" data-screen-link="calendario"><span>▦</span>Calendario</button>
+      <button type="button" data-screen-link="analisis"><span>◔</span>Análisis</button>
+      <button type="button" data-screen-link="ajustes"><span>⚙</span>Ajustes</button>
+    </nav>
+    <footer class="v2-footer"><span id="last-updated"></span><span>Finanzas V2</span></footer>
   </main>
   <script type="module" src="./v2.js"></script>
   <script>if ("serviceWorker" in navigator) addEventListener("load", function () { navigator.serviceWorker.register("./sw.js", {scope:"./"}).catch(function () {}); });</script>

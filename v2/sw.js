@@ -1,5 +1,5 @@
-const CACHE = "finanzas-v2-pwa-v1";
-const ASSETS = ["./", "./index.html", "./v2.css", "./v2.js", "./manifest.webmanifest", "./v2-icon.svg", "../js/db.js"];
+const CACHE = "finanzas-v2-pwa-v2";
+const ASSETS = ["./", "./index.html", "./v2.css", "./v2.js", "./manifest.webmanifest", "./v2-icon.svg", "../js/db.js", "../styles.css"];
 self.addEventListener("install", event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", event => { event.waitUntil((async () => { for (const key of await caches.keys()) if (key.startsWith("finanzas-v2-pwa-") && key !== CACHE) await caches.delete(key); await self.clients.claim(); })()); });
 self.addEventListener("fetch", event => { const request = event.request; if (request.method !== "GET" || new URL(request.url).origin !== location.origin) return; event.respondWith(fetch(request).then(response => { if (response.ok) caches.open(CACHE).then(cache => cache.put(request, response.clone())); return response; }).catch(async () => (await caches.match(request)) || (request.mode === "navigate" ? caches.match("./index.html") : Response.error()))); });
