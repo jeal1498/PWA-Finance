@@ -106,6 +106,8 @@ const repIcon = m => m.repite && m.serie ? `<svg class="rep-ic" viewBox="0 0 24 
 
 /* `soloSerie`: al guardar un pago que se repite, rellena también los meses que falten entre el primero y `hasta`
    (p. ej. una copia que se eliminó mientras ya existían meses posteriores). `hasta` = mes (año*12+mes) hasta el que se crean copias. */
+let seriesWrite = Promise.resolve();
+
 function generarSeries(lista, store, hasta, soloSerie) {
   const series = new Map();
   lista.forEach(m => { if (m.serie) (series.get(m.serie) || series.set(m.serie, []).get(m.serie)).push(m); });
@@ -156,7 +158,11 @@ function generarSeries(lista, store, hasta, soloSerie) {
   if (!nuevos.length) return;
   lista.push(...nuevos);
   lista.sort(byFecha);
-  dbBatch({ [store]: { put: nuevos } }).then(autoSync, e => console.error('Pagos repetidos', e));
+  /* Serializa las escrituras y permite que recargarDatos espere a que terminen. */
+  seriesWrite = seriesWrite
+    .then(() => dbBatch({ [store]: { put: nuevos } }))
+    .then(autoSync)
+    .catch(e => console.error('Pagos repetidos', e));
 }
 
 const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
@@ -178,6 +184,9 @@ let recargaPendiente = false;
 async function recargarDatos() {
   if (!sheet.el.hidden) { recargaPendiente = true; return; }
   try {
+    /* No releer IndexedDB mientras las copias recurrentes recién generadas siguen guardándose.
+       Evita que una recarga pendiente reemplace la lista en memoria con datos anteriores. */
+    await seriesWrite;
     const [mov, met] = await Promise.all([db.all('movimientos'), db.all('metas')]);
     movimientos = mov.sort(byFecha); metas = met.sort(byFecha);
     recargaPendiente = false;
