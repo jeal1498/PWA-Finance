@@ -74,8 +74,8 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v115';
-const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
+const APP_VERSION = 'v116';
+const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat', modo: 'finanzas_pagar_modo' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 
@@ -222,7 +222,7 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
 
-const VISTAS = ['gastos', 'metas', 'apartar', 'perfil'];
+const VISTAS = ['gastos', 'metas', 'apartar', 'analisis', 'perfil'];
 const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
   view: vista0,
@@ -233,7 +233,10 @@ const state = {
   search: '',
   sort: { col: 'fecha', asc: true },
   sortMetas: { col: 'fecha', asc: true },
-  apartar: 'dia'
+  apartar: 'dia',
+  /* Pagar: tabla o calendario del mes (y el día elegido en el calendario). */
+  pagarModo: lsGet(KEYS.modo) === 'cal' ? 'cal' : 'tabla',
+  calDia: ''
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
 
@@ -630,12 +633,43 @@ function renderMetasList(b) {
   renderList([], '', '', 'metas', b.base.length === 0);
 }
 
+const modoHTML = () => `<div class="seg-pc" role="group" aria-label="Ver como">${[['tabla', 'Tabla'], ['cal', 'Calendario']].map(([k, l]) => `<button type="button" data-action="pagar-modo" data-modo="${k}" aria-pressed="${state.pagarModo === k}">${l}</button>`).join('')}</div>`;
+
+/* Calendario del mes: un punto por pago con el color de su estatus; al tocar un día salen sus pagos con las filas de la tabla. */
+const DOT = { Vencido: 'danger', Pendiente: 'warn', Pagado: 'ok' }, DOT_RANK = { Vencido: 0, Pendiente: 1, Pagado: 2 };
+function calendarioHTML(b) {
+  calcularChips();
+  const y = state.month.year, mo = state.month.month, pre = `${y}-${String(mo + 1).padStart(2, '0')}`;
+  const porDia = new Map();
+  b.items.filter(m => enMes(m.date)).forEach(m => (porDia.get(m.fecha) || porDia.set(m.fecha, []).get(m.fecha)).push(m));
+  const hoy = toISO(HOY);
+  if (!state.calDia.startsWith(pre)) state.calDia = isCurrentMonth() ? hoy : ([...porDia.keys()].sort()[0] || `${pre}-01`);
+  const sel = state.calDia;
+  const offset = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
+  const cells = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
+  for (let i = 0; i < offset; i++) cells.push('<span aria-hidden="true"></span>');
+  for (let d = 1; d <= n; d++) {
+    const iso = `${pre}-${String(d).padStart(2, '0')}`, list = porDia.get(iso) || [];
+    const dots = list.slice().sort((a, c) => DOT_RANK[a.estado] - DOT_RANK[c.estado]).slice(0, 4).map(m => `<i class="${DOT[m.estado]}"></i>`).join('');
+    cells.push(`<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === sel}" aria-label="${d} de ${MESES[mo].toLowerCase()}, ${plural(list.length, 'pago', 'pagos')}">${d}<span class="cal-dots">${dots}</span></button>`);
+  }
+  const dia = (porDia.get(sel) || []).sort(porFechaYMonto), f = parseDate(sel);
+  const titulo = `${DIAS[f.getDay()][0].toUpperCase()}${DIAS[f.getDay()].slice(1)} ${f.getDate()}`;
+  return `<div class="pt cal">
+      <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
+      <div class="cal-grid">${cells.join('')}</div>
+    </div>
+    <div class="cal-tit"><b>${titulo}</b><span>${dia.length ? `${plural(dia.length, 'pago', 'pagos')} · ${fmtMoney(sum(dia, 'imp'))}` : 'Sin pagos'}</span></div>
+    ${dia.length ? `<div class="pt">${dia.map(pagoRow).join('')}</div>` : ''}`;
+}
+
 function renderPagos(b) {
   $('#list-caption').textContent = 'Movimientos';
   $('#list-count').textContent = '';
-  if (b.items.length) { $('#list').innerHTML = pagosTable(b); return; }
+  if (state.pagarModo === 'cal') { $('#list').innerHTML = modoHTML() + calendarioHTML(b); return; }
+  if (b.items.length) { $('#list').innerHTML = modoHTML() + pagosTable(b); return; }
   renderList([], '', '', 'gastos', b.base.length === 0);
-  $('#list').insertAdjacentHTML('afterbegin', `<div class="pt">${mesBar()}</div>`);
+  $('#list').insertAdjacentHTML('afterbegin', `${modoHTML()}<div class="pt">${mesBar()}</div>`);
 }
 
 function renderList(groups, caption, countText, emptyKind, baseEmpty) {
@@ -656,7 +690,7 @@ function render() {
   marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
-  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar';
+  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis';
   document.body.dataset.view = state.view;
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
@@ -664,7 +698,7 @@ function render() {
   $('#month-label').disabled = !isG;
   $('.controls').hidden = true;
   $('#seg').hidden = true;
-  const addBtn = $('.nav-add'), addLabel = isG || isA ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
+  const addBtn = $('.nav-add'), addLabel = isG || isA || isN ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
   addBtn.setAttribute('aria-label', addLabel); addBtn.title = addLabel;
 
   if (isP) {
@@ -675,6 +709,10 @@ function render() {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Apartar';
     renderApartar();
+  } else if (isN) {
+    $('#search-bar').hidden = true;
+    $('#month-text').textContent = 'Análisis';
+    renderAnalisis();
   } else if (isG) {
     const b = buildGastos();
     renderHeroGastos(b);
@@ -1420,6 +1458,47 @@ async function shareFondo(d) {
 
 /* Dashboard de Pagar: tarjeta partida Total | Por pagar, tres mosaicos de estado (filtran la lista)
    y resumen operativo (total cartera; vuelve a mostrar todo). */
+/* Análisis: números de todos los pagos (sin planes), pendiente por categoría y total contra pagado de los últimos meses. */
+const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : fmtMoney(n);
+function renderAnalisis() {
+  const all = movimientos.map(procesar);
+  const pend = all.filter(m => m.pendiente > 0);
+  const mesHoy = toISO(HOY).slice(0, 7);
+  const abonadoMes = movimientos.reduce((t, m) => t + (m.pagos || []).reduce((s, p) => s + ((p.fecha || m.fecha).slice(0, 7) === mesHoy ? p.monto : 0), 0), 0);
+  const tiles = [
+    ['Registrado', fmtMoney(sum(all, 'imp'))],
+    ['Pendiente', fmtMoney(sum(pend, 'pendiente'))],
+    ['Abonado mes', fmtMoney(abonadoMes)],
+    ['Liquidados', all.filter(m => m.estado === 'Pagado').length],
+    ['Atrasados', pend.filter(m => m.estado === 'Vencido').length, 'lg-b'],
+    ['Próx. 30 días', pend.filter(m => { const d = daysFromToday(m.date); return d >= 0 && d <= 30; }).length]
+  ].map(([l, v, k]) => `<div class="kpi-lg an-t ${k || ''}"><span class="kpi-lg-t">${l}</span><span><span class="kpi-lg-m">${v}</span></span></div>`).join('');
+  $('#kpi-dash').innerHTML = `<div class="kpi-legend sin-sub an">${tiles}</div>`;
+  $('#kpi-dash').hidden = false;
+
+  const porCat = new Map();
+  pend.forEach(m => { const c = catOf(m.cat); porCat.set(c.id, { c, v: ((porCat.get(c.id) || {}).v || 0) + m.pendiente }); });
+  const cats = [...porCat.values()].sort((a, c) => c.v - a.v), max = cats.length ? cats[0].v : 0;
+  const base = HOY.getFullYear() * 12 + HOY.getMonth();
+  let meses = [-2, -1, 0, 1].map(k => {
+    const idx = base + k, y = Math.floor(idx / 12), mo = idx % 12;
+    const l = all.filter(m => m.date.getFullYear() === y && m.date.getMonth() === mo);
+    return { mo, total: sum(l, 'imp'), pagado: Math.min(sum(l, 'abo'), sum(l, 'imp')) };
+  });
+  while (meses.length > 1 && !meses[0].total) meses.shift();
+  const top = Math.max(1, ...meses.map(m => m.total));
+  $('#list').innerHTML = `
+    <section class="an-card" aria-label="Pendiente por categoría">
+      <h2 class="an-h">Pendiente por categoría</h2>
+      ${cats.length ? cats.map(({ c, v }) => `<div class="cp-row" data-cat="${esc(c.id)}"><div class="cp-top"><span class="cp-n">${esc(c.id)}</span><b>${fmtMoney(v)}</b></div><div class="cp-bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="an-vacio">No hay saldos pendientes.</p>'}
+    </section>
+    <section class="an-card" aria-label="Total y pagado por mes">
+      <h2 class="an-h">Últimos meses · total y pagado</h2>
+      <div class="an-chart" style="grid-template-columns:repeat(${meses.length},minmax(0,1fr))">${meses.map(m => `<div class="an-col" aria-label="${MESES[m.mo]}: total ${fmtMoney(m.total)}, pagado ${fmtMoney(m.pagado)}"><b>${fmtK(m.total)}</b><span class="an-bar" style="height:${Math.max(2, m.total / top * 100).toFixed(1)}%"><i style="height:${m.total ? (m.pagado / m.total * 100).toFixed(1) : 0}%"></i></span><small>${MESES_CORTO[m.mo]}</small></div>`).join('')}</div>
+      <div class="an-ley"><span class="p">Pagado</span><span>Total del mes</span></div>
+    </section>`;
+}
+
 function kpiDashboard(base) {
   const totalAbo = sum(base, 'abo'), totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
   const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
@@ -1757,6 +1836,9 @@ document.addEventListener('click', async e => {
     case 'resumen': state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = state.view === 'metas' ? 'sortMetas' : 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': state.filter = t.dataset.filter; render(); break;
+    case 'pagar-modo': state.pagarModo = t.dataset.modo; lsSet(KEYS.modo, state.pagarModo); render(); break;
+    case 'cal-dia': state.calDia = t.dataset.dia; render(); break;
+    case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
     case 'toggle-group': {
       const sec = t.closest('.group');
       const open = !sec.classList.contains('open');
