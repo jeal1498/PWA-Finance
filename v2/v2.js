@@ -22,7 +22,7 @@ function buildRows(today) {
     const paidToday = abonosHoy(item, today);
     const delta = due ? daysBetween(today, item.fecha) : null;
     return Object.assign({}, item, {pending:pending, paidToday:paidToday, delta:delta, due:due});
-  }).filter((item) => item.pending > 0 && item.due && item.delta <= 30)
+  }).filter((item) => item.pending > 0 && item.due)
     .sort((a,b) => a.delta - b.delta || a.pending - b.pending);
 }
 
@@ -42,20 +42,21 @@ function renderPayment(item) {
 
 function render() {
   const today = todayISO();
-  const rows = buildRows(today);
+  const allRows = buildRows(today);
+  const rows = allRows.filter((item) => item.delta <= 30);
   const eligible = rows.filter((item) => item.delta >= 0);
   const urgent = rows.filter((item) => item.delta <= 0);
-  const dailyTarget = rows.reduce((total, item) => {
+  const dailyTarget = allRows.reduce((total, item) => {
     const startOfDayPending = item.pending + item.paidToday;
     return total + startOfDayPending / Math.max(1, item.delta);
   }, 0);
-  const paidToday = records.reduce((total, item) => total + abonosHoy(item, today), 0);
+  const paidToday = allRows.reduce((total, item) => total + item.paidToday, 0);
   const remainingToday = Math.max(0, dailyTarget - paidToday);
   const pendingTotal = eligible.reduce((total, item) => total + item.pending, 0);
   const urgentTotal = urgent.reduce((total, item) => total + item.pending, 0);
   const shown = rows.filter((item) => currentFilter === 'urgent' ? item.delta <= 0 : currentFilter === 'future' ? item.delta > 0 : true);
   $('#daily-target').textContent = money(dailyTarget);
-  $('#daily-caption').textContent = rows.length ? rows.length + (rows.length === 1 ? ' compromiso considerado en los próximos 30 días o atrasado' : ' compromisos considerados en los próximos 30 días o atrasados') : 'No hay compromisos pendientes con vencimiento en los próximos 30 días.';
+  $('#daily-caption').textContent = allRows.length ? allRows.length + (allRows.length === 1 ? ' compromiso pendiente incluido en la meta' : ' compromisos pendientes incluidos en la meta') : 'No hay compromisos pendientes con fecha de vencimiento registrada.';
   $('#paid-label').textContent = 'Abonado hoy: ' + money(paidToday);
   $('#remaining-label').textContent = 'Meta pendiente: ' + money(remainingToday);
   $('#today-paid').textContent = money(paidToday);
