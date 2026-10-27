@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0C0C10">
+  <meta name="color-scheme" content="dark">
+  <title>FINANZAS V2 · Meta diaria</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./v2.css">
+</head>
+<body class="v2-body">
+  <main class="v2-app">
+    <header class="v2-header">
+      <a class="v2-back" href="../index.html" aria-label="Volver a FINANZAS">←</a>
+      <div><p class="v2-eyebrow">VERSIÓN MEJORADA</p><h1>FINANZAS <span>V2</span></h1></div>
+      <button class="v2-refresh" id="refresh" type="button" aria-label="Actualizar datos">↻</button>
+    </header>
+    <p class="v2-intro">Tu meta diaria calculada con los pagos pendientes y sus fechas de vencimiento.</p>
+    <section class="v2-hero" aria-labelledby="daily-label">
+      <p id="daily-label" class="v2-label">META DIARIA DE PAGOS</p>
+      <p id="daily-target" class="v2-money">$0</p>
+      <p id="daily-caption" class="v2-caption">Calculando compromisos…</p>
+      <div class="v2-progress"><span id="daily-progress"></span></div>
+      <div class="v2-progress-meta"><span id="paid-label">Abonado hoy: $0</span><strong id="remaining-label">Meta pendiente: $0</strong></div>
+    </section>
+    <section class="v2-kpis" aria-label="Resumen de hoy">
+      <article class="v2-kpi"><span>Abonos de hoy</span><strong id="today-paid">$0</strong><small>Según la fecha de cada abono</small></article>
+      <article class="v2-kpi"><span>Vencidos y para hoy</span><strong id="urgent-total">$0</strong><small id="urgent-count">0 compromisos</small></article>
+      <article class="v2-kpi"><span>Pendiente próximo a 30 días</span><strong id="pending-total">$0</strong><small id="pending-count">0 compromisos</small></article>
+    </section>
+    <section class="v2-section">
+      <div class="v2-section-head"><div><p class="v2-eyebrow">PLAN DE CUMPLIMIENTO</p><h2>Qué pagos atender</h2></div><select id="filter" aria-label="Filtrar compromisos"><option value="all">Todos</option><option value="urgent">Vencidos y hoy</option><option value="future">Próximos</option></select></div>
+      <div id="payments" class="v2-payments"><p class="v2-empty">Cargando pagos…</p></div>
+    </section>
+    <aside class="v2-note"><strong>Cómo se calcula</strong><p>La meta suma el saldo pendiente de cada pago dividido entre los días disponibles hasta su vencimiento. Los pagos vencidos o que vencen hoy se consideran urgentes. Los abonos de hoy cuentan como avance del día, aunque el dinero se haya generado antes.</p><p>Los abonos son dinero aplicado a compromisos; no prueban por sí solos cuánto generaste trabajando.</p></aside>
+    <footer class="v2-footer"><a href="../index.html">Volver a la versión actual</a><span id="last-updated"></span></footer>
+  </main>
+  <script type="module" src="./v2.js"></script>
+</body>
+</html>
