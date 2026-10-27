@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v114';
+const APP_VERSION = 'v115';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -563,8 +563,9 @@ const mesBar = () => `<button type="button" class="pt-mes" data-action="month-pi
 /* «×N»: cuántos pagos con ese nombre hay en el mes que se ve (no cuenta los 30 días siguientes ni los atrasados de otros meses). */
 let chipMes = new Map();
 function calcularChips() {
+  /* Cuenta renglones de la tabla del mes (un grupo de atrasados de la misma serie cuenta como uno). */
   chipMes = new Map();
-  for (const x of movimientos) if (enMes(parseDate(x.fecha))) { const k = llaveC(x); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
+  for (const x of juntarSeries(monthItems())) { const k = llaveC(x); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
 }
 
 function pagosTable(b) {
