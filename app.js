@@ -73,6 +73,8 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Persistencia: IndexedDB de SecondBrain (stores "movimientos" y "metas").
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
+/* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
+const APP_VERSION = 'v113';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1899,6 +1901,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { if
   const sig = new Date(); sig.setHours(24, 0, 5, 0);
   setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
 })();
+$('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
 render();
 if (!dbOk) toast('No se pudo abrir el almacenamiento de este dispositivo');
 
