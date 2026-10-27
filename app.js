@@ -891,6 +891,16 @@ function reveal(kind, raw) {
 
 async function finish(kind, raw, msg) {
   const ok = await persist(kind, raw);
+  /* Al guardar una serie, no pintar la pantalla hasta que sus ocurrencias estén guardadas
+     y volver a leer IndexedDB. Así la vista usa la misma lista persistida, no una copia vieja. */
+  if (raw.serie && raw.repite) {
+    await seriesWrite;
+    try {
+      const [mov, met] = await Promise.all([db.all('movimientos'), db.all('metas')]);
+      movimientos = mov.sort(byFecha);
+      metas = met.sort(byFecha);
+    } catch (e) { /* conservar la lista en memoria si falla la lectura */ }
+  }
   reveal(kind, raw);
   closeSheet();
   render();
