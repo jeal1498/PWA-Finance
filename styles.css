@@ -788,7 +788,7 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .freq-opt input:checked + span { background: rgba(244, 244, 239, .14); color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
 .freq-opt input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-/* Color por categoría: la fila de la tabla se pinta con el tono de su categoría (rojo, amarillo y verde quedan solo para estatus). */
+/* Tonos de categoría: solo para barras de Análisis y franjas de otras listas; las filas de las tablas ya no se tiñen. */
 [data-cat="Finanzas"] { --cc: 96 165 250; --ca: .22; }
 [data-cat="Vehículo"] { --cc: 34 211 238; --ca: .20; }
 [data-cat="Yo"] { --cc: 167 139 250; --ca: .22; }
@@ -796,15 +796,12 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 [data-cat="Julieta"] { --cc: 232 121 249; --ca: .22; }
 [data-cat="Servicios"] { --cc: 148 163 184; --ca: .20; }
 [data-cat="Familia"] { --cc: 45 212 191; --ca: .20; }
-.pt-row.v { background: none; }
-.pt-row[data-cat] { background: rgb(var(--cc, 244 244 239) / var(--ca, .2)); border-top-color: rgba(12, 12, 16, .6); }
-.pt-row[data-cat]:not([data-cat="Finanzas"],[data-cat="Vehículo"],[data-cat="Yo"],[data-cat="Karen"],[data-cat="Julieta"],[data-cat="Servicios"],[data-cat="Familia"]) { background: none; border-top-color: rgba(244, 244, 239, .12); }
-.pt-row[data-cat]:active { filter: brightness(1.3); }
-.pt-row[data-cat] .pt-cat { color: rgb(var(--cc, 244 244 239)); }
-.pt-key > span[data-cat] .ic, .pt-key > span[data-cat] .mono { color: rgb(var(--cc, 244 244 239)); }
 
-/* Atrasados: franja roja a la izquierda de la fila; el mes de la fecha no lleva rojo. */
-.pt-row.v { box-shadow: inset 4px 0 0 var(--danger); }
+/* Filas en dos colores: todas en un gris liso (ícono de categoría en gris) y las atrasadas con tinte rojo y franja. */
+.pt-row, .pt-row[data-cat] { background: #1C1C23; border-top-color: var(--line); }
+.pt-row:active { filter: brightness(1.3); }
+.pt-row .pt-cat, .pt-key .ic, .pt-key .mono { color: var(--muted); }
+.pt-row.v, .pt-row.v[data-cat] { background: rgba(239, 68, 68, .14); box-shadow: inset 4px 0 0 var(--danger); }
 .pt-row.v .pt-fecha small { color: var(--muted); }
 
 /* Misma separación (8 px) entre los mosaicos y la tabla que entre los mosaicos. */
