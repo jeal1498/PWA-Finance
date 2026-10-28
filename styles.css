@@ -929,26 +929,25 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .app-ver { margin: 20px 0 8px; text-align: center; font: 500 12px/1 'JetBrains Mono', monospace; color: var(--muted); }
 @media (min-width: 768px) { body:is([data-view="gastos"],[data-view="metas"],[data-view="apartar"],[data-view="analisis"]) .app-ver { grid-column: 2; grid-row: 4; } }
 
-/* Pagar: interruptor Tabla | Calendario. */
-.seg-pc { display: grid; grid-template-columns: 1fr 1fr; height: 38px; margin-bottom: 8px; padding: 3px; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; }
-.seg-pc button { border: 0; border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; }
-.seg-pc button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
-
-/* Calendario del mes: puntos con el color del estatus; el día elegido lleva borde hueso de 2 px. */
+/* Pagar: calendario arriba de la tabla; anillo por día con el color del estatus que se llena con lo abonado; el día elegido lleva borde hueso de 2 px. */
+.pt.cal { margin-bottom: 8px; }
 .cal-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; border-bottom: 1px solid var(--line); }
 .cal-head .pt-mes { border-bottom: 0; }
 .cal-arr { border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 6px; }
 .cal-wd { font-family: var(--font-data); font-size: 10px; font-weight: 600; line-height: 24px; text-align: center; color: var(--muted); }
-.cal-d { height: 44px; display: grid; justify-items: center; align-content: center; gap: 4px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--ink); font-family: var(--font-data); font-size: 13px; font-weight: 700; }
-.cal-d.hoy { background: rgba(244, 244, 239, .1); }
+.cal-d { position: relative; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--ink); font-family: var(--font-data); font-size: 13px; font-weight: 700; }
+.cal-d > span { position: relative; }
+.cal-d.hoy::after { content: ""; position: absolute; bottom: 3px; left: 50%; width: 12px; height: 2px; margin-left: -6px; border-radius: 2px; background: var(--ink); }
 .cal-d[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
-.cal-dots { display: flex; gap: 3px; height: 5px; }
-.cal-dots i { width: 5px; height: 5px; border-radius: 50%; }
-.cal-dots .danger { background: var(--danger); } .cal-dots .warn { background: var(--warn); } .cal-dots .ok { background: var(--ok); }
-.cal-tit { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 12px 4px 8px; }
+.cal-ring { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; transform: rotate(-90deg); }
+.cal-ring circle { fill: none; stroke: currentColor; stroke-width: 3; }
+.cal-ring .tr { opacity: .25; }
+.cal-ring .pr { stroke-linecap: round; stroke-dasharray: var(--p) 100; }
+.cal-ring.danger { color: var(--danger); } .cal-ring.warn { color: var(--warn); } .cal-ring.ok { color: var(--ok); }
+.cal-tit { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 4px 8px; }
 .cal-tit b { font-family: var(--font-title); font-weight: 800; font-size: 17px; }
-.cal-tit span { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.cal-todo { border: 1px solid #3A3A45; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; border-radius: 99px; padding: 5px 10px; }
 
 /* Análisis: seis mosaicos de 54 px, pendiente por categoría y total contra pagado por mes. */
 .kpi-legend.an .kpi-lg { cursor: default; }

@@ -74,8 +74,8 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v116';
-const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat', modo: 'finanzas_pagar_modo' };
+const APP_VERSION = 'v117';
+const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 
@@ -235,7 +235,6 @@ const state = {
   sortMetas: { col: 'fecha', asc: true },
   apartar: 'dia',
   /* Pagar: tabla o calendario del mes (y el día elegido en el calendario). */
-  pagarModo: lsGet(KEYS.modo) === 'cal' ? 'cal' : 'tabla',
   calDia: ''
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
@@ -571,7 +570,7 @@ function calcularChips() {
   for (const x of juntarSeries(monthItems())) { const k = llaveC(x); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
 }
 
-function pagosTable(b) {
+function pagosTable(b, conMes = true) {
   calcularChips();
   const { col, asc } = state.sort;
   const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
@@ -581,7 +580,7 @@ function pagosTable(b) {
   }).join('');
   const pend = sum(items, 'pendiente');
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt">${mesBar()}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
+  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
 }
 
@@ -633,43 +632,50 @@ function renderMetasList(b) {
   renderList([], '', '', 'metas', b.base.length === 0);
 }
 
-const modoHTML = () => `<div class="seg-pc" role="group" aria-label="Ver como">${[['tabla', 'Tabla'], ['cal', 'Calendario']].map(([k, l]) => `<button type="button" data-action="pagar-modo" data-modo="${k}" aria-pressed="${state.pagarModo === k}">${l}</button>`).join('')}</div>`;
-
-/* Calendario del mes: un punto por pago con el color de su estatus; al tocar un día salen sus pagos con las filas de la tabla. */
+/* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva un anillo del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
 const DOT = { Vencido: 'danger', Pendiente: 'warn', Pagado: 'ok' }, DOT_RANK = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 function calendarioHTML(b) {
-  calcularChips();
   const y = state.month.year, mo = state.month.month, pre = `${y}-${String(mo + 1).padStart(2, '0')}`;
   const porDia = new Map();
-  b.items.filter(m => enMes(m.date)).forEach(m => (porDia.get(m.fecha) || porDia.set(m.fecha, []).get(m.fecha)).push(m));
+  b.base.filter(m => enMes(m.date)).forEach(m => (porDia.get(m.fecha) || porDia.set(m.fecha, []).get(m.fecha)).push(m));
   const hoy = toISO(HOY);
-  if (!state.calDia.startsWith(pre)) state.calDia = isCurrentMonth() ? hoy : ([...porDia.keys()].sort()[0] || `${pre}-01`);
-  const sel = state.calDia;
+  if (!state.calDia.startsWith(pre)) state.calDia = '';
   const offset = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
   const cells = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
   for (let i = 0; i < offset; i++) cells.push('<span aria-hidden="true"></span>');
   for (let d = 1; d <= n; d++) {
     const iso = `${pre}-${String(d).padStart(2, '0')}`, list = porDia.get(iso) || [];
-    const dots = list.slice().sort((a, c) => DOT_RANK[a.estado] - DOT_RANK[c.estado]).slice(0, 4).map(m => `<i class="${DOT[m.estado]}"></i>`).join('');
-    cells.push(`<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === sel}" aria-label="${d} de ${MESES[mo].toLowerCase()}, ${plural(list.length, 'pago', 'pagos')}">${d}<span class="cal-dots">${dots}</span></button>`);
+    let ring = '', aria = '';
+    if (list.length) {
+      const est = list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0];
+      const imp = sum(list, 'imp'), pct = imp > 0 ? Math.round(list.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / imp * 100) : 0;
+      ring = `<svg class="cal-ring ${DOT[est]}" viewBox="0 0 36 36" aria-hidden="true"><circle class="tr" cx="18" cy="18" r="15" pathLength="100"/>${pct > 0 ? `<circle class="pr" cx="18" cy="18" r="15" pathLength="100" style="--p:${pct}"/>` : ''}</svg>`;
+      aria = `, ${plural(list.length, 'pago', 'pagos')}, ${pct}% pagado`;
+    }
+    cells.push(`<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${ring}<span>${d}</span></button>`);
   }
-  const dia = (porDia.get(sel) || []).sort(porFechaYMonto), f = parseDate(sel);
-  const titulo = `${DIAS[f.getDay()][0].toUpperCase()}${DIAS[f.getDay()].slice(1)} ${f.getDate()}`;
   return `<div class="pt cal">
       <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
       <div class="cal-grid">${cells.join('')}</div>
-    </div>
-    <div class="cal-tit"><b>${titulo}</b><span>${dia.length ? `${plural(dia.length, 'pago', 'pagos')} · ${fmtMoney(sum(dia, 'imp'))}` : 'Sin pagos'}</span></div>
-    ${dia.length ? `<div class="pt">${dia.map(pagoRow).join('')}</div>` : ''}`;
+    </div>`;
+}
+
+/* Pagos del día elegido en el calendario. */
+function diaHTML(b) {
+  const dia = b.base.filter(m => m.fecha === state.calDia), f = parseDate(state.calDia);
+  const titulo = `${DIAS[f.getDay()][0].toUpperCase()}${DIAS[f.getDay()].slice(1)} ${f.getDate()}`;
+  return `<div class="cal-tit"><b>${titulo}</b><button type="button" class="cal-todo" data-action="cal-dia" data-dia="">Todo el mes</button></div>
+    ${dia.length ? pagosTable({ items: dia }, false) : `<div class="empty"><strong>Sin pagos este día</strong></div>`}`;
 }
 
 function renderPagos(b) {
   $('#list-caption').textContent = 'Movimientos';
   $('#list-count').textContent = '';
-  if (state.pagarModo === 'cal') { $('#list').innerHTML = modoHTML() + calendarioHTML(b); return; }
-  if (b.items.length) { $('#list').innerHTML = modoHTML() + pagosTable(b); return; }
+  const cal = calendarioHTML(b);
+  if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
+  if (b.items.length) { $('#list').innerHTML = cal + pagosTable(b, false); return; }
   renderList([], '', '', 'gastos', b.base.length === 0);
-  $('#list').insertAdjacentHTML('afterbegin', `${modoHTML()}<div class="pt">${mesBar()}</div>`);
+  $('#list').insertAdjacentHTML('afterbegin', cal);
 }
 
 function renderList(groups, caption, countText, emptyKind, baseEmpty) {
@@ -1833,11 +1839,10 @@ document.addEventListener('click', async e => {
     case 'month-picker': openMonthPicker(); break;
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
     case 'pick-today': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; closeSheet(); render(); break;
-    case 'resumen': state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
+    case 'resumen': state.calDia = ''; state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = state.view === 'metas' ? 'sortMetas' : 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
-    case 'filter': state.filter = t.dataset.filter; render(); break;
-    case 'pagar-modo': state.pagarModo = t.dataset.modo; lsSet(KEYS.modo, state.pagarModo); render(); break;
-    case 'cal-dia': state.calDia = t.dataset.dia; render(); break;
+    case 'filter': state.calDia = ''; state.filter = t.dataset.filter; render(); break;
+    case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
     case 'toggle-group': {
       const sec = t.closest('.group');
