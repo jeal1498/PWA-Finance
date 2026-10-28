@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v122';
+const APP_VERSION = 'v123';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1268,6 +1268,7 @@ function renderPerfil() {
 const APARTAR_DIAS = 15;
 const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quince', '15 Días', 15]];
 /* Semana = la del calendario (lunes a domingo) y «15 Días» = 15 días corridos desde hoy: suman el monto completo de lo que vence en ese lapso; «Día» reparte entre los días que faltan. */
+const APARTAR_FILAS = 20;
 const diasHastaDomingo = () => (7 - HOY.getDay()) % 7;
 function apartarItems() {
   const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
@@ -1313,7 +1314,9 @@ function renderApartar() {
   if (!lista.length && !ya.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'dia' ? 'No hay pagos pendientes con fecha futura.' : per[0] === 'semana' ? 'Nada más vence esta semana.' : 'Nada vence en los próximos 15 días.'}</div>`; return; }
   const head = [['Fecha', ''], ['Est.', ''], ['Cat.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
   /* Primero los atrasados (y lo que vence hoy), del más antiguo al más reciente, con el monto completo que falta; luego el periodo normal. */
-  const rowsYa = ya.map(m => {
+  /* La tabla muestra como máximo APARTAR_FILAS renglones (atrasados primero); los totales siguen contando todo. */
+  const verYa = ya.slice(0, APARTAR_FILAS), verLista = lista.slice(0, APARTAR_FILAS - verYa.length);
+  const rowsYa = verYa.map(m => {
     const c = catOf(m.cat), atr = m.d < 0, n = -m.d;
     const nota = atr ? `${n === 1 ? '1 día atrasado' : `${n} días atrasados`}` : 'Vence hoy';
     return `<button type="button" class="pt-cols pt-row v" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${nota.toLowerCase()}, pagar ya ${fmtMoney(m.pend)}`)}">
@@ -1324,7 +1327,7 @@ function renderApartar() {
     <span class="pt-amt"><b>${fmtMoney(m.pend)}</b></span>
   </button>`;
   }).join('');
-  const rows = rowsYa + lista.map(m => {
+  const rows = rowsYa + verLista.map(m => {
     const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
     return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
