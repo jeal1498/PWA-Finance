@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v117';
+const APP_VERSION = 'v118';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -632,7 +632,7 @@ function renderMetasList(b) {
   renderList([], '', '', 'metas', b.base.length === 0);
 }
 
-/* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva un anillo del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
+/* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
 const DOT = { Vencido: 'danger', Pendiente: 'warn', Pagado: 'ok' }, DOT_RANK = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 function calendarioHTML(b) {
   const y = state.month.year, mo = state.month.month, pre = `${y}-${String(mo + 1).padStart(2, '0')}`;
@@ -645,14 +645,14 @@ function calendarioHTML(b) {
   for (let i = 0; i < offset; i++) cells.push('<span aria-hidden="true"></span>');
   for (let d = 1; d <= n; d++) {
     const iso = `${pre}-${String(d).padStart(2, '0')}`, list = porDia.get(iso) || [];
-    let ring = '', aria = '';
+    let bar = '', aria = '';
     if (list.length) {
       const est = list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0];
       const imp = sum(list, 'imp'), pct = imp > 0 ? Math.round(list.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / imp * 100) : 0;
-      ring = `<svg class="cal-ring ${DOT[est]}" viewBox="0 0 36 36" aria-hidden="true"><circle class="tr" cx="18" cy="18" r="15" pathLength="100"/>${pct > 0 ? `<circle class="pr" cx="18" cy="18" r="15" pathLength="100" style="--p:${pct}"/>` : ''}</svg>`;
+      bar = `<span class="cal-bar ${DOT[est]}" aria-hidden="true"><i style="width:${pct}%"></i></span>`;
       aria = `, ${plural(list.length, 'pago', 'pagos')}, ${pct}% pagado`;
     }
-    cells.push(`<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${ring}<span>${d}</span></button>`);
+    cells.push(`<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}"><span>${d}</span>${bar}</button>`);
   }
   return `<div class="pt cal">
       <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
