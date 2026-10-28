@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v119';
+const APP_VERSION = 'v120';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -573,7 +573,9 @@ function calcularChips() {
 function pagosTable(b, conMes = true) {
   calcularChips();
   const { col, asc } = state.sort;
-  const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
+  /* Orden por defecto (fecha ascendente): primero todos los atrasados y luego el resto, cada grupo por fecha. */
+  const atr = m => m.estado === 'Vencido' ? 0 : 1, def = col === 'fecha' && asc;
+  const items = juntarSeries(b.items).sort((a, c) => (def && atr(a) - atr(c)) || (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
   const head = COLS.map(([k, l, sh]) => {
     const on = col === k;
     return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
