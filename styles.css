@@ -932,8 +932,8 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 /* Pagar: calendario arriba de la tabla; barrita por día con el color del estatus que se llena con lo abonado; el día elegido lleva borde hueso de 2 px. */
 .pt.cal { margin-bottom: 8px; }
 .cal-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; border-bottom: 1px solid var(--line); }
-.cal-head .pt-mes { border-bottom: 0; }
-.cal-arr { border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; }
+.cal-head .pt-mes { height: 34px; border-bottom: 0; }
+.cal-arr { height: 34px; border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 6px; }
 .cal-wd { font-family: var(--font-data); font-size: 10px; font-weight: 600; line-height: 24px; text-align: center; color: var(--muted); }
 .cal-d { position: relative; height: 34px; display: grid; justify-items: center; align-content: center; gap: 3px; padding: 0; border: 0; border-radius: 9px; background: none; color: var(--ink); font-family: var(--font-data); font-size: 13px; font-weight: 700; }
