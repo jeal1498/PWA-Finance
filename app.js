@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v135';
+const APP_VERSION = 'v136';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -944,8 +944,7 @@ function openQuick() {
   const last = lsGet(KEYS.cat), sel = CATS.some(c => catString(c) === last) ? catLabelOf(last) : CATS[0].id;
   const dia = `${DIAS[HOY.getDay()].slice(0, 3)} ${HOY.getDate()} ${MESES_CORTO[HOY.getMonth()]}`;
   sheet.ctx = { type: 'quick' };
-  openSheet('Gasto de hoy', `<p class="q-meta">${dia} · pagado</p>
-    <form id="quick-form" class="qform" novalidate>
+  openSheet('Gasto de hoy', `<form id="quick-form" class="qform" novalidate>
       <div class="q-monto"><span aria-hidden="true">$</span><input id="q-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Monto"></div>
       <label class="q-lab" for="q-conc">Concepto</label>
       <label class="fld" for="q-conc"><input id="q-conc" type="text" autocomplete="off" placeholder="Ej. Tacos"></label>
@@ -955,6 +954,8 @@ function openQuick() {
       <button type="submit" class="btn btn-primary">Guardar gasto</button>
       <button type="button" class="q-link" data-action="quick-prog">Programar un pago futuro</button>
     </form>`);
+  /* La fecha va en la misma línea del título. */
+  sheet.title.insertAdjacentHTML('beforeend', `<small class="q-meta">${dia}</small>`);
   $('#q-imp').focus({ preventScroll: true });
 }
 
@@ -971,7 +972,7 @@ async function submitQuick() {
   lsSet(KEYS.cat, cat);
   const ok = await persist(item);
   reveal(item); render();
-  $('#q-imp').value = ''; $('#q-conc').value = ''; $('#q-error').textContent = '';
+  $('#q-imp').value = ''; $('#q-imp').style.width = ''; $('#q-conc').value = ''; $('#q-error').textContent = '';
   $$('[aria-invalid]', sheet.body).forEach(el => el.removeAttribute('aria-invalid'));
   $('#q-imp').focus();
   toast(ok ? `Guardado: ${conc} ${fmtMoney(imp)}` : 'No se pudo guardar en este dispositivo');
@@ -1910,7 +1911,7 @@ document.addEventListener('click', async e => {
 
 document.addEventListener('input', e => {
   if (e.target.id === 'f-conc') pintarSugerencias();
-  if (e.target.id === 'q-imp') e.target.value = e.target.value.replace(/[^\d.,]/g, '');
+  if (e.target.id === 'q-imp') { e.target.value = e.target.value.replace(/[^\d.,]/g, ''); e.target.style.width = Math.max(1, e.target.value.length) + 'ch'; }
   /* Gasto rápido: si el nombre ya existe, se marca la categoría que ya tenía. */
   if (e.target.id === 'q-conc') {
     const s = sugerencias(e.target.value).find(x => llave(x.nombre) === llave(e.target.value));
