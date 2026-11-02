@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v139';
+const APP_VERSION = 'v140';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -917,8 +917,10 @@ function openForm(id) {
   openSheet(editing ? 'Editar pago' : 'Anotar pago', `
     <form id="form" class="fform qform" novalidate>
       <div class="q-monto"><span aria-hidden="true">$</span><input id="f-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Importe" value="${editing ? editing.imp : ''}"></div>
-      <label class="q-lab" for="f-conc">Concepto</label>
-      <label class="fld" for="f-conc"><input id="f-conc" type="text" autocomplete="off" placeholder="Ej. Tacos" value="${editing ? esc(editing.conc) : ''}"></label>
+      <div class="f-row2">
+        <div class="f-col f-col-c"><label class="q-lab" for="f-conc">Concepto</label><label class="fld" for="f-conc"><input id="f-conc" type="text" autocomplete="off" placeholder="Ej. Tacos" value="${editing ? esc(editing.conc) : ''}"></label></div>
+        ${editing ? '' : `<div class="f-col"><span class="q-lab" id="f-paid-l">Pagado</span><label class="f-paid" for="f-paid"><input type="checkbox" class="switch" id="f-paid" role="switch" aria-labelledby="f-paid-l"></label></div>`}
+      </div>
       <span class="q-lab" id="f-date-l">Fecha</span>
       <div class="f-dates" role="group" aria-labelledby="f-date-l">
         ${DATE_CHIPS.map(([l, o]) => `<button type="button" class="dchip" data-action="f-date" data-off="${o}" aria-pressed="false">${l}</button>`).join('')}
@@ -926,7 +928,6 @@ function openForm(id) {
       </div>
       <span class="q-lab" id="f-cat-l">Categoría</span>
       <div class="q-cats" role="radiogroup" aria-labelledby="f-cat-l">${CATS.map(c => `<label class="q-cat"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span>${catIcon(c)}${esc(c.id)}</span></label>`).join('')}</div>
-      ${editing ? '' : `<label class="switch-row" for="f-paid"><span>Pagado<small id="f-paid-cap"></small></span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <div class="rep-card">
         <label class="switch-row" for="f-rep"><span>Se repite</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
         <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
@@ -957,7 +958,7 @@ function pintarFecha() {
   const paid = $('#f-paid');
   if (paid) {
     if (!sheet.ctx.pagadoManual) paid.checked = !!v && v <= toISO(HOY);
-    $('#f-paid-cap').textContent = !v ? '' : paid.checked ? (v > toISO(HOY) || v === toISO(HOY) ? 'Se anota como pagado hoy' : `Se anota como pagado el ${fmtDate(v)}`) : `Queda pendiente · vence ${v === addDays(1) ? 'mañana' : fmtDate(v)}`;
+    $('#f-paid-l').textContent = paid.checked ? 'Pagado' : 'No pagado';
   }
   actualizarFin();
 }

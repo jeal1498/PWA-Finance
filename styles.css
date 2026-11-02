@@ -980,6 +980,13 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .dchip[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 700; }
 .dchip input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .dchip:focus-visible, .dchip:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-.switch-row small { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 400; color: var(--muted); }
 .fbtns.solo { display: block; }
 .fbtns.solo .btn { width: 100%; }
+
+/* Concepto y Pagado en la misma línea; el interruptor va solo, sin cuadro */
+.f-row2 { display: flex; align-items: flex-end; gap: 12px; }
+.f-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.f-col .q-lab { margin: 2px 0 -2px; }
+.f-col-c { flex: 1; }
+.f-paid { display: grid; place-items: center; width: 64px; height: 40px; margin: 0; cursor: pointer; }
+.f-paid:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
