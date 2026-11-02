@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v145';
+const APP_VERSION = 'v146';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1295,13 +1295,13 @@ function conceptosHTML() {
     g.set(k, e);
   }
   const lista = [...g.values()].sort((a, b) => b.total - a.total);
-  const max = lista.length ? lista[0].total : 1;
+  const max = lista.length ? lista[0].total : 1, ver = state.conceptosTodos ? lista : lista.slice(0, 5);
   const chips = [['mes', MESES[HOY.getMonth()]], ['anio', String(HOY.getFullYear())], ['todo', 'Todo']].map(([k, l]) => `<button type="button" class="pchip" data-action="conc-per" data-per="${k}" aria-pressed="${k === per}">${l}</button>`).join('');
   return `<section class="an-card" aria-label="Por concepto">
       <h2 class="an-h">Por concepto</h2>
       <div class="cp-chips">${chips}</div>
       ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
-      ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
+      ${ver.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}${lista.length > 5 ? `<button type="button" class="an-more" data-action="conc-todos">${state.conceptosTodos ? 'Ver menos' : `Ver todos (${lista.length})`}</button>` : ''}`
         : '<p class="an-vacio">No hay pagos en este periodo.</p>'}
     </section>
     `;
@@ -1312,15 +1312,24 @@ function renderAnalisis() {
   const pend = all.filter(m => m.pendiente > 0);
   const mesHoy = toISO(HOY).slice(0, 7);
   const abonadoMes = movimientos.reduce((t, m) => t + (m.pagos || []).reduce((s, p) => s + ((p.fecha || m.fecha).slice(0, 7) === mesHoy ? p.monto : 0), 0), 0);
+  /* El mes: lo mismo que la tabla de Pagos (pagos del mes + atrasados de meses anteriores). */
+  const iniMes = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
+  const delMesL = all.filter(m => (m.date.getFullYear() === HOY.getFullYear() && m.date.getMonth() === HOY.getMonth()) || (m.estado === 'Vencido' && m.date < iniMes));
+  const totMes = sum(delMesL, 'imp'), aboMes = delMesL.reduce((t, m) => t + Math.min(m.abo, m.imp), 0), faltaMes = sum(delMesL, 'pendiente');
+  const pctMes = totMes ? Math.round(aboMes / totMes * 100) : 0;
   const tiles = [
-    ['Registrado', fmtMoney(sum(all, 'imp'))],
-    ['Pendiente', fmtMoney(sum(pend, 'pendiente'))],
-    ['Abonado mes', fmtMoney(abonadoMes)],
-    ['Liquidados', all.filter(m => m.estado === 'Pagado').length],
     ['Atrasados', pend.filter(m => m.estado === 'Vencido').length, 'lg-b'],
-    ['Próx. 30 días', pend.filter(m => { const d = daysFromToday(m.date); return d >= 0 && d <= 30; }).length]
+    ['Próx. 30 días', pend.filter(m => { const d = daysFromToday(m.date); return d >= 0 && d <= 30; }).length],
+    ['Liquidados', all.filter(m => m.estado === 'Pagado').length]
   ].map(([l, v, k]) => `<div class="kpi-lg an-t ${k || ''}"><span class="kpi-lg-t">${l}</span><span><span class="kpi-lg-m">${v}</span></span></div>`).join('');
-  $('#kpi-dash').innerHTML = `<div class="kpi-legend sin-sub an">${tiles}</div>`;
+  $('#kpi-dash').innerHTML = `<div class="an-hero">
+      <span class="an-hero-t">${MESES[HOY.getMonth()]}</span>
+      <div class="an-hero-b">
+        <div class="an-ring" role="img" aria-label="${pctMes} % pagado"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="#26262E" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#F4F4EF" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="${pctMes} 100"/></svg><span>${pctMes} %</span></div>
+        <div class="an-hero-n"><small>Falta por pagar</small><b>${fmtMoney(faltaMes)}</b><small>Abonado ${fmtMoney(aboMes)} de ${fmtMoney(totMes)}</small></div>
+      </div>
+    </div>
+    <div class="kpi-legend sin-sub an">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
 
   const porCat = new Map();
@@ -1744,6 +1753,7 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
+    case 'conc-todos': state.conceptosTodos = !state.conceptosTodos; render(); break;
     case 'sync-quick': syncRapido(t); break;
     case 'sync-card': t.textContent = 'Sincronizando…'; await syncRapido(t); break;
     case 'quien':
