@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v123';
+const APP_VERSION = 'v124';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -218,6 +218,24 @@ async function unpersist(kind, id) {
 
 /* Historial de abonos: cada movimiento guarda pagos [{fecha, monto}]; abo es la suma. */
 const r2 = n => Math.round(n * 100) / 100;
+/* Quién aporta cada abono (pagos[].quien). Lo último que se eligió en este teléfono queda como predeterminado. */
+const PERSONAS = { e: 'Eduardo', k: 'Karen' };
+const quienDef = () => { const q = lsGet('finanzas_quien'); return PERSONAS[q] ? q : 'e'; };
+const avatar = q => PERSONAS[q] ? `<span class="av av-${q}" aria-hidden="true">${PERSONAS[q][0]}</span>` : '';
+function quienHTML(sel) {
+  return `<div class="quien-f"><span class="quien-l" id="quien-l">¿Quién aporta?</span><div class="mode quien" role="group" aria-labelledby="quien-l">${Object.entries(PERSONAS).map(([k, n]) => `<button type="button" data-action="quien" data-q="${k}" aria-pressed="${k === sel}">${avatar(k)}${n}</button>`).join('')}</div></div>`;
+}
+const quienSel = () => { const b = $('.quien [aria-pressed=true]'); return b ? b.dataset.q : quienDef(); };
+/* Barra de lo abonado por persona (solo si algún abono dice quién lo puso). */
+function aportesBar(por, total) {
+  return `<div class="ap-bar">${Object.keys(PERSONAS).map(k => `<i class="ap-${k}" style="width:${total ? (por[k] / total * 100).toFixed(1) : 0}%"></i>`).join('')}</div>`;
+}
+function porPersona(pagos) {
+  const por = Object.fromEntries(Object.keys(PERSONAS).map(k => [k, 0]));
+  let sin = 0;
+  pagos.forEach(p => { if (PERSONAS[p.quien]) por[p.quien] = r2(por[p.quien] + p.monto); else sin = r2(sin + p.monto); });
+  return { por, sin };
+}
 const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 0)); };
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
@@ -822,6 +840,7 @@ function abonoFormHTML(isMeta, pend) {
           <input id="abono-fecha" type="date" value="${toISO(HOY)}">
         </div>
       </div>
+      ${quienHTML(quienDef())}
       <p class="hint">Máximo: ${fmtMoney(pend)}</p>
       <button type="button" class="btn btn-soft" data-action="abono-all">${isMeta ? 'Completar' : 'Pagar todo'} · ${fmtMoney(pend)}</button>
       <p class="form-error" id="abono-error" role="alert"></p>
@@ -833,9 +852,12 @@ function historialHTML(m, isMeta) {
   const ps = (m.pagos || []).map((x, i) => ({ ...x, i })).sort((x, y) => (y.fecha ? parseDate(y.fecha) : 0) - (x.fecha ? parseDate(x.fecha) : 0));
   if (!ps.length) return '';
   const lapiz = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+  const { por, sin } = porPersona(ps), conQuien = ps.some(x => PERSONAS[x.quien]);
+  const reparto = conQuien ? `<div class="ap-det">${aportesBar(por, r2(m.abo - sin))}<div class="ap-ley">${Object.entries(PERSONAS).map(([k, n]) => `<span>${avatar(k)}${n} <b>${fmtMoney(por[k])}</b></span>`).join('')}</div>${sin ? `<small>Sin asignar: ${fmtMoney(sin)}</small>` : ''}</div>` : '';
   return `<div class="hist">
     <div class="hist-head"><h3>${isMeta ? 'Historial de ahorro' : 'Historial de abonos'}</h3><span>${isMeta ? plural(ps.length, 'registro', 'registros') : plural(ps.length, 'abono', 'abonos')}</span></div>
-    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar ${isMeta ? 'ahorro' : 'abono'} de ${fmtMoney(x.monto)}"><span>${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
+    ${reparto}
+    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar ${isMeta ? 'ahorro' : 'abono'} de ${fmtMoney(x.monto)}${PERSONAS[x.quien] ? ' de ' + PERSONAS[x.quien] : ''}"><span class="hist-q">${avatar(x.quien)}${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
   </div>`;
 }
 
@@ -852,6 +874,7 @@ function openAbonoEdit(kind, id, idx) {
         <div><label for="ae-monto">Monto</label><input id="ae-monto" type="number" inputmode="decimal" min="0" step="0.01" value="${p.monto}"></div>
         <div><label for="ae-fecha">Fecha</label><input id="ae-fecha" type="date" value="${p.fecha || ''}"></div>
       </div>
+      ${quienHTML(PERSONAS[p.quien] ? p.quien : null)}
       <p class="hint">Máximo: ${fmtMoney(max)}</p>
       <p class="form-error" id="ae-error" role="alert"></p>
       <div class="fbtns edit">
@@ -875,6 +898,7 @@ function submitAbonoEdit() {
     : !fecha && p.fecha ? 'Selecciona la fecha.' : '';
   if (err) { formError('ae-error', monto > 0 && monto <= max ? 'ae-fecha' : 'ae-monto', err); return; }
   p.monto = monto; p.fecha = fecha || null;
+  const qb = $('.quien [aria-pressed=true]'); if (qb) p.quien = qb.dataset.q;
   syncAbo(m);
   finish(kind, m, kind === 'meta' ? 'Ahorro actualizado' : 'Abono actualizado');
 }
@@ -967,7 +991,7 @@ function submitAbono() {
     : monto > falta ? `Máximo ${fmtMoney(falta)}, que es lo que falta.`
     : !fecha ? 'Selecciona la fecha del pago.' : '';
   if (err) { formError('abono-error', monto > 0 && monto <= falta ? 'abono-fecha' : 'abono', err); return; }
-  (m.pagos = m.pagos || []).push({ fecha, monto });
+  (m.pagos = m.pagos || []).push({ fecha, monto, quien: quienSel() });
   syncAbo(m);
   finish(kind, m, m.abo >= m.imp ? (isMeta ? 'Listo, ya lo tienes' : 'Pagado por completo') : `${isMeta ? 'Ahorro registrado' : 'Abono registrado'}: ${fmtMoney(monto)}`);
 }
@@ -1192,7 +1216,7 @@ function submitForm() {
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
     if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
-    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp }); syncAbo(item); }
+    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp, quien: quienDef() }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
   }
@@ -1508,7 +1532,28 @@ function renderAnalisis() {
   });
   while (meses.length > 1 && !meses[0].total) meses.shift();
   const top = Math.max(1, ...meses.map(m => m.total));
-  $('#list').innerHTML = `
+  /* Aportado este mes por cada persona (abonos de pagos con fecha de este mes). */
+  const delMes = [], apCat = new Map();
+  movimientos.forEach(m => (m.pagos || []).forEach(p => {
+    if ((p.fecha || m.fecha).slice(0, 7) !== mesHoy) return;
+    delMes.push(p);
+    if (!PERSONAS[p.quien]) return;
+    const c = catOf(m.cat), e = apCat.get(c.id) || { c, por: Object.fromEntries(Object.keys(PERSONAS).map(k => [k, 0])) };
+    e.por[p.quien] = r2(e.por[p.quien] + p.monto); apCat.set(c.id, e);
+  }));
+  const { por, sin } = porPersona(delMes), conQ = r2(abonadoMes - sin), ks = Object.keys(PERSONAS);
+  const dif = ks.length === 2 ? r2(Math.abs(por[ks[0]] - por[ks[1]]) / 2) : 0, menos = ks.length === 2 && por[ks[0]] < por[ks[1]] ? ks[0] : ks[1];
+  const catsAp = [...apCat.values()].map(e => ({ ...e, t: r2(ks.reduce((t, k) => t + e.por[k], 0)) })).sort((a, c) => c.t - a.t), maxAp = catsAp.length ? catsAp[0].t : 0;
+  const aporte = `
+    <section class="an-card" aria-label="Aportado en ${MESES[HOY.getMonth()].toLowerCase()}">
+      <h2 class="an-h">Aportado en ${MESES[HOY.getMonth()].toLowerCase()}</h2>
+      ${conQ ? `<div class="ap-dos">${ks.map((k, i) => `${i ? '<span class="ap-div" aria-hidden="true"></span>' : ''}<div><span class="ap-n">${avatar(k)}${PERSONAS[k]}</span><b>${fmtMoney(por[k])}</b><small>${Math.round(por[k] / conQ * 100)} %</small></div>`).join('')}</div>
+      ${aportesBar(por, conQ)}
+      <p class="ap-bal">${dif < 1 ? 'Van parejos' : `Para quedar a mitades, <b>${PERSONAS[menos]}</b> pondría <b>${fmtMoney(dif)}</b> más`}</p>
+      ${catsAp.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.c.id)}</span><span class="ap-cv">${ks.map(k => fmtMoney(e.por[k])).join(' · ')}</span></div><div class="ap-bar" style="width:${(e.t / maxAp * 100).toFixed(1)}%">${ks.map(k => `<i class="ap-${k}" style="width:${e.t ? (e.por[k] / e.t * 100).toFixed(1) : 0}%"></i>`).join('')}</div></div>`).join('')}` : '<p class="an-vacio">Al abonar, elige quién aporta y aquí verás cuánto puso cada uno.</p>'}
+      ${sin ? `<p class="ap-sin">Sin asignar: ${fmtMoney(sin)}</p>` : ''}
+    </section>`;
+  $('#list').innerHTML = `${aporte}
     <section class="an-card" aria-label="Pendiente por categoría">
       <h2 class="an-h">Pendiente por categoría</h2>
       ${cats.length ? cats.map(({ c, v }) => `<div class="cp-row" data-cat="${esc(c.id)}"><div class="cp-top"><span class="cp-n">${esc(c.id)}</span><b>${fmtMoney(v)}</b></div><div class="cp-bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="an-vacio">No hay saldos pendientes.</p>'}
@@ -1619,7 +1664,7 @@ function sanear(list) {
   for (const x of Array.isArray(list) ? list : []) {
     if (!x || typeof x !== 'object' || typeof x.id !== 'string' || !x.id || ids.has(x.id)) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x.fecha)) || typeof x.conc !== 'string' || !Number.isFinite(+x.imp) || +x.imp < 0) continue;
-    const pagos = Array.isArray(x.pagos) ? x.pagos.filter(p => p && Number.isFinite(+p.monto) && +p.monto > 0).map(p => ({ fecha: p.fecha || null, monto: +p.monto })) : [];
+    const pagos = Array.isArray(x.pagos) ? x.pagos.filter(p => p && Number.isFinite(+p.monto) && +p.monto > 0).map(p => ({ fecha: p.fecha || null, monto: +p.monto, ...(p.quien ? { quien: String(p.quien) } : {}) })) : [];
     ids.add(x.id);
     ok.push({ ...x, imp: +x.imp, pagos, abo: r2(pagos.reduce((t, p) => t + p.monto, 0)) });
   }
@@ -1888,6 +1933,10 @@ document.addEventListener('click', async e => {
     case 'open-conceptos': state.conceptoPer = state.conceptoPer || 'mes'; openConceptos(); break;
     case 'conc-per': state.conceptoPer = t.dataset.per; openConceptos(); break;
     case 'sync-quick': syncRapido(t); break;
+    case 'quien':
+      $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
+      if (sheet.ctx && sheet.ctx.type === 'detail') lsSet('finanzas_quien', t.dataset.q);
+      break;
     case 'abono-edit': openAbonoEdit(sheet.ctx.kind, sheet.ctx.id, +t.dataset.idx); break;
     case 'abono-back': openDetail(sheet.ctx.kind, sheet.ctx.id); break;
     case 'abono-del': {
