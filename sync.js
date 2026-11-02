@@ -13,7 +13,8 @@ export function setCfg(patch) {
   return cfg;
 }
 
-const abonosTxt = v => (v || []).map(p => `${p.fecha || 'sin fecha'}: ${p.monto}`).join(' · ');
+const QUIEN = { e: 'Eduardo', k: 'Karen' };
+const abonosTxt = v => (v || []).map(p => `${p.fecha || 'sin fecha'}: ${p.monto}${QUIEN[p.quien] ? ` (${QUIEN[p.quien]})` : ''}`).join(' · ');
 /* Un texto que empieza con "=" Google lo tomaría como fórmula. */
 const cell = v => (v == null ? '' : typeof v === 'string' && /^[=+@-]/.test(v) ? "'" + v : v);
 
