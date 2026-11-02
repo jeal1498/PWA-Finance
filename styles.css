@@ -789,12 +789,13 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .freq-opt input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* Tonos de categoría: solo para barras de Análisis y franjas de otras listas; las filas de las tablas ya no se tiñen. */
-[data-cat="Finanzas"] { --cc: 96 165 250; --ca: .22; }
-[data-cat="Vehículo"] { --cc: 34 211 238; --ca: .20; }
-[data-cat="Yo"] { --cc: 167 139 250; --ca: .22; }
-[data-cat="Karen"] { --cc: 244 114 182; --ca: .22; }
-[data-cat="Julieta"] { --cc: 232 121 249; --ca: .22; }
+[data-cat="Vivienda"] { --cc: 251 146 60; --ca: .20; }
 [data-cat="Servicios"] { --cc: 148 163 184; --ca: .20; }
+[data-cat="Transporte"] { --cc: 34 211 238; --ca: .20; }
+[data-cat="Finanzas"] { --cc: 96 165 250; --ca: .22; }
+[data-cat="Salud"] { --cc: 232 121 249; --ca: .22; }
+[data-cat="Educación"] { --cc: 167 139 250; --ca: .22; }
+[data-cat="Personal"] { --cc: 244 114 182; --ca: .22; }
 [data-cat="Familia"] { --cc: 45 212 191; --ca: .20; }
 
 /* Filas en dos colores: todas en un gris liso (ícono de categoría en gris) y las atrasadas con tinte rojo y franja. */
