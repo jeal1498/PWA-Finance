@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v130';
+const APP_VERSION = 'v131';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1057,6 +1057,7 @@ function submitForm() {
 
   let item;
   if (prev) {
+    const concAntes = prev.conc;
     item = Object.assign(prev, { fecha, cat, conc, imp });
     {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
@@ -1068,6 +1069,8 @@ function submitForm() {
       if (item.repite && freq !== 'mensual') item.freq = freq; else delete item.freq;
       /* Repetir, frecuencia y fin valen para toda la serie. */
       if (item.serie) list.filter(m => m.serie === item.serie && m !== item).forEach(m => {
+        /* Si se cambió el nombre, las copias siguientes (de fecha posterior) lo toman también. */
+        if (conc !== concAntes && m.fecha > item.fecha) m.conc = conc;
         if (item.repite) m.repite = true; else delete m.repite;
         if (item.fin) m.fin = item.fin; else delete m.fin;
         if (item.freq) m.freq = item.freq; else delete m.freq;
