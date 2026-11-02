@@ -11,12 +11,13 @@ const r2 = (n) => Math.round(n * 100) / 100;
 const fold = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const labelOf = (c) => String(c ?? '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
 
-// "🚗 Vehículo", "VEHÍCULO" o "vehiculo" → texto guardado de la categoría conocida; una desconocida se conserva.
+// "🚗 Transporte", "TRANSPORTE" o "vehiculo" (las categorías viejas Vehículo, Yo, Karen y Julieta pasan a Transporte, Personal y Familia) → texto guardado de la categoría conocida; una desconocida se conserva.
 export function catFrom(text, cats) {
   const raw = String(text ?? '').trim();
   const l = labelOf(raw);
   if (!l) return '📦 Otro';
-  const c = cats.find((x) => fold(x.id) === fold(l));
+  const VIEJAS = { vehiculo: 'Transporte', yo: 'Personal', karen: 'Personal', julieta: 'Familia' };
+  const c = cats.find((x) => fold(x.id) === (VIEJAS[fold(l)] ? fold(VIEJAS[fold(l)]) : fold(l)));
   if (c) return `${c.emoji} ${c.id}`;
   return /^[^\p{L}\p{N}\s]+\s+\S/u.test(raw) ? raw : `📦 ${l}`;
 }

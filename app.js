@@ -50,22 +50,25 @@ const ICON = {
    Categorías (el texto guardado es "emoji Nombre", igual que antes)
    ========================================================= */
 const CATS = [
-  { id: 'Finanzas',  emoji: '🏛️', icon: '<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>' },
-  { id: 'Vehículo',  emoji: '🚗', icon: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>' },
-  { id: 'Yo',        emoji: '👤', mono: 'Y' },
-  { id: 'Karen',     emoji: '👩', mono: 'K' },
-  { id: 'Julieta',   emoji: '👧', mono: 'J' },
-  { id: 'Servicios', emoji: '💡', icon: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
-  { id: 'Familia',   emoji: '👨‍👩‍👧‍👦', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' }
+  { id: 'Vivienda',   emoji: '🏠', icon: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' },
+  { id: 'Servicios',  emoji: '💡', icon: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
+  { id: 'Transporte', emoji: '🚗', icon: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>' },
+  { id: 'Finanzas',   emoji: '🏛️', icon: '<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>' },
+  { id: 'Salud',      emoji: '🩺', icon: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/>' },
+  { id: 'Educación',  emoji: '🎓', icon: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>' },
+  { id: 'Personal',   emoji: '👤', icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
+  { id: 'Familia',    emoji: '👨‍👩‍👧‍👦', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' }
 ];
+/* Categorías viejas (personales) → generales. Lo ya guardado se ve con la nueva sin reescribir nada; al editar y guardar se guarda la nueva. */
+const CAT_VIEJAS = { 'Vehículo': 'Transporte', 'Yo': 'Personal', 'Karen': 'Personal', 'Julieta': 'Familia' };
 const TAG_ICON = '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><path d="M7.5 7.5h.01"/>';
 /* El texto guardado sigue siendo "emoji Nombre"; en pantalla se dibuja el icono SVG. */
 const catIcon = c => c.mono ? `<span class="mono" aria-hidden="true">${c.mono}</span>` : svg(c.icon || TAG_ICON);
 const catString = c => `${c.emoji} ${c.id}`;
-const catLabelOf = str => { const s = String(str); const i = s.indexOf(' '); return i >= 0 ? s.slice(i + 1) : s; };
+const catLabelOf = str => { const s = String(str); const i = s.indexOf(' '); const l = i >= 0 ? s.slice(i + 1) : s; return CAT_VIEJAS[l] || l; };
 /* Conceptos con el mismo nombre se relacionan (sin importar mayúsculas, acentos ni espacios dobles). */
 const llave = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-/* Clave de relación: mismo nombre Y misma categoría (un «Gym» de Yo y uno de Karen no se mezclan). */
+/* Clave de relación: mismo nombre Y misma categoría (un «Gym» de Personal y uno de Familia no se mezclan). */
 const llaveC = x => llave(x.conc) + '|' + llave(catLabelOf(x.cat));
 const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelOf(str), emoji: '•' };
 
@@ -74,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v127';
+const APP_VERSION = 'v128';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', tab: 'finanzas_pagar_tab', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
