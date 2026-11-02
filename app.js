@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v142';
+const APP_VERSION = 'v143';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -474,11 +474,10 @@ const ESTADO_ORD = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 const SORTS = {
   fecha:   (a, c) => a.date - c.date,
   estatus: (a, c) => ESTADO_ORD[a.estado] - ESTADO_ORD[c.estado],
-  cat:     (a, c) => catOf(a.cat).id.localeCompare(catOf(c.cat).id, 'es'),
   conc:    (a, c) => a.conc.localeCompare(c.conc, 'es'),
   monto:   (a, c) => a.imp - c.imp
 };
-const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['cat', 'Categoría', 'Cat.'], ['conc', 'Concepto'], ['monto', 'Monto']];
+const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['conc', 'Concepto'], ['monto', 'Monto']];
 const BADGE_ICON = {
   Vencido: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   Pendiente: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -512,7 +511,6 @@ function pagoRow(m) {
   return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
-    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : (m.abo > 0 ? `<small class="pt-ap">de ${fmtMoney(m.imp)}</small>` : ''))}</span>
   </button>`;
@@ -538,9 +536,7 @@ function pagosTable(b, conMes = true) {
     return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
   }).join('');
   const pend = sum(items, 'pendiente');
-  const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
-    <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
+  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>`;
 }
 
 /* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
@@ -1106,7 +1102,7 @@ function renderApartar() {
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
   if (!lista.length && !ya.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'dia' ? 'No hay pagos pendientes con fecha futura.' : per[0] === 'semana' ? 'Nada más vence esta semana.' : 'Nada vence en los próximos 15 días.'}</div>`; return; }
-  const head = [['Fecha', ''], ['Est.', ''], ['Cat.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
+  const head = [['Fecha', ''], ['Est.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
   /* Primero los atrasados (y lo que vence hoy), del más antiguo al más reciente, con el monto completo que falta; luego el periodo normal. */
   /* La tabla muestra como máximo APARTAR_FILAS renglones (atrasados primero); los totales siguen contando todo. */
   const verYa = ya.slice(0, APARTAR_FILAS), verLista = lista.slice(0, APARTAR_FILAS - verYa.length);
@@ -1116,7 +1112,6 @@ function renderApartar() {
     return `<button type="button" class="pt-cols pt-row v" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${nota.toLowerCase()}, pagar ya ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est danger" role="img" aria-label="${atr ? 'Atrasado' : 'Vence hoy'}">${svg(BADGE_ICON.Vencido)}</span>
-    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota danger">${nota}</span></span>
     <span class="pt-amt"><b>${fmtMoney(m.pend)}</b></span>
   </button>`;
@@ -1126,14 +1121,11 @@ function renderApartar() {
     return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
-    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
     <span class="pt-amt"><b>${fmtMoney(monto(m))}</b></span>
   </button>`;
   }).join('');
-  const cats = [...new Map([...ya, ...lista].map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${APARTAR_DIAS} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>
-    <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${APARTAR_DIAS} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>`;
 }
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
