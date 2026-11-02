@@ -336,21 +336,6 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .mode { display: flex; gap: 2px; padding: 3px; border-radius: 14px; background: var(--surface-2); }
 .mode button { flex: 1; height: 44px; border: 0; border-radius: 11px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; }
 .mode button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: var(--shadow); }
-.pay-search { position: relative; margin-top: 14px; }
-.pay-search .ic { position: absolute; left: 14px; top: 15px; width: 20px; height: 20px; color: var(--muted); pointer-events: none; }
-.pay-search input { width: 100%; height: 50px; padding: 0 14px 0 42px; border-radius: 14px; border: 1px solid var(--field-line); background: var(--bg); font-size: 16px; -webkit-appearance: none; appearance: none; }
-.pay-cap { margin: 16px 0 4px; }
-.pay-row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 4px; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; color: var(--ink); }
-.pay-row:active { background: var(--surface-2); border-radius: 12px; }
-.pay-ic { flex: none; width: 24px; display: grid; place-items: center; color: var(--muted); }
-.pay-ic .ic { width: 20px; height: 20px; }
-.pay-main b, .pay-amt b { display: block; font-size: 16px; font-weight: 700; }
-.pay-row small { display: block; font-size: 14px; margin-top: 2px; color: var(--muted); }
-.pay-row .t-danger { color: var(--danger-text); } .pay-row .t-warn { color: var(--warn); } .pay-row .t-ok { color: var(--ok); }
-.pay-amt { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
-.back { height: 44px; padding: 0; margin-top: 6px; background: none; border: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 600; color: var(--muted); }
-.back .ic { width: 18px; height: 18px; }
-.pay-name { margin: 0 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
 .hint { margin: 6px 0 10px; font-size: 14px; color: var(--muted); }
 #abono-form .btn-primary { margin-top: 10px; }
 .hist { margin-top: 20px; }
@@ -658,9 +643,6 @@ input[type=text], input[type=number], input[type=date], input[type=url] {
 }
 input[type=text]:focus, input[type=number]:focus, input[type=date]:focus, input[type=url]:focus { outline: none; box-shadow: inset 0 0 0 2px var(--ink); }
 input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
-.pay-search { margin-top: 10px; }
-.pay-search .ic { left: 12px; top: 9px; width: 20px; height: 20px; }
-.pay-search input { height: 38px; padding: 0 12px 0 38px; border-radius: 16px; font-size: 15px; background: rgba(244, 244, 239, .08); border: 0; box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
 .btn { height: 44px; padding: 0 14px; border-radius: 16px; font-size: 15px; }
 .btn-row { margin-top: 8px; gap: 8px; }
 .two-col { gap: 8px; }
@@ -672,7 +654,6 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .switch:checked::after { transform: translateX(18px); }
 .mode { border-radius: 16px; }
 .mode button { height: 36px; border-radius: 13px; font-size: 14px; }
-.pay-row { min-height: 56px; padding: 8px 4px; }
 .menu-row { min-height: 52px; padding: 6px 12px; }
 .month-opt { min-height: 44px; }
 .cat-grid { gap: 6px; }
@@ -740,17 +721,8 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .hist { margin-top: 10px; }
 .hist-row { min-height: 36px; font-size: 14px; }
 .hist-head h3 { font-size: 13px; }
-.pay-chips { display: flex; gap: 6px; margin-top: 10px; }
 .pchip { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border: 0; border-radius: 99px; background: none; color: var(--ink); font-size: 13px; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .35); }
 .pchip.on { background: var(--ink); color: var(--on-ink); box-shadow: none; }
-.pchip-ic .ic { width: 15px; height: 15px; }
-.pay-row { position: relative; min-height: 50px; padding: 6px 4px 6px 12px; gap: 10px; }
-.pay-row::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: transparent; }
-.pay-row.tone-danger::before { background: var(--danger); }
-.pay-row.tone-warn::before { background: var(--warn); }
-.pay-row small { color: var(--muted); margin-top: 0; font-size: 12.5px; }
-.pay-main b, .pay-amt b { font-size: 15px; }
-.pay-amt b { font-family: var(--font-data); font-weight: 500; font-size: 14px; }
 
 /* Tablet: Pagos y Planes en dos columnas (resumen fijo a la izquierda, tabla a la derecha). */
 @media (min-width: 768px) {
@@ -849,14 +821,6 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 @media (prefers-reduced-motion: reduce) { .nav-sync.girando .ic { animation: none; opacity: .5; } }
 
 /* Conceptos con el mismo nombre: sugerencias al crear, historial en el detalle y resumen por concepto. */
-.sug { margin: -2px 0 8px; background: var(--surface-2); border: 1px solid rgba(244, 244, 239, .25); border-radius: 14px; overflow: hidden; }
-.sug-i { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 12px; border: 0; border-bottom: 1px solid rgba(244, 244, 239, .1); background: none; color: var(--ink); text-align: left; font-family: inherit; }
-.sug-i:last-child { border-bottom: 0; }
-.sug-i .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: rgb(var(--cc, 244 244 239)); }
-.sug-t { flex: 1; min-width: 0; }
-.sug-t b { display: block; font-size: 14.5px; font-weight: 600; }
-.sug-t small { display: block; font-size: 12px; color: var(--muted); }
-.sug-i i { font-style: normal; font-family: var(--font-data); font-size: 11px; font-weight: 600; color: var(--muted); }
 .cp-chips { display: flex; gap: 6px; margin-bottom: 12px; }
 .cp-total { font-family: var(--font-data); font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--muted); margin-bottom: 4px; }
 .cp-row { padding: 10px 0; border-top: 1px solid var(--line); }
@@ -992,8 +956,6 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 
 
 /* Gasto rápido (+): monto grande, concepto y categorías en mosaicos con ícono */
-.sheet-head h2:has(.q-meta) { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.q-meta { margin: 0; font-weight: 400; text-align: right; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .qform { display: flex; flex-direction: column; gap: 8px; }
 .q-monto { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 4px 0; }
 .q-monto span { font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 26px; color: var(--muted); }
@@ -1010,5 +972,14 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .q-cat input:checked + span { border-color: var(--ink); color: var(--ink); font-weight: 700; }
 .q-cat input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .qform .form-error { min-height: 0; margin: 0; }
-.q-link { align-self: center; padding: 0 0 1px; border: 0; border-bottom: 1px solid #3A3A45; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
-.q-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* Fecha con atajos: Hoy, Ayer, Mañana, En 1 semana y «Otra» (selector nativo) */
+.f-dates { display: flex; gap: 5px; }
+.dchip { position: relative; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px; border-radius: 17px; border: 1.5px solid #3A3A45; background: none; color: #C9C9C2; font: inherit; font-size: 12.5px; white-space: nowrap; flex: none; cursor: pointer; overflow: hidden; }
+.dchip .ic { width: 15px; height: 15px; }
+.dchip[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.dchip input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dchip:focus-visible, .dchip:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.switch-row small { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.fbtns.solo { display: block; }
+.fbtns.solo .btn { width: 100%; }

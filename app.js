@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v136';
+const APP_VERSION = 'v137';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -830,7 +830,7 @@ function reveal(raw) {
   state.open[state.grouping === 'urgencia' ? `u|${urgenciaKey(procesar(raw))}` : `c|${catOf(raw.cat).id}`] = true;
 }
 
-async function finish(raw, msg) {
+async function finish(raw, msg, otro = false) {
   const ok = await persist(raw);
   /* Al guardar una serie, no pintar la pantalla hasta que sus ocurrencias estén guardadas
      y volver a leer IndexedDB. Así la vista usa la misma lista persistida, no una copia vieja. */
@@ -841,9 +841,10 @@ async function finish(raw, msg) {
     } catch (e) { /* conservar la lista en memoria si falla la lectura */ }
   }
   reveal(raw);
-  closeSheet();
+  /* Pago nuevo: la hoja queda vacía para anotar el siguiente sin volver a abrirla. */
+  if (otro) openForm(null); else closeSheet();
   render();
-  const row = $$('.row, .pt-row').find(r => r.dataset.id === raw.id);
+  const row = !otro && $$('.row, .pt-row').find(r => r.dataset.id === raw.id);
   if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('flash'); }
   toast(ok ? msg : 'No se pudo guardar en este dispositivo');
 }
@@ -864,7 +865,7 @@ function submitAbono() {
   finish(m, m.abo >= m.imp ? 'Pagado por completo' : `Abono registrado: ${fmtMoney(monto)}`);
 }
 
-/* ----- Agregar movimiento: (+) ----- */
+/* ----- Nuevo pago o editar: (+) ----- */
 const isDirty = () => { const c = sheet.ctx; return !!(c && c.type === 'form' && !c.id && ($('#f-conc').value.trim() || $('#f-imp').value)); };
 function dismissDiscard() { const b = $('#discard'); if (b) b.remove(); const f = $('#f-conc'); if (f) f.focus(); }
 function askDiscard(onYes) {
@@ -880,103 +881,6 @@ function askDiscard(onYes) {
   $('[data-action=discard-no]', box).focus();
 }
 function requestClose() { askDiscard(closeSheet); }
-
-function addTabs(mode) {
-  return `<div class="mode" role="group" aria-label="Tipo de movimiento">
-    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">Nuevo pago</button>
-    <button type="button" data-action="add-mode" data-mode="pay" aria-pressed="${mode === 'pay'}">Abonar o pagar</button>
-  </div>`;
-}
-
-function openAdd(mode) { if (mode === 'pay') openPay(); else openForm(null); }
-
-function payListHTML(q, f = 'todos') {
-  q = q.trim().toLowerCase();
-  const arr = movimientos.map(procesar)
-    .filter(m => m.imp > 0 && m.abo < m.imp && (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q)))
-    .filter(m => f === 'todos' || (gastoInfo(m).tone === 'danger') === (f === 'atrasado'))
-    .sort(porFechaYMonto);
-  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : 'No hay pagos pendientes.'}</p>`;
-  return arr.map(m => {
-    const i = gastoInfo(m);
-    const extra = m.abo > 0 ? ` · abonado ${fmtMoney(m.abo)}` : '';
-    return `<button type="button" class="pay-row tone-${i.tone}" data-action="pay-pick" data-id="${esc(m.id)}">
-      <span class="pay-ic" aria-hidden="true">${catIcon(catOf(m.cat))}</span>
-      <span class="pay-main"><b>${esc(m.conc)}</b><small>${i.text}${extra}</small></span>
-      <span class="pay-amt"><b>${fmtMoney(i.pend)}</b></span>
-    </button>`;
-  }).join('');
-}
-
-function openPay() {
-  sheet.ctx = { type: 'add' };
-  openSheet('Nuevo pago', `${addTabs('pay')}
-    <div class="pay-chips" id="pay-chips">
-      ${[['todos', 'Todos'], ['atrasado', 'Atrasados'], ['porvencer', 'Por vencer']].map(([k, l]) => `<button type="button" class="pchip${k === 'todos' ? ' on' : ''}" data-action="pay-filter" data-f="${k}" aria-pressed="${k === 'todos'}">${l}</button>`).join('')}
-      <button type="button" class="pchip pchip-ic" data-action="pay-search-toggle" aria-label="Buscar concepto o categoría" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-    </div>
-    <div class="pay-search" id="pay-search-wrap" hidden>
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="pay-search" type="search" autocomplete="off" aria-label="Buscar concepto o categoría" placeholder="Buscar concepto o categoría">
-    </div>
-    <div id="pay-list">${payListHTML('')}</div>`);
-  sheet.ctx.payF = 'todos';
-  sheet.panel.focus({ preventScroll: true });
-}
-
-function openPayDetail(id) {
-  const raw = movimientos.find(m => m.id === id);
-  if (!raw) return;
-  const m = procesar(raw);
-  const i = gastoInfo(m);
-  sheet.ctx = { type: 'detail', id };
-  openSheet('Nuevo pago', `${addTabs('pay')}
-    <button type="button" class="back" data-action="pay-back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Cambiar concepto</button>
-    <h3 class="pay-name">${esc(m.conc)}</h3>
-    ${summaryHTML(m, i)}
-    ${abonoFormHTML(i.pend)}
-    ${historialHTML(m)}`);
-  sheet.panel.focus({ preventScroll: true });
-}
-
-/* ----- Gasto rápido: (+) anota algo que ya se pagó hoy ----- */
-function openQuick() {
-  const last = lsGet(KEYS.cat), sel = CATS.some(c => catString(c) === last) ? catLabelOf(last) : CATS[0].id;
-  const dia = `${DIAS[HOY.getDay()].slice(0, 3)} ${HOY.getDate()} ${MESES_CORTO[HOY.getMonth()]}`;
-  sheet.ctx = { type: 'quick' };
-  openSheet('Gasto de hoy', `<form id="quick-form" class="qform" novalidate>
-      <div class="q-monto"><span aria-hidden="true">$</span><input id="q-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Monto"></div>
-      <label class="q-lab" for="q-conc">Concepto</label>
-      <label class="fld" for="q-conc"><input id="q-conc" type="text" autocomplete="off" placeholder="Ej. Tacos"></label>
-      <span class="q-lab" id="q-cat-l">Categoría</span>
-      <div class="q-cats" role="radiogroup" aria-labelledby="q-cat-l">${CATS.map(c => `<label class="q-cat"><input type="radio" name="q-cat" value="${c.id}"${c.id === sel ? ' checked' : ''}><span>${catIcon(c)}${esc(c.id)}</span></label>`).join('')}</div>
-      <p class="form-error" id="q-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary">Guardar gasto</button>
-      <button type="button" class="q-link" data-action="quick-prog">Programar un pago futuro</button>
-    </form>`);
-  /* La fecha va en la misma línea del título. */
-  sheet.title.insertAdjacentHTML('beforeend', `<small class="q-meta">${dia}</small>`);
-  $('#q-imp').focus({ preventScroll: true });
-}
-
-/* Guarda el gasto ya pagado (fecha de hoy) y deja la hoja lista para anotar el siguiente. */
-async function submitQuick() {
-  const imp = r2(parseFloat($('#q-imp').value.replace(',', '.')));
-  if (!(imp > 0)) { formError('q-error', 'q-imp', 'Escribe el monto.'); return; }
-  const cat = catString(CATS.find(c => c.id === $('input[name=q-cat]:checked').value));
-  const escrito = $('#q-conc').value.trim() || 'Gasto', hoy = toISO(HOY), now = Date.now();
-  /* Si el nombre ya existe, se conserva como estaba escrito (mayúsculas y acentos). */
-  const conc = (sugerencias(escrito).find(x => llave(x.nombre) === llave(escrito)) || { nombre: escrito }).nombre;
-  const item = { id: String(now), fecha: hoy, cat, conc, imp, abo: imp, pagos: [{ fecha: hoy, monto: imp, quien: quienDef(), t: now }] };
-  movimientos.push(item); movimientos.sort(byFecha);
-  lsSet(KEYS.cat, cat);
-  const ok = await persist(item);
-  reveal(item); render();
-  $('#q-imp').value = ''; $('#q-imp').style.width = ''; $('#q-conc').value = ''; $('#q-error').textContent = '';
-  $$('[aria-invalid]', sheet.body).forEach(el => el.removeAttribute('aria-invalid'));
-  $('#q-imp').focus();
-  toast(ok ? `Guardado: ${conc} ${fmtMoney(imp)}` : 'No se pudo guardar en este dispositivo');
-}
 
 /* ----- Formulario ----- */
 function defaultDate() {
@@ -999,14 +903,8 @@ function sugerencias(texto) {
   }
   return [...g.values()].map(e => ({ ...e, imp: [...e.imps.entries()].sort((a, b) => b[1].n - a[1].n || b[1].ult - a[1].ult)[0][0] })).sort((a, b) => b.n - a.n).slice(0, 4);
 }
-function pintarSugerencias() {
-  const box = $('#f-sug'), inp = $('#f-conc');
-  if (!box || !inp || !sheet.ctx || sheet.ctx.id) return;
-  const lista = sugerencias(inp.value);
-  sheet.sug = lista;
-  box.hidden = !lista.length;
-  box.innerHTML = lista.map((s, i) => `<button type="button" class="sug-i" data-action="sug-pick" data-i="${i}"><span class="dot" data-cat="${esc(catLabelOf(s.cat))}"></span><span class="sug-t"><b>${esc(s.nombre)}</b><small>${esc(catLabelOf(s.cat))} · ${plural(s.n, 'pago', 'pagos')} · suele ser ${fmtMoney(s.imp)}</small></span><i>USAR</i></button>`).join('');
-}
+const DATE_CHIPS = [['Hoy', 0], ['Ayer', -1], ['Mañana', 1], ['+1 sem', 7]];
+const addDays = (n) => toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
 
 function openForm(id) {
   const editing = id ? movimientos.find(m => m.id === id) : null;
@@ -1015,37 +913,53 @@ function openForm(id) {
   const catStr = editing ? editing.cat : (CATS.some(c => catString(c) === last) ? last : catString(CATS[0]));
   const selected = catLabelOf(catStr);
 
-  sheet.ctx = { type: 'form', id: id || null, cat: catStr };
+  sheet.ctx = { type: 'form', id: id || null, cat: catStr, pagadoManual: false };
   openSheet(editing ? 'Editar pago' : 'Nuevo pago', `
-    ${editing ? '' : addTabs('new')}
-    <form id="form" class="fform" novalidate>
-      <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="Ej. Combustible" value="${editing ? esc(editing.conc) : ''}"></label>
-      ${editing ? '' : '<div class="sug" id="f-sug" hidden></div>'}
-      <div class="two-col">
-        <label class="fld" for="f-imp"><span>Importe</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
-        <label class="fld" for="f-fecha"><span>Vence</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate()}"></label>
+    <form id="form" class="fform qform" novalidate>
+      <div class="q-monto"><span aria-hidden="true">$</span><input id="f-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Importe" value="${editing ? editing.imp : ''}"></div>
+      <label class="q-lab" for="f-conc">Concepto</label>
+      <label class="fld" for="f-conc"><input id="f-conc" type="text" autocomplete="off" placeholder="Ej. Tacos" value="${editing ? esc(editing.conc) : ''}"></label>
+      <span class="q-lab" id="f-date-l">Fecha</span>
+      <div class="f-dates" role="group" aria-labelledby="f-date-l">
+        ${DATE_CHIPS.map(([l, o]) => `<button type="button" class="dchip" data-action="f-date" data-off="${o}" aria-pressed="false">${l}</button>`).join('')}
+        <label class="dchip" id="f-otra" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span id="f-otra-t">Otra</span><input id="f-fecha" type="date" aria-label="Elegir otra fecha" value="${editing ? editing.fecha : defaultDate()}"></label>
       </div>
-      <div class="cat-grid" role="radiogroup" aria-label="Categoría">
-        ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
-      </div>
-      ${`<div class="rep-card">
+      <span class="q-lab" id="f-cat-l">Categoría</span>
+      <div class="q-cats" role="radiogroup" aria-labelledby="f-cat-l">${CATS.map(c => `<label class="q-cat"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span>${catIcon(c)}${esc(c.id)}</span></label>`).join('')}</div>
+      ${editing ? '' : `<label class="switch-row" for="f-paid"><span>Pagado<small id="f-paid-cap"></small></span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
+      <div class="rep-card">
         <label class="switch-row" for="f-rep"><span>Se repite</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
         <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
           <div class="freq-row" role="radiogroup" aria-label="Frecuencia">${Object.entries(FREQS).map(([k, v]) => `<label class="freq-opt"><input type="radio" name="f-freq" value="${k}"${k === (editing ? freqOf(editing) : 'mensual') ? ' checked' : ''}><span>${v.label}</span></label>`).join('')}</div>
           <label class="fin-row" for="f-fin"><span>Termina</span><input id="f-fin" type="date" value="${editing && editing.fin ? editing.fin : ''}"></label>
           <p class="note" id="f-fin-hint"></p>
         </div>
-      </div>`}
-      ${editing ? '' : `<label class="switch-row" for="f-paid"><span>Ya está pagado</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
+      </div>
       <p class="form-error" id="f-error" role="alert"></p>
-      <div class="fbtns${editing ? ' edit' : ''}">
-        <button type="button" class="btn btn-soft" data-action="close-sheet">Cancelar</button>
-        ${editing ? '<button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>' : ''}
+      <div class="fbtns${editing ? ' edit' : ' solo'}">
+        ${editing ? '<button type="button" class="btn btn-soft" data-action="close-sheet">Cancelar</button><button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>' : ''}
         <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
     </form>`);
+  pintarFecha();
+  const imp = $('#f-imp'); imp.style.width = Math.max(1, imp.value.length) + 'ch';
+  if (editing) sheet.panel.focus({ preventScroll: true }); else imp.focus({ preventScroll: true });
+}
+
+/* Marca el atajo de fecha que coincide (o «Otra» con la fecha elegida) y, en un pago nuevo, deja «Pagado» según la fecha:
+   hoy o antes = pagado; después = pendiente. Si se tocó el interruptor a mano, ya no se mueve solo. */
+function pintarFecha() {
+  const v = $('#f-fecha').value;
+  let hit = false;
+  $$('.f-dates [data-off]').forEach(b => { const on = !!v && v === addDays(+b.dataset.off); b.setAttribute('aria-pressed', String(on)); hit = hit || on; });
+  $('#f-otra').setAttribute('aria-pressed', String(!hit));
+  $('#f-otra-t').textContent = !hit && v ? fmtDate(v) : 'Otra';
+  const paid = $('#f-paid');
+  if (paid) {
+    if (!sheet.ctx.pagadoManual) paid.checked = !!v && v <= toISO(HOY);
+    $('#f-paid-cap').textContent = !v ? '' : paid.checked ? (v > toISO(HOY) || v === toISO(HOY) ? 'Se anota como pagado hoy' : `Se anota como pagado el ${fmtDate(v)}`) : `Queda pendiente · vence ${v === addDays(1) ? 'mañana' : fmtDate(v)}`;
+  }
   actualizarFin();
-  if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });
 }
 
 /* Frecuencia y «Termina»: solo con «Se repite»; el texto dice cuántos pagos serán. */
@@ -1078,8 +992,10 @@ function actualizarFin() {
 function submitForm() {
   const { id, cat } = sheet.ctx;
   const fecha = $('#f-fecha').value;
-  const imp = parseFloat($('#f-imp').value) || 0;
-  const conc = $('#f-conc').value.trim() || 'Gasto';
+  const imp = r2(parseFloat($('#f-imp').value.replace(',', '.')) || 0);
+  /* Si el nombre ya existe, se conserva como estaba escrito (mayúsculas y acentos). */
+  const escrito = $('#f-conc').value.trim() || 'Gasto';
+  const conc = id ? escrito : (sugerencias(escrito).find(x => llave(x.nombre) === llave(escrito)) || { nombre: escrito }).nombre;
   const list = movimientos;
   const prev = id ? list.find(m => m.id === id) : null;
   if (id && !prev) return;
@@ -1118,13 +1034,13 @@ function submitForm() {
   } else {
     item = { id: Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
     if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
-    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp, quien: quienDef(), t: Date.now() }); syncAbo(item); }
+    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: fecha < toISO(HOY) ? fecha : toISO(HOY), monto: imp, quien: quienDef(), t: Date.now() }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
   }
   list.sort(byFecha);
   if (item.serie && item.repite) generarSeries(list, 'movimientos', HOY.getFullYear() * 12 + HOY.getMonth() + 1, item.serie);
-  finish(item, id ? 'Cambios guardados' : 'Pago guardado');
+  finish(item, id ? 'Cambios guardados' : `Guardado: ${conc} ${fmtMoney(imp)}`, !id);
 }
 
 /* ----- Selector de mes ----- */
@@ -1805,33 +1721,12 @@ document.addEventListener('click', async e => {
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
-      if (t.dataset.mode) openAdd(t.dataset.mode); else openQuick();
+      openForm(null);
       break;
     }
-    case 'add-mode': {
-      if (t.getAttribute('aria-pressed') === 'true') break;
-      const mode = t.dataset.mode;
-      askDiscard(() => openAdd(mode));
-      break;
-    }
-    case 'quick-prog': openForm(null); break;
+    case 'f-date': { $('#f-fecha').value = addDays(+t.dataset.off); pintarFecha(); break; }
     case 'discard-no': dismissDiscard(); break;
     case 'discard-yes': { const go = sheet.discard; $('#discard').remove(); if (go) go(); break; }
-    case 'pay-pick': openPayDetail(t.dataset.id); break;
-    case 'pay-back': openPay(); break;
-    case 'pay-filter': {
-      sheet.ctx.payF = t.dataset.f;
-      $$('#pay-chips [data-f]').forEach(c => { const on = c === t; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); });
-      $('#pay-list').innerHTML = payListHTML($('#pay-search').value, sheet.ctx.payF);
-      break;
-    }
-    case 'pay-search-toggle': {
-      const w = $('#pay-search-wrap');
-      w.hidden = !w.hidden;
-      t.setAttribute('aria-expanded', String(!w.hidden));
-      if (!w.hidden) $('#pay-search').focus(); else { $('#pay-search').value = ''; $('#pay-list').innerHTML = payListHTML('', sheet.ctx.payF); }
-      break;
-    }
     case 'group': setGrouping(t.dataset.group); break;
     case 'month-picker': openMonthPicker(); break;
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
@@ -1853,17 +1748,6 @@ document.addEventListener('click', async e => {
     case 'abono-all': {
       const m = movimientos.find(x => x.id === sheet.ctx.id);
       if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
-      break;
-    }
-    case 'sug-pick': {
-      const s = (sheet.sug || [])[+t.dataset.i];
-      if (!s) break;
-      $('#f-conc').value = s.nombre;
-      const c = CATS.find(x => x.id === catLabelOf(s.cat)), r = c && $(`input[name=f-cat][value="${c.id}"]`);
-      if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
-      if (!$('#f-imp').value) $('#f-imp').value = s.imp;
-      $('#f-sug').hidden = true;
-      $('#f-imp').focus();
       break;
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
@@ -1910,18 +1794,22 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('input', e => {
-  if (e.target.id === 'f-conc') pintarSugerencias();
-  if (e.target.id === 'q-imp') { e.target.value = e.target.value.replace(/[^\d.,]/g, ''); e.target.style.width = Math.max(1, e.target.value.length) + 'ch'; }
-  /* Gasto rápido: si el nombre ya existe, se marca la categoría que ya tenía. */
-  if (e.target.id === 'q-conc') {
-    const s = sugerencias(e.target.value).find(x => llave(x.nombre) === llave(e.target.value));
-    const r = s && $(`input[name=q-cat][value="${catOf(s.cat).id}"]`);
-    if (r) r.checked = true;
+  if (e.target.id === 'f-imp') { e.target.value = e.target.value.replace(/[^\d.,]/g, ''); e.target.style.width = Math.max(1, e.target.value.length) + 'ch'; }
+  /* Si el nombre ya existe, se marca la categoría que ya tenía. */
+  if (e.target.id === 'f-conc' && sheet.ctx && !sheet.ctx.id) {
+    const x = sugerencias(e.target.value).find(y => llave(y.nombre) === llave(e.target.value));
+    const r = x && $(`input[name=f-cat][value="${catOf(x.cat).id}"]`);
+    if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
   }
+  if (e.target.id === 'f-fecha') pintarFecha();
 });
+/* Enter en el monto pasa al concepto; Enter en el concepto guarda. */
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'f-imp') { e.preventDefault(); $('#f-conc').focus(); } });
 
 document.addEventListener('change', e => {
-  if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
+  if (e.target.id === 'f-paid') { sheet.ctx.pagadoManual = true; pintarFecha(); }
+  else if (e.target.id === 'f-fecha') pintarFecha();
+  else if (['f-rep', 'f-fin', 'f-imp'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
   if (e.target.name === 'f-cat' && sheet.ctx) { const c = CATS.find(x => x.id === e.target.value); if (c) sheet.ctx.cat = catString(c); }
   if (e.target.id === 'imp-file') readImportFile(e.target.files[0]);
   if (e.target.name === 'imp-mode') {
@@ -1933,7 +1821,6 @@ document.addEventListener('change', e => {
 
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
-  else if (e.target.id === 'quick-form') { e.preventDefault(); submitQuick(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
   else if (e.target.id === 'sync-form') { e.preventDefault(); syncSave(e.target); }
@@ -1941,7 +1828,6 @@ document.addEventListener('submit', e => {
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
 document.addEventListener('input', e => {
-  if (e.target.id === 'pay-search') $('#pay-list').innerHTML = payListHTML(e.target.value, sheet.ctx.payF);
   if (e.target.getAttribute('aria-invalid')) {
     e.target.removeAttribute('aria-invalid');
     const m = $('#' + e.target.getAttribute('aria-describedby'));
