@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v126';
+const APP_VERSION = 'v127';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', tab: 'finanzas_pagar_tab', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -244,7 +244,7 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 
 const VISTAS = ['gastos', 'metas', 'todo', 'apartar', 'analisis', 'perfil'];
 /* Pagar es una sola sección con tres pestañas: Pagos (gastos), Planes (metas) y Todo (los dos del mes). */
-const TABS = [['gastos', 'Pagos'], ['metas', 'Planes'], ['todo', 'Todo']];
+const TABS = [['todo', 'Todo'], ['gastos', 'Pagos'], ['metas', 'Planes']];
 const esPagar = v => TABS.some(([k]) => k === v);
 const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
@@ -1925,7 +1925,7 @@ document.addEventListener('click', async e => {
     case 'view': {
       /* El botón Pagar de la barra vuelve a la última pestaña (Pagos, Planes o Todo); si ya estás en Pagar no cambia. */
       let v = t.dataset.view;
-      if (t.classList.contains('nav-btn') && v === 'gastos') { if (esPagar(state.view)) break; v = esPagar(lsGet(KEYS.tab)) ? lsGet(KEYS.tab) : 'gastos'; }
+      if (t.classList.contains('nav-btn') && v === 'gastos') { if (esPagar(state.view)) break; v = esPagar(lsGet(KEYS.tab)) ? lsGet(KEYS.tab) : 'todo'; }
       if (v !== state.view) setView(v);
       break;
     }
