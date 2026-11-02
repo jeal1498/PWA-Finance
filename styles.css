@@ -1023,3 +1023,23 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .s-form .q-lab { margin: 2px 0 -2px; }
 .s-link { display: block; margin: 18px auto 6px; padding: 0 0 1px; border: 0; border-bottom: 1px solid #5a2f2f; background: none; color: var(--danger-text); font: inherit; font-size: 13px; cursor: pointer; }
 .s-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* Ajustes: tarjeta de sincronización arriba, mosaicos para compartir y lista de datos */
+.aj-card { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px; border-radius: 18px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; }
+.aj-st { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; }
+.aj-card .s-sub { margin: 0; }
+.aj-card .btn { margin-top: 8px; }
+.aj-ic { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); }
+.aj-ic .ic { width: 18px; height: 18px; stroke-width: 1.9; color: var(--ink); }
+.aj-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.aj-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 104px; padding: 14px; border: 0; border-radius: 18px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.aj-tile b { display: block; font-size: 15px; font-weight: 600; }
+.aj-tile small { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.aj-grp { border-radius: 18px; background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; overflow: hidden; }
+.aj-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 8px 14px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.aj-row + .aj-row { border-top: 1px solid #26262E; }
+.aj-t { flex: 1; min-width: 0; }
+.aj-t b { display: block; font-size: 15px; font-weight: 600; }
+.aj-t small { display: block; margin-top: 1px; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.aj-ch { color: var(--muted); font-size: 18px; flex: none; }
+.aj-tile:focus-visible, .aj-row:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }

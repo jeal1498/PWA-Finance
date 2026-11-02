@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v144';
+const APP_VERSION = 'v145';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1042,15 +1042,31 @@ const ICO = {
 
 
 function renderPerfil() {
-  const cfg = sync.getCfg();
+  const cfg = sync.getCfg(), conn = sync.connection();
+  const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
+  const ic = d => `<span class="aj-ic">${svg(d)}</span>`;
+  const IMG = '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/>';
+  const PHONE = '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>';
+  const SYNC = '<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/>';
+  const UP = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>';
+  const DOWN = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>';
+  const fila = (accion, d, t, sub) => `<button type="button" class="aj-row" data-action="${accion}">${ic(d)}<span class="aj-t"><b>${t}</b><small>${sub}</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
   $('#perfil').innerHTML = `
-    <h2 class="perfil-h">Respaldo</h2>
-    <div class="menu">
-      <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
-      <button type="button" class="menu-row" data-action="fondo-apartar">${ICO.upload}<span><b>Fondo de pantalla</b><small>Imagen 9:16 con la meta del periodo elegido en Apartar</small></span></button>
-      <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
-      <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
-      <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
+    <div class="aj-card">
+      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin conexión con Google Sheets' : cfg.error ? 'Sin sincronizar' : 'Sincronización conectada'}</div>
+      <p class="s-sub">${!conn ? 'Conecta una hoja de tu Drive para respaldar tus pagos.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
+      <button type="button" class="btn btn-primary" data-action="${conn ? 'sync-card' : 'open-sync'}">${conn ? 'Sincronizar ahora' : 'Conectar'}</button>
+    </div>
+    <h2 class="perfil-h">Compartir</h2>
+    <div class="aj-tiles">
+      <button type="button" class="aj-tile" data-action="share-month">${ic(IMG)}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()}</small></span></button>
+      <button type="button" class="aj-tile" data-action="fondo-apartar">${ic(PHONE)}<span><b>Fondo de pantalla</b><small>Imagen 9:16</small></span></button>
+    </div>
+    <h2 class="perfil-h">Datos</h2>
+    <div class="aj-grp">
+      ${fila('open-import', UP, 'Importar datos', 'Archivo JSON o CSV')}
+      ${fila('export-json', DOWN, 'Exportar respaldo', 'Descarga un archivo JSON')}
+      ${fila('open-sync', SYNC, 'Conexión con Google Sheets', 'URL, clave y sincronizar sola')}
     </div>`;
 }
 
@@ -1431,6 +1447,7 @@ async function syncRapido(btn) {
     toast(e.message || 'No se pudo sincronizar');
   } finally {
     btn.classList.remove('girando'); btn.disabled = false; marcaSync();
+    if (state.view === 'perfil' && sheet.el.hidden) renderPerfil();
   }
 }
 
@@ -1728,6 +1745,7 @@ document.addEventListener('click', async e => {
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
     case 'sync-quick': syncRapido(t); break;
+    case 'sync-card': t.textContent = 'Sincronizando…'; await syncRapido(t); break;
     case 'quien':
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
       if (sheet.ctx && sheet.ctx.type === 'detail') lsSet('finanzas_quien', t.dataset.q);
