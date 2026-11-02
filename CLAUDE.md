@@ -20,6 +20,7 @@ PWA de uso propio para llevar **pagos con abonos y metas de ahorro**. Antes viv�
 ## Datos compartidos con SecondBrain
 - Vive en el **mismo origen** (`jeal1498.github.io`) que SecondBrain (`/JEAL/`), así que usa la **misma IndexedDB `secondbrain`** (`js/db.js`, `VERSION` 7): stores `movimientos` y `metas`, más `settings` (`finance`, `backup`). No se perdieron datos al mover la app.
 - `js/db.js`, `js/backup.js`, `js/migrar-finanzas.js` y `js/finance.js` son **copias** de las de `jeal1498/JEAL`. Si cambia el esquema de la DB (subir `VERSION`), hay que cambiarlo **en los dos repos a la vez** o una app dejará de abrir la base.
+- **Dos teléfonos, una hoja** (Eduardo y Karen con la misma URL y clave): «Sincronizar» (botón ↻, «Sincronizar ahora» y el envío automático; `sincronizar()` en `app.js`) **trae la copia de la hoja, la combina** (`combinar()` en `sync.js`) **y envía el resultado**; si no puede leer la hoja no envía nada. Reglas: por registro gana el `updatedAt` más reciente; los abonos se juntan por su marca `t` (ms al crearlo); lo borrado se anota en `finanzas_borrados` (localStorage: `movimientos:<id>`, `metas:<id>`, `p:<t>` para abonos; viaja como `borrados` en la copia de la hoja; se olvida a los 180 días) y no reaparece; las copias de una serie que el otro saltó (`omitidos`) y sin abonos se quitan. «Traer de la hoja» sigue reemplazando todo.
 - Respaldo en Google Sheets: Perfil → «Sincronizar» (`sync.js`) usa la hoja y el script que se conectan en SecondBrain → Respaldo (enlace desde la app).
 
 ## Modelo
