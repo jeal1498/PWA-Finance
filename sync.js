@@ -99,7 +99,9 @@ export function tables(movimientos, metas) {
 const NET_HELP = 'Google no respondió. Revisa que la implementación tenga acceso «Cualquier persona», que la URL termine en /exec y que la clave sea la misma del script.';
 async function call(url, opts) {
   let res;
-  try { res = await fetch(url, opts); } catch (e) { throw new Error(navigator.onLine === false ? 'Sin conexión a internet' : NET_HELP); }
+  /* Si Google no contesta en 45 s se corta, para que el botón no se quede en «Sincronizando…». */
+  const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined;
+  try { res = await fetch(url, { ...opts, signal }); } catch (e) { throw new Error(e && e.name === 'TimeoutError' ? 'La hoja tardó demasiado en responder. Intenta de nuevo.' : navigator.onLine === false ? 'Sin conexión a internet' : NET_HELP); }
   try { return await res.json(); } catch (e) { throw new Error(NET_HELP); }
 }
 

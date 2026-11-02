@@ -1008,3 +1008,18 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .d-del { margin-top: 12px; width: 100%; }
 .sheet-head h2:has(+ [data-head]) { flex: 1; min-width: 0; }
 .sheet-head [data-head] { margin-right: -4px; }
+
+/* Sincronizar: estado y un botón, interruptor, conexión plegada y «Traer de la hoja» como enlace */
+.s-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.s-st { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; }
+.s-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+.s-dot.off { background: var(--danger); }
+.s-sub { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.s-sub.s-c { text-align: center; }
+.s-card .btn { margin-top: 8px; }
+.s-card .note, .s-card .form-error { margin: 2px 0 0; font-size: 12.5px; min-height: 0; }
+.s-auto { margin-top: 10px; }
+.s-form { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.s-form .q-lab { margin: 2px 0 -2px; }
+.s-link { display: block; margin: 18px auto 6px; padding: 0 0 1px; border: 0; border-bottom: 1px solid #5a2f2f; background: none; color: var(--danger-text); font: inherit; font-size: 13px; cursor: pointer; }
+.s-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }

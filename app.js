@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v143';
+const APP_VERSION = 'v144';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1382,26 +1382,32 @@ function openSync(note) {
   sheet.ctx = { type: 'sync' };
   const cfg = sync.getCfg(), conn = sync.connection();
   const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
-  const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : (cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : '');
-  openSheet('Respaldo en Google Sheets', `
-    ${conn ? `<p class="note">Tus pagos van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
-    <form id="sync-form" autocomplete="off">
-      <label for="sync-url">URL de la aplicación web</label>
-      <input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required>
-      <label for="sync-token">Clave</label>
-      <input id="sync-token" type="text" autocapitalize="off" spellcheck="false" value="${esc(cfg.token || '')}" required>
-      <label class="switch-row" for="sync-auto"><span>Sincronizar sola después de cada cambio</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
-      <div class="btn-row"><button type="submit" class="btn btn-primary">${conn ? 'Guardar' : 'Conectar y sincronizar'}</button></div>
-    </form>
-    ${conn ? `<div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-push" id="sync-push">Sincronizar ahora</button></div>
-    <div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-pull">Traer de la hoja</button></div>
-    <p class="hint">«Sincronizar ahora» junta lo de este teléfono con lo de la hoja (sirve para dos teléfonos con la misma hoja y clave). «Traer de la hoja» reemplaza todo lo de este teléfono por la copia.</p>` : ''}`);
+  const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : '';
+  const form = `<form id="sync-form" class="s-form" autocomplete="off">
+      <label class="q-lab" for="sync-url">URL de la aplicación web</label>
+      <label class="fld" for="sync-url"><input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required></label>
+      <label class="q-lab" for="sync-token">Clave</label>
+      <label class="fld" for="sync-token"><input id="sync-token" type="text" autocapitalize="off" spellcheck="false" value="${esc(cfg.token || '')}" required></label>
+      <button type="submit" class="btn ${conn ? 'btn-soft' : 'btn-primary'}">${conn ? 'Guardar conexión' : 'Conectar y sincronizar'}</button>
+    </form>`;
+  openSheet('Sincronizar', `
+    ${conn ? `<div class="s-card">
+      <div class="s-st"><span class="s-dot${cfg.error ? ' off' : ''}"></span>${cfg.error ? 'Sin sincronizar' : 'Conectado'}</div>
+      <p class="s-sub">Última sincronización: ${when}</p>
+      ${cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : msg}
+      <button type="button" class="btn btn-primary" data-action="sync-push" id="sync-push">Sincronizar ahora</button>
+    </div>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>${msg}`}
+    <label class="switch-row s-auto" for="sync-auto"><span>Sincronizar sola tras cada cambio</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
+    <button type="button" class="acc" data-action="acc" aria-expanded="${!conn}" aria-controls="acc-conn"><b>Conexión</b><span>URL y clave ›</span></button>
+    <div class="acc-p" id="acc-conn"${conn ? ' hidden' : ''}>${form}</div>
+    ${conn ? `<button type="button" class="s-link" data-action="sync-pull">Traer de la hoja</button>
+    <p class="s-sub s-c">Reemplaza todo lo de este teléfono por la copia de la hoja.</p>` : ''}`);
   sheet.panel.focus({ preventScroll: true });
 }
 
 async function syncSave(form) {
   const url = $('#sync-url', form).value.trim(), token = $('#sync-token', form).value.trim();
-  sync.setCfg({ url, token, auto: $('#sync-auto', form).checked, error: '' });
+  sync.setCfg({ url, token, auto: $('#sync-auto').checked, error: '' });
   await syncPush();
 }
 
@@ -1782,6 +1788,7 @@ document.addEventListener('input', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'f-imp') { e.preventDefault(); $('#f-conc').focus(); } });
 
 document.addEventListener('change', e => {
+  if (e.target.id === 'sync-auto') { sync.setCfg({ auto: e.target.checked }); if (sync.connection() && e.target.checked) autoSync(); }
   if (e.target.id === 'f-paid') { sheet.ctx.pagadoManual = true; pintarFecha(); }
   else if (e.target.id === 'f-fecha') pintarFecha();
   else if (['f-rep', 'f-fin', 'f-imp'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
