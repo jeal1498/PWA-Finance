@@ -50,14 +50,14 @@ const ICON = {
    Categorías (el texto guardado es "emoji Nombre", igual que antes)
    ========================================================= */
 const CATS = [
-  { id: 'Vivienda',   emoji: '🏠', icon: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' },
+  { id: 'Educación',  emoji: '🎓', icon: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>' },
+  { id: 'Familia',    emoji: '👨‍👩‍👧‍👦', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
+  { id: 'Finanzas',   emoji: '🏛️', icon: '<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>' },
+  { id: 'Personal',   emoji: '👤', icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
+  { id: 'Salud',      emoji: '🩺', icon: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/>' },
   { id: 'Servicios',  emoji: '💡', icon: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>' },
   { id: 'Transporte', emoji: '🚗', icon: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>' },
-  { id: 'Finanzas',   emoji: '🏛️', icon: '<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>' },
-  { id: 'Salud',      emoji: '🩺', icon: '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21.5l8.8-8.8a5 5 0 0 0 0-7.1z"/>' },
-  { id: 'Educación',  emoji: '🎓', icon: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>' },
-  { id: 'Personal',   emoji: '👤', icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
-  { id: 'Familia',    emoji: '👨‍👩‍👧‍👦', icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' }
+  { id: 'Vivienda',   emoji: '🏠', icon: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' }
 ];
 /* Categorías viejas (personales) → generales. Lo ya guardado se ve con la nueva sin reescribir nada; al editar y guardar se guarda la nueva. */
 const CAT_VIEJAS = { 'Vehículo': 'Transporte', 'Yo': 'Personal', 'Karen': 'Personal', 'Julieta': 'Familia' };
@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v137';
+const APP_VERSION = 'v138';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -594,7 +594,7 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
   $('#list-count').textContent = countText;
   if (groups.length) { $('#list').innerHTML = groups.map(groupHTML).join(''); return; }
   $('#list').innerHTML = baseEmpty
-    ? `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong>Agrega el primer pago de este mes.<button type="button" class="btn btn-primary" data-action="add" data-mode="new">Nuevo pago</button></div>`
+    ? `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong>Agrega el primer pago de este mes.<button type="button" class="btn btn-primary" data-action="add" data-mode="new">Anotar pago</button></div>`
     : `<div class="empty"><strong>Sin resultados</strong>Prueba con otro filtro.</div>`;
 }
 
@@ -865,7 +865,7 @@ function submitAbono() {
   finish(m, m.abo >= m.imp ? 'Pagado por completo' : `Abono registrado: ${fmtMoney(monto)}`);
 }
 
-/* ----- Nuevo pago o editar: (+) ----- */
+/* ----- Anotar pago o editar: (+) ----- */
 const isDirty = () => { const c = sheet.ctx; return !!(c && c.type === 'form' && !c.id && ($('#f-conc').value.trim() || $('#f-imp').value)); };
 function dismissDiscard() { const b = $('#discard'); if (b) b.remove(); const f = $('#f-conc'); if (f) f.focus(); }
 function askDiscard(onYes) {
@@ -903,18 +903,18 @@ function sugerencias(texto) {
   }
   return [...g.values()].map(e => ({ ...e, imp: [...e.imps.entries()].sort((a, b) => b[1].n - a[1].n || b[1].ult - a[1].ult)[0][0] })).sort((a, b) => b.n - a.n).slice(0, 4);
 }
-const DATE_CHIPS = [['Hoy', 0], ['Ayer', -1], ['Mañana', 1], ['+1 sem', 7]];
+const DATE_CHIPS = [['Ayer', -1], ['Hoy', 0], ['Mañana', 1]];
 const addDays = (n) => toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
 
 function openForm(id) {
   const editing = id ? movimientos.find(m => m.id === id) : null;
   if (id && !editing) return;
   const last = lsGet(KEYS.cat);
-  const catStr = editing ? editing.cat : (CATS.some(c => catString(c) === last) ? last : catString(CATS[0]));
+  const catStr = editing ? editing.cat : (CATS.some(c => catString(c) === last) ? last : catString(CATS.find(c => c.id === 'Personal')));
   const selected = catLabelOf(catStr);
 
   sheet.ctx = { type: 'form', id: id || null, cat: catStr, pagadoManual: false };
-  openSheet(editing ? 'Editar pago' : 'Nuevo pago', `
+  openSheet(editing ? 'Editar pago' : 'Anotar pago', `
     <form id="form" class="fform qform" novalidate>
       <div class="q-monto"><span aria-hidden="true">$</span><input id="f-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Importe" value="${editing ? editing.imp : ''}"></div>
       <label class="q-lab" for="f-conc">Concepto</label>
