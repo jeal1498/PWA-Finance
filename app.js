@@ -73,11 +73,11 @@ const llaveC = x => llave(x.conc) + '|' + llave(catLabelOf(x.cat));
 const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelOf(str), emoji: '•' };
 
 /* =========================================================
-   Persistencia: IndexedDB de SecondBrain (stores "movimientos" y "metas").
+   Persistencia: IndexedDB de SecondBrain (store "movimientos"; "metas" es el viejo de planes, solo se vacía).
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v129';
+const APP_VERSION = 'v130';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -94,7 +94,6 @@ try {
    o hasta su fecha de fin (`fin`). */
 function generarRepetidos(hasta) {
   generarSeries(movimientos, 'movimientos', hasta);
-  generarSeries(metas, 'metas', hasta);
 }
 
 /* Frecuencias: por días (semanal, quincenal) o por meses (mensual, bimestral, anual). `repite: true` + `freq` (sin `freq` = mensual). */
@@ -169,7 +168,6 @@ function generarSeries(lista, store, hasta, soloSerie) {
     .catch(e => console.error('Pagos repetidos', e));
 }
 
-const storeOf = kind => kind === 'meta' ? 'metas' : 'movimientos';
 /* Guarda un registro (o lo borra). Con la hoja conectada y «auto», se envía sola unos segundos después. */
 let autoTimer;
 function autoSync() {
@@ -216,21 +214,21 @@ async function absorberPlanes() {
   } catch (e) { /* se reintenta en la próxima carga */ }
 }
 
-async function persist(kind, item) {
+async function persist(item) {
   try {
     item.updatedAt = Date.now();
     if (!item.createdAt) item.createdAt = item.updatedAt;
-    await db.put(storeOf(kind), item);
-    sync.quitarBorrado([`${storeOf(kind)}:${item.id}`]);
+    await db.put('movimientos', item);
+    sync.quitarBorrado([`movimientos:${item.id}`]);
     avisar();
     autoSync();
     return true;
   } catch (e) { return false; }
 }
-async function unpersist(kind, id) {
+async function unpersist(id) {
   try {
-    await db.remove(storeOf(kind), id);
-    sync.marcarBorrado(`${storeOf(kind)}:${id}`);
+    await db.remove('movimientos', id);
+    sync.marcarBorrado(`movimientos:${id}`);
     avisar();
     autoSync();
     return true;
@@ -300,33 +298,7 @@ function gastoInfo(m) {
   else if (d === 1) { tone = 'warn'; text = 'Vence mañana'; }
   else { tone = d <= 7 ? 'warn' : 'muted'; text = `Vence en ${d} días`; }
   const pct = m.imp > 0 ? Math.min(100, Math.round(m.abo / m.imp * 100)) : 0;
-  return { done, tone, text, pct, pend: m.pendiente, partial: m.abo > 0 && !done, plan: '' };
-}
-
-function procesarMeta(m) {
-  return { ...m, date: parseDate(m.fecha) };
-}
-
-function metaInfo(m) {
-  const d = daysFromToday(parseDate(m.fecha));
-  const sinMonto = m.imp === 0;
-  const done = m.imp > 0 && m.abo >= m.imp;
-  const pend = Math.max(0, m.imp - m.abo);
-  const pct = m.imp > 0 ? Math.min(100, Math.round(m.abo / m.imp * 100)) : 0;
-  let tone = 'muted', text = '', plan = '';
-  if (sinMonto) { text = 'Monto por definir'; }
-  else if (done) { tone = 'ok'; text = 'Alcanzada'; }
-  else if (d < 0) { tone = 'danger'; text = d === -1 ? 'Se atrasó 1 día' : `Atrasada ${-d} días`; }
-  else if (d === 0) { tone = 'warn'; text = 'Vence hoy'; }
-  else {
-    tone = d <= 30 ? 'warn' : 'muted';
-    if (d === 1) text = 'Falta 1 día';
-    else if (d < 60) text = `Faltan ${d} días`;
-    else if (d < 730) text = `Faltan ${Math.round(d / 30.44)} meses`;
-    else text = `Faltan ${(d / 365.25).toFixed(1).replace(/\.0$/, '')} años`;
-    plan = d <= 45 ? `${fmtMoney(Math.ceil(pend / d))} al día` : `${fmtMoney(Math.ceil(pend / (d / 30.44)))} al mes`;
-  }
-  return { done, sinMonto, tone, text, plan, pct, pend, partial: m.abo > 0 && !done, d };
+  return { done, tone, text, pct, pend: m.pendiente, partial: m.abo > 0 && !done };
 }
 
 /* Orden de las listas: por fecha y, dentro de un mismo día, del monto menor al mayor. */
@@ -354,22 +326,13 @@ const URGENCIA = {
 };
 const URGENCIA_ORDER = ['vencido', 'hoy', 'semana', 'quincena', 'mes', 'despues', 'pagado'];
 
-function plazoKey(m) {
-  if (m.imp > 0 && m.abo >= m.imp) return 'alcanzada';
-  if (m.imp === 0) return 'proxima';
-  const d = daysFromToday(parseDate(m.fecha));
-  if (d < 0) return 'vencida';
-  if (d <= 180) return 'proxima';
-  return 'largo';
-}
-
 /* =========================================================
    Construcción de datos por vista
    ========================================================= */
-/* Pagos del mes: los movimientos con fecha en el mes y los «Planes» (metas con monto) que caen en él. */
+/* Pagos del mes: los movimientos con fecha en el mes. */
 const enMes = d => d.getFullYear() === state.month.year && d.getMonth() === state.month.month;
 function monthItems() {
-  /* Solo pagos (los planes viven en la pestaña Planes, en Todo y en Apartar), del mes que se ve; en el mes actual también salen los atrasados de meses anteriores (siguen sin pagarse). */
+  /* Pagos del mes que se ve; en el mes actual también salen los atrasados de meses anteriores (siguen sin pagarse). */
   const inicio = new Date(state.month.year, state.month.month, 1);
   const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
   return pagos;
@@ -424,7 +387,7 @@ function tileHTML(tone, big, small) {
 function gastoRow(m, showCat) {
   const i = gastoInfo(m);
   const c = catOf(m.cat);
-  return `<button type="button" class="row" data-action="open" data-kind="gasto" data-id="${esc(m.id)}">
+  return `<button type="button" class="row" data-action="open" data-id="${esc(m.id)}">
     ${tileHTML(i.tone, m.date.getDate(), MESES_CORTO[m.date.getMonth()])}
     <span class="row-main">
       <span class="row-title">${showCat ? `<span class="row-emoji" aria-hidden="true">${catIcon(c)}</span>` : ''}${esc(m.conc)}</span>
@@ -532,7 +495,7 @@ function diasTexto(m, i) {
 /* Los atrasados de un pago mensual se juntan en un solo renglón: «$1,500 de $750 · 2 meses». */
 function juntarSeries(items) {
   const grupos = new Map();
-  items.forEach(m => { if (m.serie && !m.esProximo && !m.esPlan && m.estado === 'Vencido') (grupos.get(m.serie) || grupos.set(m.serie, []).get(m.serie)).push(m); });
+  items.forEach(m => { if (m.serie && m.estado === 'Vencido') (grupos.get(m.serie) || grupos.set(m.serie, []).get(m.serie)).push(m); });
   const fuera = new Set();
   const juntos = [];
   grupos.forEach(g => {
@@ -546,11 +509,11 @@ function juntarSeries(items) {
 
 function pagoRow(m) {
   const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} ${freqOf(m) === 'mensual' ? 'meses' : 'pagos'} · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
-  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.esProximo ? 'meta' : 'gasto'}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
+  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${!m.esProximo && enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}${m.esProximo ? '<em class="pt-tag">Plan</em>' : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
+    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done ? '' : (daysFromToday(m.date) <= 0 ? '<small class="pt-ap ya">pagar ya</small>' : (m.abo > 0 ? `<small class="pt-ap">de ${fmtMoney(m.imp)}</small>` : ''))}</span>
   </button>`;
 }
@@ -630,9 +593,8 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
   $('#list-caption').textContent = caption;
   $('#list-count').textContent = countText;
   if (groups.length) { $('#list').innerHTML = groups.map(groupHTML).join(''); return; }
-  const isMeta = state.view === 'metas';
   $('#list').innerHTML = baseEmpty
-    ? `<div class="empty"><strong>${isMeta ? 'Aún no hay planes' : `Nada en ${MESES[state.month.month].toLowerCase()}`}</strong>${isMeta ? 'Agrega el primero: frenos, mantenimiento…' : 'Agrega el primer pago de este mes.'}<button type="button" class="btn btn-primary" data-action="add" data-mode="new">${isMeta ? 'Nuevo plan' : 'Nuevo pago'}</button></div>`
+    ? `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong>Agrega el primer pago de este mes.<button type="button" class="btn btn-primary" data-action="add" data-mode="new">Nuevo pago</button></div>`
     : `<div class="empty"><strong>Sin resultados</strong>Prueba con otro filtro.</div>`;
 }
 
@@ -732,12 +694,9 @@ function formError(errId, fieldId, msg) {
   el.focus();
 }
 
-const listOf = kind => kind === 'meta' ? metas : movimientos;
-
 /* ----- Detalle ----- */
-function summaryHTML(m, i, isMeta) {
+function summaryHTML(m, i) {
   const c = catOf(m.cat);
-  const labels = isMeta ? ['Falta', 'Ahorrado', 'Meta'] : ['Pendiente', 'Abonado', 'Total'];
   return `
     <div class="detail-top">
       <span class="pill">${catIcon(c)}${esc(c.id)}</span>
@@ -746,54 +705,52 @@ function summaryHTML(m, i, isMeta) {
       <span class="detail-st t-${i.tone}">${i.text}</span>
     </div>
     <div class="figbox">
-      <div><span>${labels[0]}</span><b>${fmtMoney(i.pend)}</b></div>
-      <div><span>${labels[1]}</span><b>${fmtMoney(m.abo)}</b></div>
-      <div><span>${labels[2]}</span><b>${m.imp > 0 ? fmtMoney(m.imp) : '—'}</b></div>
-    </div>
-    ${i.plan ? `<p class="plan">Para llegar a tiempo: ${i.plan}.</p>` : ''}`;
+      <div><span>Pendiente</span><b>${fmtMoney(i.pend)}</b></div>
+      <div><span>Abonado</span><b>${fmtMoney(m.abo)}</b></div>
+      <div><span>Total</span><b>${m.imp > 0 ? fmtMoney(m.imp) : '—'}</b></div>
+    </div>`;
 }
 
-function abonoFormHTML(isMeta, pend) {
+function abonoFormHTML(pend) {
   return `<form id="abono-form" novalidate>
       <div class="two-col">
         <div>
-          <label for="abono">${isMeta ? 'Monto a ahorrar' : 'Monto del abono'}</label>
+          <label for="abono">Monto del abono</label>
           <input id="abono" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
         </div>
         <div>
-          <label for="abono-fecha">${isMeta ? 'Fecha del ahorro' : 'Fecha del pago'}</label>
+          <label for="abono-fecha">Fecha del pago</label>
           <input id="abono-fecha" type="date" value="${toISO(HOY)}">
         </div>
       </div>
       ${quienHTML(quienDef())}
       <p class="hint">Máximo: ${fmtMoney(pend)}</p>
-      <button type="button" class="btn btn-soft" data-action="abono-all">${isMeta ? 'Completar' : 'Pagar todo'} · ${fmtMoney(pend)}</button>
+      <button type="button" class="btn btn-soft" data-action="abono-all">Pagar todo · ${fmtMoney(pend)}</button>
       <p class="form-error" id="abono-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary">${isMeta ? 'Registrar ahorro' : 'Registrar abono'}</button>
+      <button type="submit" class="btn btn-primary">Registrar abono</button>
     </form>`;
 }
 
-function historialHTML(m, isMeta) {
+function historialHTML(m) {
   const ps = (m.pagos || []).map((x, i) => ({ ...x, i })).sort((x, y) => (y.fecha ? parseDate(y.fecha) : 0) - (x.fecha ? parseDate(x.fecha) : 0));
   if (!ps.length) return '';
   const lapiz = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   const { por, sin } = porPersona(ps), conQuien = ps.some(x => PERSONAS[x.quien]);
   const reparto = conQuien ? `<div class="ap-det">${aportesBar(por, r2(m.abo - sin))}<div class="ap-ley">${Object.entries(PERSONAS).map(([k, n]) => `<span>${avatar(k)}${n} <b>${fmtMoney(por[k])}</b></span>`).join('')}</div>${sin ? `<small>Sin asignar: ${fmtMoney(sin)}</small>` : ''}</div>` : '';
   return `<div class="hist">
-    <div class="hist-head"><h3>${isMeta ? 'Historial de ahorro' : 'Historial de abonos'}</h3><span>${isMeta ? plural(ps.length, 'registro', 'registros') : plural(ps.length, 'abono', 'abonos')}</span></div>
+    <div class="hist-head"><h3>Historial de abonos</h3><span>${plural(ps.length, 'abono', 'abonos')}</span></div>
     ${reparto}
-    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar ${isMeta ? 'ahorro' : 'abono'} de ${fmtMoney(x.monto)}${PERSONAS[x.quien] ? ' de ' + PERSONAS[x.quien] : ''}"><span class="hist-q">${avatar(x.quien)}${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
+    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar abono de ${fmtMoney(x.monto)}${PERSONAS[x.quien] ? ' de ' + PERSONAS[x.quien] : ''}"><span class="hist-q">${avatar(x.quien)}${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
   </div>`;
 }
 
 /* Editar o eliminar un abono del historial; el pendiente y el estatus se recalculan solos. */
-function openAbonoEdit(kind, id, idx) {
-  const isMeta = kind === 'meta';
-  const m = listOf(kind).find(x => x.id === id), p = m && (m.pagos || [])[idx];
+function openAbonoEdit(id, idx) {
+  const m = movimientos.find(x => x.id === id), p = m && (m.pagos || [])[idx];
   if (!p) return;
   const max = r2(m.imp - (m.abo - p.monto));
-  sheet.ctx = { type: 'abono-edit', kind, id, idx };
-  openSheet(isMeta ? 'Editar ahorro' : 'Editar abono', `
+  sheet.ctx = { type: 'abono-edit', id, idx };
+  openSheet('Editar abono', `
     <form id="abono-edit-form" novalidate>
       <div class="two-col">
         <div><label for="ae-monto">Monto</label><input id="ae-monto" type="number" inputmode="decimal" min="0" step="0.01" value="${p.monto}"></div>
@@ -812,8 +769,8 @@ function openAbonoEdit(kind, id, idx) {
 }
 
 function submitAbonoEdit() {
-  const { kind, id, idx } = sheet.ctx;
-  const m = listOf(kind).find(x => x.id === id), p = m && (m.pagos || [])[idx];
+  const { id, idx } = sheet.ctx;
+  const m = movimientos.find(x => x.id === id), p = m && (m.pagos || [])[idx];
   if (!p) return;
   const monto = r2(parseFloat($('#ae-monto').value));
   const fecha = $('#ae-fecha').value;
@@ -825,7 +782,7 @@ function submitAbonoEdit() {
   p.monto = monto; p.fecha = fecha || null;
   const qb = $('.quien [aria-pressed=true]'); if (qb) p.quien = qb.dataset.q;
   syncAbo(m);
-  finish(kind, m, kind === 'meta' ? 'Ahorro actualizado' : 'Abono actualizado');
+  finish(m, 'Abono actualizado');
 }
 
 function conceptoHTML(m) {
@@ -843,27 +800,18 @@ function conceptoHTML(m) {
   </div>`;
 }
 
-function openDetail(kind, id) {
-  const isMeta = kind === 'meta';
-  const raw = listOf(kind).find(m => m.id === id);
+function openDetail(id) {
+  const raw = movimientos.find(m => m.id === id);
   if (!raw) return;
-  const m = isMeta ? procesarMeta(raw) : procesar(raw);
-  const i = isMeta ? metaInfo(m) : gastoInfo(m);
+  const m = procesar(raw);
+  const i = gastoInfo(m);
+  const action = i.done ? '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>' : abonoFormHTML(i.pend);
 
-  let action;
-  if (isMeta && i.sinMonto) {
-    action = '<p class="note">Este plan todavía no tiene monto. Defínelo para empezar a ahorrar.</p>';
-  } else if (i.done) {
-    action = isMeta ? '<p class="note">Ya lo tienes completo.</p>' : '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>';
-  } else {
-    action = abonoFormHTML(isMeta, i.pend);
-  }
-
-  sheet.ctx = { type: 'detail', kind, id };
-  openSheet(m.conc, `${summaryHTML(m, i, isMeta)}
-    ${isMeta ? '' : conceptoHTML(m)}
+  sheet.ctx = { type: 'detail', id };
+  openSheet(m.conc, `${summaryHTML(m, i)}
+    ${conceptoHTML(m)}
     ${action}
-    ${historialHTML(m, isMeta)}
+    ${historialHTML(m)}
     <div class="btn-row">
       <button type="button" class="btn btn-soft" data-action="edit">Editar</button>
       <button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>
@@ -872,31 +820,27 @@ function openDetail(kind, id) {
 }
 
 /* Deja visible lo recién guardado: limpia filtro/búsqueda que lo esconderían y abre su grupo. */
-function reveal(kind, raw) {
-  const isMeta = kind === 'meta';
-  if (!isMeta) { const d = parseDate(raw.fecha); state.month = { year: d.getFullYear(), month: d.getMonth() }; }
-  const okFilter = isMeta ? (state.filter === 'todas' || plazoKey(raw) === state.filter) : (state.filter === 'todos' || procesar(raw).estado.toLowerCase() === state.filter);
-  if (!okFilter) state.filter = isMeta ? 'todas' : 'todos';
+function reveal(raw) {
+  const d = parseDate(raw.fecha); state.month = { year: d.getFullYear(), month: d.getMonth() };
+  if (!(state.filter === 'todos' || procesar(raw).estado.toLowerCase() === state.filter)) state.filter = 'todos';
   const q = state.search.trim().toLowerCase();
   if (q && !`${raw.conc} ${raw.cat}`.toLowerCase().includes(q)) {
     state.search = ''; $('#search').value = ''; $('#search-bar').hidden = true;
   }
-  state.open[isMeta ? `p|${plazoKey(raw)}` : (state.grouping === 'urgencia' ? `u|${urgenciaKey(procesar(raw))}` : `c|${catOf(raw.cat).id}`)] = true;
+  state.open[state.grouping === 'urgencia' ? `u|${urgenciaKey(procesar(raw))}` : `c|${catOf(raw.cat).id}`] = true;
 }
 
-async function finish(kind, raw, msg) {
-  const ok = await persist(kind, raw);
+async function finish(raw, msg) {
+  const ok = await persist(raw);
   /* Al guardar una serie, no pintar la pantalla hasta que sus ocurrencias estén guardadas
      y volver a leer IndexedDB. Así la vista usa la misma lista persistida, no una copia vieja. */
   if (raw.serie && raw.repite) {
     await seriesWrite;
     try {
-      const [mov, met] = await Promise.all([db.all('movimientos'), db.all('metas')]);
-      movimientos = mov.sort(byFecha);
-      metas = met.sort(byFecha);
+      movimientos = (await db.all('movimientos')).sort(byFecha);
     } catch (e) { /* conservar la lista en memoria si falla la lectura */ }
   }
-  reveal(kind, raw);
+  reveal(raw);
   closeSheet();
   render();
   const row = $$('.row, .pt-row').find(r => r.dataset.id === raw.id);
@@ -905,9 +849,8 @@ async function finish(kind, raw, msg) {
 }
 
 function submitAbono() {
-  const { kind, id } = sheet.ctx;
-  const isMeta = kind === 'meta';
-  const m = listOf(kind).find(x => x.id === id);
+  const { id } = sheet.ctx;
+  const m = movimientos.find(x => x.id === id);
   if (!m) return;
   const monto = r2(parseFloat($('#abono').value));
   const fecha = $('#abono-fecha').value;
@@ -918,11 +861,11 @@ function submitAbono() {
   if (err) { formError('abono-error', monto > 0 && monto <= falta ? 'abono-fecha' : 'abono', err); return; }
   (m.pagos = m.pagos || []).push({ fecha, monto, quien: quienSel(), t: Date.now() });
   syncAbo(m);
-  finish(kind, m, m.abo >= m.imp ? (isMeta ? 'Listo, ya lo tienes' : 'Pagado por completo') : `${isMeta ? 'Ahorro registrado' : 'Abono registrado'}: ${fmtMoney(monto)}`);
+  finish(m, m.abo >= m.imp ? 'Pagado por completo' : `Abono registrado: ${fmtMoney(monto)}`);
 }
 
 /* ----- Agregar movimiento: (+) ----- */
-const hasPending = kind => listOf(kind).some(m => m.imp > 0 && m.abo < m.imp);
+const hasPending = () => movimientos.some(m => m.imp > 0 && m.abo < m.imp);
 const isDirty = () => { const c = sheet.ctx; return !!(c && c.type === 'form' && !c.id && ($('#f-conc').value.trim() || $('#f-imp').value)); };
 function dismissDiscard() { const b = $('#discard'); if (b) b.remove(); const f = $('#f-conc'); if (f) f.focus(); }
 function askDiscard(onYes) {
@@ -939,27 +882,25 @@ function askDiscard(onYes) {
 }
 function requestClose() { askDiscard(closeSheet); }
 
-function addTabs(kind, mode) {
-  const isMeta = kind === 'meta';
+function addTabs(mode) {
   return `<div class="mode" role="group" aria-label="Tipo de movimiento">
-    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">${isMeta ? 'Nuevo plan' : 'Nuevo pago'}</button>
-    <button type="button" data-action="add-mode" data-mode="pay" aria-pressed="${mode === 'pay'}">${isMeta ? 'Registrar ahorro' : 'Abonar o pagar'}</button>
+    <button type="button" data-action="add-mode" data-mode="new" aria-pressed="${mode === 'new'}">Nuevo pago</button>
+    <button type="button" data-action="add-mode" data-mode="pay" aria-pressed="${mode === 'pay'}">Abonar o pagar</button>
   </div>`;
 }
 
-function openAdd(kind, mode) { if (mode === 'pay') openPay(kind); else openForm(kind, null); }
+function openAdd(mode) { if (mode === 'pay') openPay(); else openForm(null); }
 
-function payListHTML(kind, q, f = 'todos') {
-  const isMeta = kind === 'meta';
+function payListHTML(q, f = 'todos') {
   q = q.trim().toLowerCase();
-  const arr = (isMeta ? metas.map(procesarMeta) : movimientos.map(procesar))
+  const arr = movimientos.map(procesar)
     .filter(m => m.imp > 0 && m.abo < m.imp && (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q)))
-    .filter(m => f === 'todos' || ((isMeta ? metaInfo(m) : gastoInfo(m)).tone === 'danger') === (f === 'atrasado'))
+    .filter(m => f === 'todos' || (gastoInfo(m).tone === 'danger') === (f === 'atrasado'))
     .sort(porFechaYMonto);
-  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : (isMeta ? 'No hay planes por completar.' : 'No hay pagos pendientes.')}</p>`;
+  if (!arr.length) return `<p class="note">${q ? 'Sin resultados.' : 'No hay pagos pendientes.'}</p>`;
   return arr.map(m => {
-    const i = isMeta ? metaInfo(m) : gastoInfo(m);
-    const extra = m.abo > 0 ? ` · ${isMeta ? 'ahorrado' : 'abonado'} ${fmtMoney(m.abo)}` : '';
+    const i = gastoInfo(m);
+    const extra = m.abo > 0 ? ` · abonado ${fmtMoney(m.abo)}` : '';
     return `<button type="button" class="pay-row tone-${i.tone}" data-action="pay-pick" data-id="${esc(m.id)}">
       <span class="pay-ic" aria-hidden="true">${catIcon(catOf(m.cat))}</span>
       <span class="pay-main"><b>${esc(m.conc)}</b><small>${i.text}${extra}</small></span>
@@ -968,52 +909,49 @@ function payListHTML(kind, q, f = 'todos') {
   }).join('');
 }
 
-function openPay(kind) {
-  const isMeta = kind === 'meta';
-  sheet.ctx = { type: 'add', kind };
-  openSheet(isMeta ? 'Nuevo plan' : 'Nuevo pago', `${addTabs(kind, 'pay')}
+function openPay() {
+  sheet.ctx = { type: 'add' };
+  openSheet('Nuevo pago', `${addTabs('pay')}
     <div class="pay-chips" id="pay-chips">
-      ${[['todos', 'Todos'], ['atrasado', isMeta ? 'Atrasadas' : 'Atrasados'], ['porvencer', isMeta ? 'En curso' : 'Por vencer']].map(([k, l]) => `<button type="button" class="pchip${k === 'todos' ? ' on' : ''}" data-action="pay-filter" data-f="${k}" aria-pressed="${k === 'todos'}">${l}</button>`).join('')}
+      ${[['todos', 'Todos'], ['atrasado', 'Atrasados'], ['porvencer', 'Por vencer']].map(([k, l]) => `<button type="button" class="pchip${k === 'todos' ? ' on' : ''}" data-action="pay-filter" data-f="${k}" aria-pressed="${k === 'todos'}">${l}</button>`).join('')}
       <button type="button" class="pchip pchip-ic" data-action="pay-search-toggle" aria-label="Buscar concepto o categoría" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
     </div>
     <div class="pay-search" id="pay-search-wrap" hidden>
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="pay-search" type="search" autocomplete="off" aria-label="Buscar concepto o categoría" placeholder="Buscar concepto o categoría">
     </div>
-    <div id="pay-list">${payListHTML(kind, '')}</div>`);
+    <div id="pay-list">${payListHTML('')}</div>`);
   sheet.ctx.payF = 'todos';
   sheet.panel.focus({ preventScroll: true });
 }
 
-function openPayDetail(kind, id) {
-  const isMeta = kind === 'meta';
-  const raw = listOf(kind).find(m => m.id === id);
+function openPayDetail(id) {
+  const raw = movimientos.find(m => m.id === id);
   if (!raw) return;
-  const m = isMeta ? procesarMeta(raw) : procesar(raw);
-  const i = isMeta ? metaInfo(m) : gastoInfo(m);
-  sheet.ctx = { type: 'detail', kind, id };
-  openSheet(isMeta ? 'Nuevo plan' : 'Nuevo pago', `${addTabs(kind, 'pay')}
+  const m = procesar(raw);
+  const i = gastoInfo(m);
+  sheet.ctx = { type: 'detail', id };
+  openSheet('Nuevo pago', `${addTabs('pay')}
     <button type="button" class="back" data-action="pay-back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Cambiar concepto</button>
     <h3 class="pay-name">${esc(m.conc)}</h3>
-    ${summaryHTML(m, i, isMeta)}
-    ${abonoFormHTML(isMeta, i.pend)}
-    ${historialHTML(m, isMeta)}`);
+    ${summaryHTML(m, i)}
+    ${abonoFormHTML(i.pend)}
+    ${historialHTML(m)}`);
   sheet.panel.focus({ preventScroll: true });
 }
 
 /* ----- Formulario ----- */
-function defaultDate(isMeta) {
-  if (isMeta) return '';
+function defaultDate() {
   if (isCurrentMonth()) return toISO(HOY);
   return toISO(new Date(state.month.year, state.month.month, 1));
 }
 
 /* Conceptos que ya existen (por nombre): categoría y importe más usados para sugerirlos al escribir. */
-function sugerencias(texto, kind) {
+function sugerencias(texto) {
   const q = llave(texto);
   if (!q) return [];
   const g = new Map();
-  for (const x of listOf(kind).slice().sort(byFecha)) {
+  for (const x of movimientos.slice().sort(byFecha)) {
     if (!llave(x.conc).includes(q)) continue;
     const k = llaveC(x);
     const e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, imps: new Map() };
@@ -1026,29 +964,28 @@ function sugerencias(texto, kind) {
 function pintarSugerencias() {
   const box = $('#f-sug'), inp = $('#f-conc');
   if (!box || !inp || !sheet.ctx || sheet.ctx.id) return;
-  const lista = sugerencias(inp.value, sheet.ctx.kind);
+  const lista = sugerencias(inp.value);
   sheet.sug = lista;
   box.hidden = !lista.length;
   box.innerHTML = lista.map((s, i) => `<button type="button" class="sug-i" data-action="sug-pick" data-i="${i}"><span class="dot" data-cat="${esc(catLabelOf(s.cat))}"></span><span class="sug-t"><b>${esc(s.nombre)}</b><small>${esc(catLabelOf(s.cat))} · ${plural(s.n, 'pago', 'pagos')} · suele ser ${fmtMoney(s.imp)}</small></span><i>USAR</i></button>`).join('');
 }
 
-function openForm(kind, id) {
-  const isMeta = kind === 'meta';
-  const editing = id ? listOf(kind).find(m => m.id === id) : null;
+function openForm(id) {
+  const editing = id ? movimientos.find(m => m.id === id) : null;
   if (id && !editing) return;
   const last = lsGet(KEYS.cat);
   const catStr = editing ? editing.cat : (CATS.some(c => catString(c) === last) ? last : catString(CATS[0]));
   const selected = catLabelOf(catStr);
 
-  sheet.ctx = { type: 'form', kind, id: id || null, cat: catStr };
-  openSheet(editing ? (isMeta ? 'Editar plan' : 'Editar pago') : (isMeta ? 'Nuevo plan' : 'Nuevo pago'), `
-    ${editing ? '' : addTabs(kind, 'new')}
+  sheet.ctx = { type: 'form', id: id || null, cat: catStr };
+  openSheet(editing ? 'Editar pago' : 'Nuevo pago', `
+    ${editing ? '' : addTabs('new')}
     <form id="form" class="fform" novalidate>
-      <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="${isMeta ? 'Ej. Llantas' : 'Ej. Combustible'}" value="${editing ? esc(editing.conc) : ''}"></label>
+      <label class="fld" for="f-conc"><span>Concepto</span><input id="f-conc" type="text" autocomplete="off" placeholder="Ej. Combustible" value="${editing ? esc(editing.conc) : ''}"></label>
       ${editing ? '' : '<div class="sug" id="f-sug" hidden></div>'}
       <div class="two-col">
-        <label class="fld" for="f-imp"><span>${isMeta ? 'Monto' : 'Importe'}</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
-        <label class="fld" for="f-fecha"><span>${isMeta ? 'Hasta' : 'Vence'}</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate(isMeta)}"></label>
+        <label class="fld" for="f-imp"><span>Importe</span><input id="f-imp" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${editing ? editing.imp : ''}"></label>
+        <label class="fld" for="f-fecha"><span>Vence</span><input id="f-fecha" type="date" value="${editing ? editing.fecha : defaultDate()}"></label>
       </div>
       <div class="cat-grid" role="radiogroup" aria-label="Categoría">
         ${CATS.map(c => `<label class="cat-opt"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span class="cat-in">${catIcon(c)}${esc(c.id)}</span></label>`).join('')}
@@ -1061,7 +998,7 @@ function openForm(kind, id) {
           <p class="note" id="f-fin-hint"></p>
         </div>
       </div>`}
-      ${editing ? '' : `<label class="switch-row" for="f-paid"><span>${isMeta ? 'Ya tengo el dinero ahorrado' : 'Ya está pagado'}</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
+      ${editing ? '' : `<label class="switch-row" for="f-paid"><span>Ya está pagado</span><input type="checkbox" class="switch" id="f-paid" role="switch"></label>`}
       <p class="form-error" id="f-error" role="alert"></p>
       <div class="fbtns${editing ? ' edit' : ''}">
         <button type="button" class="btn btn-soft" data-action="close-sheet">Cancelar</button>
@@ -1069,7 +1006,7 @@ function openForm(kind, id) {
         <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
     </form>`);
-  if (!isMeta) actualizarFin();
+  actualizarFin();
   if (editing) sheet.panel.focus({ preventScroll: true }); else $('#f-conc').focus({ preventScroll: true });
 }
 
@@ -1081,7 +1018,7 @@ function actualizarFin() {
   const fecha = $('#f-fecha').value, fin = $('#f-fin').value, hint = $('#f-fin-hint');
   if (!fin || !fecha) { hint.textContent = 'Se repite hasta que lo detengas.'; return; }
   /* Calendario completo de la serie desde su primer pago; los ya pagados no cuentan como pendientes. */
-  const lista = listOf(sheet.ctx.kind), id = sheet.ctx.id, prev = id ? lista.find(m => m.id === id) : null;
+  const lista = movimientos, id = sheet.ctx.id, prev = id ? lista.find(m => m.id === id) : null;
   const otros = prev && prev.serie ? lista.filter(m => m.serie === prev.serie && m.id !== id).sort(byFecha) : [];
   const inicio = otros.length && otros[0].fecha < fecha ? otros[0].fecha : fecha;
   const d = parseDate(inicio);
@@ -1101,21 +1038,20 @@ function actualizarFin() {
 }
 
 function submitForm() {
-  const { kind, id, cat } = sheet.ctx;
-  const isMeta = kind === 'meta';
+  const { id, cat } = sheet.ctx;
   const fecha = $('#f-fecha').value;
   const imp = parseFloat($('#f-imp').value) || 0;
-  const conc = $('#f-conc').value.trim() || (isMeta ? 'Meta' : 'Gasto');
-  const list = listOf(kind);
+  const conc = $('#f-conc').value.trim() || 'Gasto';
+  const list = movimientos;
   const prev = id ? list.find(m => m.id === id) : null;
   if (id && !prev) return;
   const fin = !$('#f-rep').checked ? '' : $('#f-fin').value;
   const freq = $('#f-rep').checked && $('input[name=f-freq]:checked') ? $('input[name=f-freq]:checked').value : 'mensual';
-  const err = !fecha ? (isMeta ? 'Selecciona la fecha límite.' : 'Selecciona una fecha.')
+  const err = !fecha ? 'Selecciona una fecha.'
     : (+fecha.slice(0, 4) < 2000 || +fecha.slice(0, 4) > 2100) ? 'Revisa el año de la fecha.'
     : fin && fin < fecha ? 'La fecha de fin no puede ser anterior al vencimiento.'
     : imp < 0 ? 'El monto no puede ser negativo.'
-    : (!isMeta && imp <= 0) ? 'El importe debe ser mayor a 0.'
+    : imp <= 0 ? 'El importe debe ser mayor a 0.'
     : (prev && imp < prev.abo) ? `El importe no puede ser menor a lo ya abonado (${fmtMoney(prev.abo)}).` : '';
   if (err) { formError('f-error', !fecha ? 'f-fecha' : (fin && fin < fecha) ? 'f-fin' : 'f-imp', err); return; }
 
@@ -1127,7 +1063,7 @@ function submitForm() {
       if (fin) item.fin = fin; else delete item.fin;
       if (item.serie && fin) {
         const sobran = list.filter(m => m.serie === item.serie && m.fecha > fin && !(m.abo > 0));
-        for (const m of sobran) { list.splice(list.indexOf(m), 1); unpersist(kind, m.id); }
+        for (const m of sobran) { list.splice(list.indexOf(m), 1); unpersist(m.id); }
       }
       if (item.repite && freq !== 'mensual') item.freq = freq; else delete item.freq;
       /* Repetir, frecuencia y fin valen para toda la serie. */
@@ -1135,27 +1071,27 @@ function submitForm() {
         if (item.repite) m.repite = true; else delete m.repite;
         if (item.fin) m.fin = item.fin; else delete m.fin;
         if (item.freq) m.freq = item.freq; else delete m.freq;
-        persist(kind, m);
+        persist(m);
       });
     }
   } else {
-    item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
+    item = { id: Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
     if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp, quien: quienDef(), t: Date.now() }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
   }
   list.sort(byFecha);
-  if (item.serie && item.repite) generarSeries(list, storeOf(kind), HOY.getFullYear() * 12 + HOY.getMonth() + 1, item.serie);
-  finish(kind, item, id ? 'Cambios guardados' : (isMeta ? 'Plan creado' : 'Pago guardado'));
+  if (item.serie && item.repite) generarSeries(list, 'movimientos', HOY.getFullYear() * 12 + HOY.getMonth() + 1, item.serie);
+  finish(item, id ? 'Cambios guardados' : 'Pago guardado');
 }
 
 /* ----- Selector de mes ----- */
 function openMonthPicker() {
   const set = new Set([`${HOY.getFullYear()}-${HOY.getMonth()}`, `${state.month.year}-${state.month.month}`]);
-  [...movimientos, ...metas.filter(m => m.imp > 0)].forEach(m => { const d = parseDate(m.fecha); set.add(`${d.getFullYear()}-${d.getMonth()}`); });
+  movimientos.forEach(m => { const d = parseDate(m.fecha); set.add(`${d.getFullYear()}-${d.getMonth()}`); });
   const list = Array.from(set).map(k => { const [y, mo] = k.split('-').map(Number); return { y, mo }; }).sort((a, b) => (a.y * 12 + a.mo) - (b.y * 12 + b.mo));
-  const count = (y, mo) => [...movimientos, ...metas.filter(m => m.imp > 0)].filter(m => { const d = parseDate(m.fecha); return d.getFullYear() === y && d.getMonth() === mo; }).length;
+  const count = (y, mo) => movimientos.filter(m => { const d = parseDate(m.fecha); return d.getFullYear() === y && d.getMonth() === mo; }).length;
   sheet.ctx = { type: 'months' };
   openSheet('Ir a otro mes', `
     <button type="button" class="month-opt today" data-action="pick-today">Ir a hoy<small>${MESES[HOY.getMonth()]} ${HOY.getFullYear()}</small></button>
@@ -1212,21 +1148,19 @@ function renderPerfil() {
 }
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
-   (pagos y planes con monto, solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
-/* Apartar mira los próximos 15 días corridos (pagos y planes). */
+   (solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
+/* Apartar mira los próximos 15 días corridos (pagos). */
 const APARTAR_DIAS = 15;
 const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quince', '15 Días', 15]];
 /* Semana = la del calendario (lunes a domingo) y «15 Días» = 15 días corridos desde hoy: suman el monto completo de lo que vence en ese lapso; «Día» reparte entre los días que faltan. */
 const APARTAR_FILAS = 20;
 const diasHastaDomingo = () => (7 - HOY.getDay()) % 7;
 function apartarItems() {
-  const pagos = movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, kind: 'gasto', pend: m.pendiente }));
-  const prox = metas.filter(m => m.imp > 0 && m.abo < m.imp).map(m => ({ ...procesarMeta(m), kind: 'meta', pend: m.imp - m.abo }));
-  return [...pagos, ...prox].map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= APARTAR_DIAS).sort((a, c) => a.date - c.date);
+  return movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, pend: m.pendiente })).map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= APARTAR_DIAS).sort((a, c) => a.date - c.date);
 }
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
-/* Misma distribución que Pagos y Planes: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
+/* Misma distribución que Pagos: mosaicos de periodo y tabla. */
 /* «12 pagos». */
 const desglose = lista => plural(lista.length, 'pago', 'pagos');
 
@@ -1268,21 +1202,21 @@ function renderApartar() {
   const rowsYa = verYa.map(m => {
     const c = catOf(m.cat), atr = m.d < 0, n = -m.d;
     const nota = atr ? `${n === 1 ? '1 día atrasado' : `${n} días atrasados`}` : 'Vence hoy';
-    return `<button type="button" class="pt-cols pt-row v" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${nota.toLowerCase()}, pagar ya ${fmtMoney(m.pend)}`)}">
+    return `<button type="button" class="pt-cols pt-row v" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${nota.toLowerCase()}, pagar ya ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est danger" role="img" aria-label="${atr ? 'Atrasado' : 'Vence hoy'}">${svg(BADGE_ICON.Vencido)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.kind === 'meta' ? '<em class="pt-tag">Plan</em>' : ''}</span><span class="pt-nota danger">${nota}</span></span>
+    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota danger">${nota}</span></span>
     <span class="pt-amt"><b>${fmtMoney(m.pend)}</b></span>
   </button>`;
   }).join('');
   const rows = rowsYa + verLista.map(m => {
     const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
-    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-kind="${m.kind}" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
+    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
     <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.kind === 'meta' ? '<em class="pt-tag">Plan</em>' : ''}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
+    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
     <span class="pt-amt"><b>${fmtMoney(monto(m))}</b></span>
   </button>`;
   }).join('');
@@ -1428,7 +1362,7 @@ async function shareFondo(d) {
 
 /* Dashboard de Pagar: tarjeta partida Total | Por pagar, tres mosaicos de estado (filtran la lista)
    y resumen operativo (total cartera; vuelve a mostrar todo). */
-/* Análisis: números de todos los pagos (sin planes), pendiente por categoría y total contra pagado de los últimos meses. */
+/* Análisis: números de todos los pagos pendiente por categoría y total contra pagado de los últimos meses. */
 const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : fmtMoney(n);
 function renderAnalisis() {
   const all = movimientos.map(procesar);
@@ -1523,7 +1457,7 @@ function openSync(note) {
   const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
   const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : (cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : '');
   openSheet('Respaldo en Google Sheets', `
-    ${conn ? `<p class="note">Tus pagos y planes van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
+    ${conn ? `<p class="note">Tus pagos van a las pestañas «Finanzas · Pagos» y «Finanzas · Metas» de tu hoja. Última sincronización: <b>${when}</b>.</p>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>`}${msg}
     <form id="sync-form" autocomplete="off">
       <label for="sync-url">URL de la aplicación web</label>
       <input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required>
@@ -1830,31 +1764,30 @@ document.addEventListener('click', async e => {
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
-      const kind = 'gasto';
-      openAdd(kind, t.dataset.mode || (hasPending(kind) ? 'pay' : 'new'));
+      openAdd(t.dataset.mode || (hasPending() ? 'pay' : 'new'));
       break;
     }
     case 'add-mode': {
       if (t.getAttribute('aria-pressed') === 'true') break;
-      const kind = sheet.ctx.kind, mode = t.dataset.mode;
-      askDiscard(() => openAdd(kind, mode));
+      const mode = t.dataset.mode;
+      askDiscard(() => openAdd(mode));
       break;
     }
     case 'discard-no': dismissDiscard(); break;
     case 'discard-yes': { const go = sheet.discard; $('#discard').remove(); if (go) go(); break; }
-    case 'pay-pick': openPayDetail(sheet.ctx.kind, t.dataset.id); break;
-    case 'pay-back': openPay(sheet.ctx.kind); break;
+    case 'pay-pick': openPayDetail(t.dataset.id); break;
+    case 'pay-back': openPay(); break;
     case 'pay-filter': {
       sheet.ctx.payF = t.dataset.f;
       $$('#pay-chips [data-f]').forEach(c => { const on = c === t; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); });
-      $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, $('#pay-search').value, sheet.ctx.payF);
+      $('#pay-list').innerHTML = payListHTML($('#pay-search').value, sheet.ctx.payF);
       break;
     }
     case 'pay-search-toggle': {
       const w = $('#pay-search-wrap');
       w.hidden = !w.hidden;
       t.setAttribute('aria-expanded', String(!w.hidden));
-      if (!w.hidden) $('#pay-search').focus(); else { $('#pay-search').value = ''; $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, '', sheet.ctx.payF); }
+      if (!w.hidden) $('#pay-search').focus(); else { $('#pay-search').value = ''; $('#pay-list').innerHTML = payListHTML('', sheet.ctx.payF); }
       break;
     }
     case 'group': setGrouping(t.dataset.group); break;
@@ -1874,10 +1807,9 @@ document.addEventListener('click', async e => {
       state.open[t.dataset.gkey] = open;
       break;
     }
-    case 'open': openDetail(t.dataset.kind, t.dataset.id); break;
+    case 'open': openDetail(t.dataset.id); break;
     case 'abono-all': {
-      const { kind, id } = sheet.ctx;
-      const m = listOf(kind).find(x => x.id === id);
+      const m = movimientos.find(x => x.id === sheet.ctx.id);
       if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
       break;
     }
@@ -1899,38 +1831,36 @@ document.addEventListener('click', async e => {
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
       if (sheet.ctx && sheet.ctx.type === 'detail') lsSet('finanzas_quien', t.dataset.q);
       break;
-    case 'abono-edit': openAbonoEdit(sheet.ctx.kind, sheet.ctx.id, +t.dataset.idx); break;
-    case 'abono-back': openDetail(sheet.ctx.kind, sheet.ctx.id); break;
+    case 'abono-edit': openAbonoEdit(sheet.ctx.id, +t.dataset.idx); break;
+    case 'abono-back': openDetail(sheet.ctx.id); break;
     case 'abono-del': {
-      const { kind, id, idx } = sheet.ctx;
-      const m = listOf(kind).find(x => x.id === id);
-      if (m && m.pagos && m.pagos[idx]) { const [q] = m.pagos.splice(idx, 1); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); finish(kind, m, kind === 'meta' ? 'Ahorro eliminado' : 'Abono eliminado'); }
+      const { id, idx } = sheet.ctx;
+      const m = movimientos.find(x => x.id === id);
+      if (m && m.pagos && m.pagos[idx]) { const [q] = m.pagos.splice(idx, 1); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); finish(m, 'Abono eliminado'); }
       break;
     }
     case 'reopen': {
-      const { kind, id } = sheet.ctx;
-      const m = listOf(kind).find(x => x.id === id);
-      if (m && m.pagos && m.pagos.length) { const q = m.pagos.pop(); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); const ok = await persist(kind, m); closeSheet(); render(); toast(ok ? 'Último abono deshecho' : 'No se pudo guardar en este dispositivo'); }
+      const m = movimientos.find(x => x.id === sheet.ctx.id);
+      if (m && m.pagos && m.pagos.length) { const q = m.pagos.pop(); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); const ok = await persist(m); closeSheet(); render(); toast(ok ? 'Último abono deshecho' : 'No se pudo guardar en este dispositivo'); }
       break;
     }
-    case 'edit': openForm(sheet.ctx.kind, sheet.ctx.id); break;
+    case 'edit': openForm(sheet.ctx.id); break;
     case 'delete': {
-      const { kind, id } = sheet.ctx;
-      const item = listOf(kind).find(m => m.id === id);
+      const id = sheet.ctx.id;
+      const item = movimientos.find(m => m.id === id);
       if (!item) break;
       /* Eliminar una copia solo salta ese mes: la serie sigue (para detenerla se apaga «Se repite» al editar o se pone «Termina»). */
-      const hermanos = item.serie ? listOf(kind).filter(m => m.serie === item.serie && m.id !== id) : [];
+      const hermanos = item.serie ? movimientos.filter(m => m.serie === item.serie && m.id !== id) : [];
       const previo = hermanos.length && item.repite ? hermanos : null;
-      if (previo) for (const h of previo) { h.omitidos = [...new Set([...(h.omitidos || []), item.fecha])]; await persist(kind, h); }
-      if (kind === 'meta') metas = metas.filter(m => m.id !== id); else movimientos = movimientos.filter(m => m.id !== id);
-      await unpersist(kind, id);
+      if (previo) for (const h of previo) { h.omitidos = [...new Set([...(h.omitidos || []), item.fecha])]; await persist(h); }
+      movimientos = movimientos.filter(m => m.id !== id);
+      await unpersist(id);
       closeSheet(); render();
       toast(previo ? 'Eliminado · se salta ese mes' : 'Eliminado', { label: 'Deshacer', run: async () => {
-        const list = listOf(kind);
-        list.push(item);
-        list.sort(byFecha);
-        if (previo) for (const h of previo) { h.omitidos = (h.omitidos || []).filter(f => f !== item.fecha); if (!h.omitidos.length) delete h.omitidos; await persist(kind, h); }
-        await persist(kind, item); reveal(kind, item); render();
+        movimientos.push(item);
+        movimientos.sort(byFecha);
+        if (previo) for (const h of previo) { h.omitidos = (h.omitidos || []).filter(f => f !== item.fecha); if (!h.omitidos.length) delete h.omitidos; await persist(h); }
+        await persist(item); reveal(item); render();
         toast('Restaurado');
       } });
       break;
@@ -1960,7 +1890,7 @@ document.addEventListener('submit', e => {
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
 document.addEventListener('input', e => {
-  if (e.target.id === 'pay-search') $('#pay-list').innerHTML = payListHTML(sheet.ctx.kind, e.target.value, sheet.ctx.payF);
+  if (e.target.id === 'pay-search') $('#pay-list').innerHTML = payListHTML(e.target.value, sheet.ctx.payF);
   if (e.target.getAttribute('aria-invalid')) {
     e.target.removeAttribute('aria-invalid');
     const m = $('#' + e.target.getAttribute('aria-describedby'));
@@ -2019,12 +1949,10 @@ await absorberPlanes();
 render();
 if (!dbOk) toast('No se pudo abrir el almacenamiento de este dispositivo');
 
-/* Enlaces desde Inicio y el buscador: finanzas/#gasto-ID o #meta-ID abren ese registro. */
-const deep = location.hash.match(/^#(gasto|meta)-(.+)$/);
+/* Enlaces desde Inicio y el buscador: finanzas/#gasto-ID (o #meta-ID, de los planes viejos) abren ese pago. */
+const deep = location.hash.match(/^#(?:gasto|meta)-(.+)$/);
 if (deep) {
   history.replaceState(null, '', location.pathname);
-  const id = decodeURIComponent(deep[2]);
-  if (listOf(deep[1]).some(m => m.id === id)) {
-    openDetail(deep[1], id);
-  }
+  const id = decodeURIComponent(deep[1]);
+  if (movimientos.some(m => m.id === id)) openDetail(id);
 }
