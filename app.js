@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v141';
+const APP_VERSION = 'v142';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -650,6 +650,7 @@ function openSheet(title, html) {
   clearTimeout(toastTimer); $('#toast').classList.remove('show');
   if (sheet.el.hidden) sheet.last = document.activeElement;
   sheet.title.textContent = title;
+  $$('.sheet-head [data-head]').forEach(b => b.remove());
   sheet.body.innerHTML = html;
   sheet.body.scrollTop = 0;
   sheet.el.hidden = false;
@@ -695,53 +696,14 @@ function formError(errId, fieldId, msg) {
 }
 
 /* ----- Detalle ----- */
-function summaryHTML(m, i) {
-  const c = catOf(m.cat);
-  return `
-    <div class="detail-top">
-      <span class="pill">${catIcon(c)}${esc(c.id)}</span>
-      <span>${fmtDateFull(m.fecha)}</span>
-      ${m.repite && m.serie ? `<span class="pill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${REP_PATH}</svg>${FREQS[freqOf(m)].label}</span>` : ''}
-      <span class="detail-st t-${i.tone}">${i.text}</span>
-    </div>
-    <div class="figbox">
-      <div><span>Pendiente</span><b>${fmtMoney(i.pend)}</b></div>
-      <div><span>Abonado</span><b>${fmtMoney(m.abo)}</b></div>
-      <div><span>Total</span><b>${m.imp > 0 ? fmtMoney(m.imp) : '—'}</b></div>
-    </div>`;
-}
-
-function abonoFormHTML(pend) {
-  return `<form id="abono-form" novalidate>
-      <div class="two-col">
-        <div>
-          <label for="abono">Monto del abono</label>
-          <input id="abono" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
-        </div>
-        <div>
-          <label for="abono-fecha">Fecha del pago</label>
-          <input id="abono-fecha" type="date" value="${toISO(HOY)}">
-        </div>
-      </div>
-      ${quienHTML(quienDef())}
-      <p class="hint">Máximo: ${fmtMoney(pend)}</p>
-      <button type="button" class="btn btn-soft" data-action="abono-all">Pagar todo · ${fmtMoney(pend)}</button>
-      <p class="form-error" id="abono-error" role="alert"></p>
-      <button type="submit" class="btn btn-primary">Registrar abono</button>
-    </form>`;
-}
-
 function historialHTML(m) {
   const ps = (m.pagos || []).map((x, i) => ({ ...x, i })).sort((x, y) => (y.fecha ? parseDate(y.fecha) : 0) - (x.fecha ? parseDate(x.fecha) : 0));
-  if (!ps.length) return '';
+  if (!ps.length) return { n: 0, html: '<p class="acc-vacio">Todavía no hay abonos.</p>' };
   const lapiz = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   const { por, sin } = porPersona(ps), conQuien = ps.some(x => PERSONAS[x.quien]);
   const reparto = conQuien ? `<div class="ap-det">${aportesBar(por, r2(m.abo - sin))}<div class="ap-ley">${Object.entries(PERSONAS).map(([k, n]) => `<span>${avatar(k)}${n} <b>${fmtMoney(por[k])}</b></span>`).join('')}</div>${sin ? `<small>Sin asignar: ${fmtMoney(sin)}</small>` : ''}</div>` : '';
-  return `<div class="hist">
-    <div class="hist-head"><h3>Historial de abonos</h3><span>${plural(ps.length, 'abono', 'abonos')}</span></div>
-    ${reparto}
-    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar abono de ${fmtMoney(x.monto)}${PERSONAS[x.quien] ? ' de ' + PERSONAS[x.quien] : ''}"><span class="hist-q">${avatar(x.quien)}${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}
-  </div>`;
+  return { n: ps.length, html: `${reparto}
+    ${ps.map(x => `<button type="button" class="hist-row" data-action="abono-edit" data-idx="${x.i}" aria-label="Editar abono de ${fmtMoney(x.monto)}${PERSONAS[x.quien] ? ' de ' + PERSONAS[x.quien] : ''}"><span class="hist-q">${avatar(x.quien)}${x.fecha ? fmtDateFull(x.fecha) : 'Sin fecha'}</span><b>${fmtMoney(x.monto)}${lapiz}</b></button>`).join('')}` };
 }
 
 /* Editar o eliminar un abono del historial; el pendiente y el estatus se recalculan solos. */
@@ -788,34 +750,48 @@ function submitAbonoEdit() {
 function conceptoHTML(m) {
   const k = llaveC(m), anio = m.fecha.slice(0, 4);
   const grupo = movimientos.filter(x => llaveC(x) === k && x.fecha.slice(0, 4) === anio).sort(byFecha);
-  if (grupo.length < 2) return '';
+  if (grupo.length < 2) return null;
   const total = sum(grupo, 'imp');
   const ult = grupo.filter(x => x.id !== m.id && x.abo >= x.imp).pop();
   const sig = grupo.find(x => x.id !== m.id && x.fecha > m.fecha && x.abo < x.imp);
   const fila = (t, v) => `<div class="hist-row"><span>${t}</span><b>${v}</b></div>`;
-  return `<div class="hist concepto">
-    <div class="hist-head"><h3>Historial de «${esc(m.conc)}» · ${esc(catLabelOf(m.cat))} · ${anio}</h3><span>${plural(grupo.length, 'pago', 'pagos')}</span></div>
+  return { n: grupo.length, html: `
     ${fila('Total del año', fmtMoney(total))}${fila('Promedio por pago', fmtMoney(Math.round(total / grupo.length * 100) / 100))}
-    ${ult ? fila('Último pagado', `${fmtDate(ult.fecha)} · ${fmtMoney(ult.imp)}`) : ''}${sig ? fila('Siguiente', `${fmtDate(sig.fecha)} · ${fmtMoney(sig.imp)}`) : ''}
-  </div>`;
+    ${ult ? fila('Último pagado', `${fmtDate(ult.fecha)} · ${fmtMoney(ult.imp)}`) : ''}${sig ? fila('Siguiente', `${fmtDate(sig.fecha)} · ${fmtMoney(sig.imp)}`) : ''}` };
 }
 
 function openDetail(id) {
   const raw = movimientos.find(m => m.id === id);
   if (!raw) return;
-  const m = procesar(raw);
-  const i = gastoInfo(m);
-  const action = i.done ? '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>' : abonoFormHTML(i.pend);
-
-  sheet.ctx = { type: 'detail', id };
-  openSheet(m.conc, `${summaryHTML(m, i)}
-    ${conceptoHTML(m)}
-    ${action}
-    ${historialHTML(m)}
-    <div class="btn-row">
-      <button type="button" class="btn btn-soft" data-action="edit">Editar</button>
-      <button type="button" class="btn btn-danger" data-action="delete">Eliminar</button>
-    </div>`);
+  const m = procesar(raw), i = gastoInfo(m), c = catOf(m.cat);
+  const ab = historialHTML(m), co = conceptoHTML(m);
+  const acc = (key, titulo, n, html) => `<button type="button" class="acc" data-action="acc" aria-expanded="false" aria-controls="acc-${key}"><b>${titulo}</b><span>${n} ›</span></button><div class="acc-p" id="acc-${key}" hidden>${html}</div>`;
+  const accion = i.done
+    ? '<button type="button" class="btn btn-soft" data-action="reopen">Deshacer último abono</button>'
+    : `<form id="abono-form" class="d-form" novalidate>
+        <div class="two-col">
+          <div class="d-col"><label class="q-lab" for="abono">Monto</label><label class="fld" for="abono"><span>$</span><input id="abono" type="text" inputmode="decimal" autocomplete="off" value="${i.pend}"></label></div>
+          <div class="d-col"><label class="q-lab" for="abono-fecha">Fecha</label><label class="fld" for="abono-fecha"><input id="abono-fecha" type="date" value="${toISO(HOY)}"></label></div>
+        </div>
+        ${quienHTML(quienDef())}
+        <p class="form-error" id="abono-error" role="alert"></p>
+        <button type="submit" class="btn btn-primary" id="abono-btn">Pagar ${fmtMoney(i.pend)}</button>
+      </form>`;
+  sheet.ctx = { type: 'detail', id, pend: i.pend };
+  openSheet(m.conc, `
+    <div class="d-meta">
+      <span class="d-pill">${catIcon(c)}${esc(c.id)}</span>
+      <span class="d-pill">${svg('<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>')}${fmtDateFull(m.fecha)}</span>
+      ${m.repite && m.serie ? `<span class="d-pill">${svg(REP_PATH)}${FREQS[freqOf(m)].label}</span>` : ''}
+      <span class="d-pill st-${i.tone}">${i.text}</span>
+    </div>
+    <div class="d-big"><span class="q-lab">${i.done ? 'Total' : 'Pendiente'}</span><b>${fmtMoney(i.done ? m.imp : i.pend)}</b><small>de ${fmtMoney(m.imp)} · abonado ${fmtMoney(m.abo)}</small></div>
+    ${accion}
+    ${acc('ab', 'Historial de abonos', ab.n, ab.html)}
+    ${co ? acc('co', `Historial de «${esc(m.conc)}»`, plural(co.n, 'pago', 'pagos'), co.html) : ''}
+    <button type="button" class="btn btn-danger d-del" data-action="delete">Eliminar pago</button>`);
+  /* El lápiz de la cabecera edita el pago. */
+  $('.sheet-head .icon-btn').insertAdjacentHTML('beforebegin', `<button type="button" class="icon-btn" data-head="1" data-action="edit" aria-label="Editar pago">${svg('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')}</button>`);
   sheet.panel.focus({ preventScroll: true });
 }
 
@@ -853,7 +829,7 @@ function submitAbono() {
   const { id } = sheet.ctx;
   const m = movimientos.find(x => x.id === id);
   if (!m) return;
-  const monto = r2(parseFloat($('#abono').value));
+  const monto = r2(parseFloat($('#abono').value.replace(',', '.')));
   const fecha = $('#abono-fecha').value;
   const falta = r2(m.imp - m.abo);
   const err = !(monto > 0) ? 'Escribe un monto mayor a 0.'
@@ -1746,9 +1722,10 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'open': openDetail(t.dataset.id); break;
-    case 'abono-all': {
-      const m = movimientos.find(x => x.id === sheet.ctx.id);
-      if (m) $('#abono').value = Math.max(0, m.imp - m.abo);
+    case 'acc': {
+      const open = t.getAttribute('aria-expanded') !== 'true';
+      t.setAttribute('aria-expanded', String(open));
+      $('#' + t.getAttribute('aria-controls')).hidden = !open;
       break;
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
@@ -1795,6 +1772,11 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'abono') {
+    e.target.value = e.target.value.replace(/[^\d.,]/g, '');
+    const v = r2(parseFloat(e.target.value.replace(',', '.')) || 0), pend = sheet.ctx.pend;
+    $('#abono-btn').textContent = v >= pend ? `Pagar ${fmtMoney(pend)}` : v > 0 ? `Abonar ${fmtMoney(v)}` : 'Abonar';
+  }
   if (e.target.id === 'f-imp') { e.target.value = e.target.value.replace(/[^\d.,]/g, ''); e.target.style.width = Math.max(1, e.target.value.length) + 'ch'; }
   /* Si el nombre ya existe, se marca la categoría que ya tenía. */
   if (e.target.id === 'f-conc' && sheet.ctx && !sheet.ctx.id) {

@@ -990,3 +990,29 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .f-col-c { flex: 1; }
 .f-paid { display: grid; place-items: center; width: 64px; height: 40px; margin: 0; cursor: pointer; }
 .f-paid:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
+
+/* Detalle de un pago: datos en una línea, pendiente en grande, un solo botón y historiales plegados */
+.d-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.d-pill { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 13px; background: var(--surface-2); color: #C9C9C2; font-size: 12.5px; }
+.d-pill .ic, .d-pill .mono { width: 13px; height: 13px; font-size: 8px; }
+.d-pill.st-danger { background: color-mix(in srgb, var(--danger) 16%, var(--surface-2)); color: var(--danger-text); font-weight: 700; }
+.d-pill.st-warn { color: var(--warn); font-weight: 700; }
+.d-pill.st-ok { color: var(--ok); font-weight: 700; }
+.d-big { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 0 2px; text-align: center; }
+.d-big .q-lab { margin: 0; }
+.d-big b { font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 46px; line-height: 1.05; letter-spacing: -.02em; }
+.d-big small { font-size: 12.5px; color: var(--muted); }
+.d-form { display: flex; flex-direction: column; gap: 8px; }
+.d-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.d-col .q-lab { margin: 0; }
+.d-form .form-error { min-height: 0; margin: 0; }
+.acc { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 42px; margin-top: 8px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; }
+.acc b { font-weight: 500; }
+.acc span { color: var(--muted); font-size: 12.5px; }
+.acc[aria-expanded="true"] { border-radius: 12px 12px 0 0; }
+.acc-p { padding: 2px 12px 8px; border-radius: 0 0 12px 12px; background: var(--surface-2); border-top: 1px solid var(--surface); }
+.acc-p .hist-row { background: none; }
+.acc-vacio { margin: 8px 0; font-size: 13px; color: var(--muted); }
+.d-del { margin-top: 12px; width: 100%; }
+.sheet-head h2:has(+ [data-head]) { flex: 1; min-width: 0; }
+.sheet-head [data-head] { margin-right: -4px; }
