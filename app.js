@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v132';
+const APP_VERSION = 'v133';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1113,27 +1113,6 @@ const ICO = {
   download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>')
 };
 
-/* Resumen por concepto: cuánto suma cada nombre en el mes, el año o todo. */
-function openConceptos() {
-  const per = state.conceptoPer || 'mes';
-  const dentro = x => per === 'todo' || (per === 'mes' ? enMes(parseDate(x.fecha)) : parseDate(x.fecha).getFullYear() === state.month.year);
-  const g = new Map();
-  for (const x of movimientos.slice().sort(byFecha)) {
-    if (!dentro(x)) continue;
-    const k = llaveC(x), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
-    e.nombre = x.conc; e.cat = x.cat; e.n++; e.total += x.imp;
-    g.set(k, e);
-  }
-  const lista = [...g.values()].sort((a, b) => b.total - a.total);
-  const max = lista.length ? lista[0].total : 1;
-  const chips = [['mes', MESES[state.month.month]], ['anio', String(state.month.year)], ['todo', 'Todo']].map(([k, l]) => `<button type="button" class="pchip" data-action="conc-per" data-per="${k}" aria-pressed="${k === per}">${l}</button>`).join('');
-  sheet.ctx = { type: 'conceptos' };
-  const html = `<div class="cp-chips">${chips}</div>
-    ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
-    ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
-      : '<div class="empty"><strong>Sin pagos</strong>No hay pagos en este periodo.</div>'}`;
-  if (sheet.el.hidden) openSheet('Por concepto', html); else { sheet.body.innerHTML = html; sheet.body.scrollTop = 0; }
-}
 
 function renderPerfil() {
   const cfg = sync.getCfg();
@@ -1143,7 +1122,6 @@ function renderPerfil() {
       <button type="button" class="menu-row" data-action="share-month">${ICO.upload}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()} ${state.month.year}</small></span></button>
       <button type="button" class="menu-row" data-action="fondo-apartar">${ICO.upload}<span><b>Fondo de pantalla</b><small>Imagen 9:16 con la meta del periodo elegido en Apartar</small></span></button>
       <button type="button" class="menu-row" data-action="open-sync">${ICO.upload}<span><b>Sincronizar con Google Sheets</b><small>${cfg.last ? 'Última vez: ' + new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'Conecta una hoja de tu Drive'}</small></span></button>
-      <button type="button" class="menu-row" data-action="open-conceptos">${ICO.list}<span><b>Resumen por concepto</b><small>Cuánto suma cada nombre</small></span></button>
       <button type="button" class="menu-row" data-action="open-import">${ICO.upload}<span><b>Importar datos</b><small>Archivo JSON o CSV</small></span></button>
       <button type="button" class="menu-row" data-action="export-json">${ICO.download}<span><b>Exportar respaldo</b><small>Descarga un archivo JSON</small></span></button>
     </div>`;
@@ -1366,6 +1344,30 @@ async function shareFondo(d) {
    y resumen operativo (total cartera; vuelve a mostrar todo). */
 /* Análisis: números de todos los pagos pendiente por categoría y total contra pagado de los últimos meses. */
 const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : fmtMoney(n);
+/* Por concepto: cuánto suma cada nombre en el mes (actual), el año (actual) o todo. */
+function conceptosHTML() {
+  const per = state.conceptoPer || 'mes', hoy = toISO(HOY);
+  const dentro = x => per === 'todo' || x.fecha.slice(0, per === 'mes' ? 7 : 4) === hoy.slice(0, per === 'mes' ? 7 : 4);
+  const g = new Map();
+  for (const x of movimientos.slice().sort(byFecha)) {
+    if (!dentro(x)) continue;
+    const k = llaveC(x), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
+    e.nombre = x.conc; e.cat = x.cat; e.n++; e.total += x.imp;
+    g.set(k, e);
+  }
+  const lista = [...g.values()].sort((a, b) => b.total - a.total);
+  const max = lista.length ? lista[0].total : 1;
+  const chips = [['mes', MESES[HOY.getMonth()]], ['anio', String(HOY.getFullYear())], ['todo', 'Todo']].map(([k, l]) => `<button type="button" class="pchip" data-action="conc-per" data-per="${k}" aria-pressed="${k === per}">${l}</button>`).join('');
+  return `<section class="an-card" aria-label="Por concepto">
+      <h2 class="an-h">Por concepto</h2>
+      <div class="cp-chips">${chips}</div>
+      ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
+      ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}`
+        : '<p class="an-vacio">No hay pagos en este periodo.</p>'}
+    </section>
+    `;
+}
+
 function renderAnalisis() {
   const all = movimientos.map(procesar);
   const pend = all.filter(m => m.pendiente > 0);
@@ -1419,7 +1421,7 @@ function renderAnalisis() {
       <h2 class="an-h">Pendiente por categoría</h2>
       ${cats.length ? cats.map(({ c, v }) => `<div class="cp-row" data-cat="${esc(c.id)}"><div class="cp-top"><span class="cp-n">${esc(c.id)}</span><b>${fmtMoney(v)}</b></div><div class="cp-bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="an-vacio">No hay saldos pendientes.</p>'}
     </section>
-    <section class="an-card" aria-label="Total y pagado por mes">
+    ${conceptosHTML()}<section class="an-card" aria-label="Total y pagado por mes">
       <h2 class="an-h">Últimos meses · total y pagado</h2>
       <div class="an-chart" style="grid-template-columns:repeat(${meses.length},minmax(0,1fr))">${meses.map(m => `<div class="an-col" aria-label="${MESES[m.mo]}: total ${fmtMoney(m.total)}, pagado ${fmtMoney(m.pagado)}"><b>${fmtK(m.total)}</b><span class="an-bar" style="height:${Math.max(2, m.total / top * 100).toFixed(1)}%"><i style="height:${m.total ? (m.pagado / m.total * 100).toFixed(1) : 0}%"></i></span><small>${MESES_CORTO[m.mo]}</small></div>`).join('')}</div>
       <div class="an-ley"><span class="p">Pagado</span><span>Total del mes</span></div>
@@ -1825,8 +1827,7 @@ document.addEventListener('click', async e => {
       $('#f-imp').focus();
       break;
     }
-    case 'open-conceptos': state.conceptoPer = state.conceptoPer || 'mes'; openConceptos(); break;
-    case 'conc-per': state.conceptoPer = t.dataset.per; openConceptos(); break;
+    case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
     case 'sync-quick': syncRapido(t); break;
     case 'quien':
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
