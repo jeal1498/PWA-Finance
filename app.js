@@ -77,8 +77,8 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v128';
-const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', tab: 'finanzas_pagar_tab', cat: 'finanzas_ultima_cat' };
+const APP_VERSION = 'v129';
+const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 
@@ -193,12 +193,28 @@ async function recargarDatos() {
     await seriesWrite;
     const [mov, met] = await Promise.all([db.all('movimientos'), db.all('metas')]);
     movimientos = mov.sort(byFecha); metas = met.sort(byFecha);
+    await absorberPlanes();
     recargaPendiente = false;
     render();
   } catch (e) { /* se queda con lo que hay */ }
 }
 if (canal) canal.onmessage = () => recargarDatos();
 const dbBatch = async ops => { await db.batch(ops); avisar(); };
+
+/* Los planes (store `metas`) se unificaron con los pagos: cada plan pasa a `movimientos` con el mismo id y se anota como borrado en `metas`
+   para que la hoja no lo devuelva. Si ya existe un pago con ese id, manda el pago. Se repite en cada carga, por si un teléfono viejo manda planes. */
+async function absorberPlanes() {
+  if (!metas.length || !dbOk) return;
+  try {
+    const ids = new Set(movimientos.map(x => x.id)), now = Date.now(), b = sync.borrados();
+    const put = metas.filter(m => !ids.has(m.id)).map(m => ({ ...m, updatedAt: now }));
+    metas.forEach(m => { b['metas:' + m.id] = now; });
+    await db.batch({ movimientos: { put }, metas: { clear: true } });
+    sync.guardarBorrados(b);
+    movimientos = (await db.all('movimientos')).sort(byFecha); metas = [];
+    avisar();
+  } catch (e) { /* se reintenta en la próxima carga */ }
+}
 
 async function persist(kind, item) {
   try {
@@ -245,20 +261,16 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
 
-const VISTAS = ['gastos', 'metas', 'todo', 'apartar', 'analisis', 'perfil'];
-/* Pagar es una sola sección con tres pestañas: Pagos (gastos), Planes (metas) y Todo (los dos del mes). */
-const TABS = [['todo', 'Todo'], ['gastos', 'Pagos'], ['metas', 'Planes']];
-const esPagar = v => TABS.some(([k]) => k === v);
+const VISTAS = ['gastos', 'apartar', 'analisis', 'perfil'];
 const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
   view: vista0,
-  filter: vista0 === 'metas' ? 'todas' : 'todos',
+  filter: 'todos',
   grouping: lsGet(KEYS.group) === 'urgencia' ? 'urgencia' : 'categoria',
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
   open: {},
   search: '',
   sort: { col: 'fecha', asc: true },
-  sortMetas: { col: 'fecha', asc: true },
   apartar: 'dia',
   /* Pagar: tabla o calendario del mes (y el día elegido en el calendario). */
   calDia: ''
@@ -362,14 +374,6 @@ function monthItems() {
   const pagos = movimientos.map(procesar).filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
   return pagos;
 }
-/* Todo: los pagos del mes y los planes con monto que vencen en él (en el mes actual también los planes atrasados). */
-function monthTodo() {
-  const inicio = new Date(state.month.year, state.month.month, 1);
-  const planes = metas.filter(m => m.imp > 0).map(m => ({ ...procesar(m), esPlan: true }))
-    .filter(m => enMes(m.date) || (isCurrentMonth() && m.estado === 'Vencido' && m.date < inicio));
-  return [...monthItems(), ...planes];
-}
-
 /* Mosaicos de Pagar: «Pagado» = con algún abono; «Pagar ya» = pendiente que venció o vence hoy; «Por vencer» = pendiente de mañana en adelante. */
 function pasaFiltro(m, f) {
   const d = daysFromToday(m.date);
@@ -382,7 +386,7 @@ function pasaFiltro(m, f) {
 function buildGastos() {
   const all = movimientos.map(procesar);
   const isUrg = state.grouping === 'urgencia';
-  const base = state.view === 'todo' ? monthTodo() : monthItems();
+  const base = monthItems();
   const q = state.search.trim().toLowerCase();
   const items = base.filter(m =>
     (state.filter === 'todos' || pasaFiltro(m, state.filter)) &&
@@ -391,54 +395,11 @@ function buildGastos() {
   return { all, base, items, isUrg, q };
 }
 
-function buildMetas() {
-  const base = metas.map(procesarMeta);
-  const q = state.search.trim().toLowerCase();
-  const items = base.filter(m =>
-    (state.filter === 'todas' || (state.filter === 'porlograr' ? ['proxima', 'largo'].includes(plazoKey(m)) : plazoKey(m) === state.filter)) &&
-    (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q))
-  );
-  return { base, items, q };
-}
-
 /* =========================================================
    Render: resumen
    ========================================================= */
-const tabsHTML = () => `<div class="tabs" role="group" aria-label="Qué mostrar">${TABS.map(([k, l]) => `<button type="button" data-action="view" data-view="${k}" aria-pressed="${state.view === k}">${l}</button>`).join('')}</div>`;
-
 function renderHeroGastos(b) {
-  $('#kpi-dash').innerHTML = tabsHTML() + kpiDashboard(b.base, state.view === 'todo');
-  $('#kpi-dash').hidden = false;
-}
-
-function renderHeroMetas(b) {
-  const base = b.base;
-  const totalObj = sum(base, 'imp'), totalAbo = sum(base, 'abo');
-  const pend = base.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
-  const faltante = m => m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0;
-  /* Meta diaria de los planes: lo que hay que ahorrar hoy para llegar a la fecha de cada plan con saldo (redondeado hacia arriba por plan). */
-  const metaDiaPlanes = base.filter(m => faltante(m) > 0 && daysFromToday(m.date) > 0).reduce((t, m) => t + Math.ceil(faltante(m) / daysFromToday(m.date)), 0);
-  const vencidas = base.filter(m => plazoKey(m) === 'vencida');
-  const enCurso = base.filter(m => ['proxima', 'largo'].includes(plazoKey(m)));
-  const atrasado = vencidas.reduce((t, m) => t + faltante(m), 0);
-  const porLograr = enCurso.reduce((t, m) => t + faltante(m), 0);
-
-  const tiles = [
-    { k: 'a', filter: 'alcanzada', label: 'Ahorrado', v: totalAbo },
-    { k: 'm', filter: 'porlograr', label: 'Por lograr', v: porLograr },
-    { k: 'b', filter: 'vencida', label: 'Atrasada', v: atrasado }
-  ].map(t => {
-    const on = state.filter === t.filter;
-    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todas' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span></span></button>`;
-  }).join('');
-
-  $('#kpi-dash').innerHTML = `${tabsHTML()}
-    <div class="kpi-legend sin-sub">${tiles}</div>
-    <div class="kpi-split pagar">
-      <div class="kpi-half"><span class="kpi-sec">META DIARIA</span><span class="kpi-pv">${fmtMoney(metaDiaPlanes)}</span></div>
-      <span class="kpi-div" aria-hidden="true"></span>
-      <button type="button" class="kpi-half" data-action="filter" data-filter="todas" aria-pressed="${state.filter === 'todas'}"><span class="kpi-sec">META TOTAL</span><span class="kpi-pv">${fmtMoney(totalObj)}</span></button>
-    </div>`;
+  $('#kpi-dash').innerHTML = kpiDashboard(b.base);
   $('#kpi-dash').hidden = false;
 }
 
@@ -605,12 +566,6 @@ function calcularChips() {
   for (const x of juntarSeries(monthItems())) { const k = llaveC(x); chipMes.set(k, (chipMes.get(k) || 0) + 1); }
 }
 
-/* «4 pagos» o, si hay planes, «4 pagos · 2 planes». */
-function cuantos(items) {
-  const np = items.filter(m => m.esPlan).length, ng = items.length - np;
-  return np ? `${plural(ng, 'pago', 'pagos')} · ${plural(np, 'plan', 'planes')}` : plural(ng, 'pago', 'pagos');
-}
-
 function pagosTable(b, conMes = true) {
   calcularChips();
   const { col, asc } = state.sort;
@@ -621,56 +576,8 @@ function pagosTable(b, conMes = true) {
   }).join('');
   const pend = sum(items, 'pendiente');
   const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(m => m.esPlan ? metaPagoRow(m) : pagoRow(m)).join('')}<div class="pt-foot"><span>${cuantos(b.items)} · ${b.items.some(m => m.esPlan) ? 'pendiente' : 'por pagar'}</span><b>${fmtMoney(pend)}</b></div></div>
+  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>
     <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
-}
-
-/* Metas con el mismo estilo de tabla: fecha objetivo, estatus (anillo si hay ahorro), categoría, meta y monto que falta. */
-const META_RANK = { vencida: 0, proxima: 1, largo: 1, alcanzada: 2 };
-const META_SORTS = {
-  fecha:   (a, c) => a.date - c.date,
-  estatus: (a, c) => META_RANK[plazoKey(a)] - META_RANK[plazoKey(c)],
-  cat:     SORTS.cat,
-  conc:    SORTS.conc,
-  monto:   (a, c) => a.imp - c.imp
-};
-const META_COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['cat', 'Categoría', 'Cat.'], ['conc', 'Meta'], ['monto', 'Monto']];
-const META_BADGE = { vencida: ['Atrasada', 'danger', BADGE_ICON.Vencido], alcanzada: ['Alcanzada', 'ok', BADGE_ICON.Pagado] };
-
-function metaPagoRow(m) {
-  const i = metaInfo(m), c = catOf(m.cat), k = plazoKey(m);
-  const [label, tone, icon] = META_BADGE[k] || [i.sinMonto ? 'Monto por definir' : 'En curso', i.tone === 'warn' ? 'warn' : 'muted', BADGE_ICON.Pendiente];
-  const yr = m.date.getFullYear() !== HOY.getFullYear() ? ` ’${String(m.date.getFullYear()).slice(-2)}` : '';
-  const aria = `${label}${i.partial ? `, ahorrado ${i.pct}%` : ''}`;
-  /* Un plan es ahorro: con abono parcial se muestra lo ahorrado y «de» la meta (en Pagar es al revés: lo que falta). */
-  const amount = i.sinMonto ? '—' : fmtMoney(i.done ? m.imp : i.partial ? m.abo : i.pend);
-  return `<button type="button" class="pt-cols pt-row${k === 'vencida' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-kind="meta" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${label}${i.done ? '' : ', ' + i.text}, ${amount}`)}">
-    <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}${yr}</small></span>
-    <span class="pt-est ${tone}" role="img" aria-label="${aria}" title="${aria}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(icon)}</span>
-    <span class="pt-cat" role="img" aria-label="${esc(c.id)}" title="${esc(c.id)}">${catIcon(c)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${m.esPlan ? '<em class="pt-tag">Plan</em>' : ''}</span>${i.done ? '' : `<span class="pt-nota ${i.tone}">${i.text}</span>`}</span>
-    <span class="pt-amt${i.done || i.sinMonto ? ' done' : ''}"><b>${amount}</b>${i.partial ? `<small>de ${fmtMoney(m.imp)}</small>` : ''}</span>
-  </button>`;
-}
-
-function metasTable(b) {
-  const { col, asc } = state.sortMetas;
-  const items = [...b.items].sort((a, c) => (META_SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
-  const head = META_COLS.map(([k, l, sh]) => {
-    const on = col === k;
-    return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
-  }).join('');
-  const falta = items.reduce((t, m) => t + (m.imp > 0 ? Math.max(0, m.imp - m.abo) : 0), 0);
-  const cats = [...new Map(items.map(m => [catOf(m.cat).id, catOf(m.cat)])).values()].sort((a, c) => a.id.localeCompare(c.id, 'es'));
-  return `<div class="pt"><div class="pt-cols pt-th">${head}</div>${items.map(metaPagoRow).join('')}<div class="pt-foot"><span>${plural(items.length, 'plan', 'planes')} · por ahorrar</span><b>${fmtMoney(falta)}</b></div></div>
-    <div class="pt-key" aria-label="Categorías">${cats.map(c => `<span data-cat="${esc(c.id)}">${catIcon(c)}${esc(c.id)}</span>`).join('')}</div>`;
-}
-
-function renderMetasList(b) {
-  $('#list-caption').textContent = 'Planes';
-  $('#list-count').textContent = '';
-  if (b.items.length) { $('#list').innerHTML = metasTable(b); return; }
-  renderList([], '', '', 'metas', b.base.length === 0);
 }
 
 /* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
@@ -737,11 +644,11 @@ function render() {
   marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
-  const isG = state.view === 'gastos' || state.view === 'todo', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis';
+  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis';
   document.body.dataset.view = state.view;
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
-  $$('#view-switch .nav-btn').forEach(b => { if (b.dataset.view === state.view || (b.dataset.view === 'gastos' && esPagar(state.view))) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  $$('#view-switch .nav-btn').forEach(b => { if (b.dataset.view === state.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   $('#month-label').disabled = !isG;
   $('.controls').hidden = true;
   $('#seg').hidden = true;
@@ -765,11 +672,6 @@ function render() {
     renderHeroGastos(b);
     renderMonthControls();
     renderPagos(b);
-  } else {
-    const b = buildMetas();
-    renderHeroMetas(b);
-    $('#month-text').textContent = `${HOY.getDate()} ${MESES[HOY.getMonth()]} ${HOY.getFullYear()}`;
-    renderMetasList(b);
   }
 }
 
@@ -1325,8 +1227,8 @@ function apartarItems() {
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
 /* Misma distribución que Pagos y Planes: tarjeta amarilla, dos mosaicos, mosaicos de periodo y tabla. */
-/* «12 pagos · 3 planes» (omite los planes si no hay). */
-const desglose = lista => { const pl = lista.filter(m => m.kind === 'meta').length; return plural(lista.length - pl, 'pago', 'pagos') + (pl ? ` · ${plural(pl, 'plan', 'planes')}` : ''); };
+/* «12 pagos». */
+const desglose = lista => plural(lista.length, 'pago', 'pagos');
 
 /* Datos del fondo 9:16 con el periodo que está elegido en Apartar (se genera desde Ajustes). */
 function datosFondoApartar() {
@@ -1686,6 +1588,7 @@ function sincronizar() {
       if (Object.keys(ops).length) {
         await dbBatch(ops);
         movimientos = r.movimientos.sort(byFecha); metas = r.metas.sort(byFecha);
+        await absorberPlanes();
         if (sheet.el.hidden) render(); else recargaPendiente = true;
       }
     }
@@ -1731,12 +1634,13 @@ async function syncPull() {
     const mov = sanear(data.movimientos), met = sanear(data.metas);
     if (!mov.length && !met.length) return openSync('La copia de la hoja no trae registros válidos; no se cambió nada.');
     const omitidos = recibidos - mov.length - met.length;
-    const msg = `La hoja trae ${plural(mov.length, 'pago', 'pagos')} y ${plural(met.length, 'plan', 'planes')}${omitidos ? ` (${omitidos} no válidos se omiten)` : ''}.\nAquí hay ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}.\n\n¿Reemplazar lo que hay en este teléfono por la copia de la hoja?`;
+    const msg = `La hoja trae ${plural(mov.length + met.length, 'pago', 'pagos')}${omitidos ? ` (${omitidos} no válidos se omiten)` : ''}.\nAquí hay ${plural(movimientos.length, 'pago', 'pagos')}.\n\n¿Reemplazar lo que hay en este teléfono por la copia de la hoja?`;
     if (!window.confirm(msg)) return;
     const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
     await dbBatch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
+    await absorberPlanes();
     closeSheet();
     setView(state.view);
     toast('Copia traída de la hoja', { label: 'Deshacer', run: () => undoImport(snap) });
@@ -1785,16 +1689,15 @@ function showImportPreview(name, p) {
   openSheet('Importar datos', `
     <p class="imp-file">${esc(name)}</p>
     <div class="figs">
-      <div class="fig"><span>Pagos</span><b>${p.movimientos.length}</b></div>
-      <div class="fig"><span>Planes</span><b>${p.metas.length}</b></div>
-      <div class="fig"><span>Importe</span><b>${fmtMoney(sum(p.movimientos, 'imp'))}</b></div>
+      <div class="fig"><span>Pagos</span><b>${p.movimientos.length + p.metas.length}</b></div>
+      <div class="fig"><span>Importe</span><b>${fmtMoney(sum(p.movimientos, 'imp') + sum(p.metas, 'imp'))}</b></div>
     </div>
-    <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos ni planes en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>
+    <p class="note">${total ? `${plural(total - existen, 'nuevo', 'nuevos')}${existen ? ` · ${existen} ya existen y se actualizan` : ''}` : 'No encontré pagos en el archivo.'}${p.ingresos ? ` · ${plural(p.ingresos, 'ingreso omitido', 'ingresos omitidos')} (Finanzas no registra ingresos)` : ''}</p>
     ${p.skipped.length ? `<details class="imp-skip"><summary>${plural(p.skipped.length, 'renglón omitido', 'renglones omitidos')}</summary><ul>${p.skipped.slice(0, 10).map(s => `<li>${esc(s.where)}: ${esc(s.reason)}</li>`).join('')}${p.skipped.length > 10 ? `<li>…y ${p.skipped.length - 10} más</li>` : ''}</ul></details>` : ''}
     ${total && have ? `<div role="radiogroup" aria-labelledby="imp-mode-l">
       <span class="label" id="imp-mode-l">¿Cómo lo importo?</span>
       <label class="opt"><input type="radio" name="imp-mode" value="add" checked><span>Agregar a lo que ya tengo<small>No borra nada; lo que ya existe se actualiza y conserva sus abonos.</small></span></label>
-      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')} actuales y deja solo lo del archivo.</small></span></label>
+      <label class="opt"><input type="radio" name="imp-mode" value="replace"><span>Reemplazar todo<small>Borra tus ${plural(movimientos.length + metas.length, 'pago', 'pagos')} actuales y deja solo lo del archivo.</small></span></label>
     </div>` : ''}
     <div class="btn-row">
       <button type="button" class="btn btn-soft" data-action="open-import">Otro archivo</button>
@@ -1828,12 +1731,13 @@ async function applyImport() {
     }
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
+    await absorberPlanes();
     autoSync();
   } catch (e) {
     return toast('No se pudo importar en este dispositivo');
   }
   setView(state.view);
-  toast(`Importado: ${plural(p.movimientos.length, 'pago', 'pagos')} y ${plural(p.metas.length, 'plan', 'planes')}`, { label: 'Deshacer', run: () => undoImport(snap) });
+  toast(`Importado: ${plural(p.movimientos.length + p.metas.length, 'pago', 'pagos')}`, { label: 'Deshacer', run: () => undoImport(snap) });
 }
 
 async function undoImport(snap) {
@@ -1856,8 +1760,7 @@ function setView(v) {
   closeSheet();
   state.view = v;
   lsSet(KEYS.view, v);
-  if (esPagar(v)) lsSet(KEYS.tab, v);
-  state.filter = v === 'metas' ? 'todas' : 'todos';
+  state.filter = 'todos';
   state.search = '';
   $('#search').value = '';
   $('#search-bar').hidden = true;
@@ -1908,11 +1811,11 @@ document.addEventListener('click', async e => {
     case 'open-import': openImport(); break;
     case 'export-json':
       download(`finanzas-${toISO(HOY)}.json`, exportJSON(movimientos, metas), 'application/json');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length + metas.length, 'pago', 'pagos')}`);
       break;
     case 'export-csv':
       download(`finanzas-${toISO(HOY)}.csv`, '\uFEFF' + exportCSV(movimientos, metas), 'text/csv');
-      closeSheet(); toast(`Descargado: ${plural(movimientos.length, 'pago', 'pagos')} y ${plural(metas.length, 'plan', 'planes')}`);
+      closeSheet(); toast(`Descargado: ${plural(movimientos.length + metas.length, 'pago', 'pagos')}`);
       break;
     case 'template': download('plantilla-finanzas.csv', '\uFEFF' + templateCSV(), 'text/csv'); break;
     case 'import-go': await applyImport(); break;
@@ -1925,15 +1828,9 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
-    case 'view': {
-      /* El botón Pagar de la barra vuelve a la última pestaña (Pagos, Planes o Todo); si ya estás en Pagar no cambia. */
-      let v = t.dataset.view;
-      if (t.classList.contains('nav-btn') && v === 'gastos') { if (esPagar(state.view)) break; v = esPagar(lsGet(KEYS.tab)) ? lsGet(KEYS.tab) : 'todo'; }
-      if (v !== state.view) setView(v);
-      break;
-    }
+    case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
-      const kind = state.view === 'metas' ? 'meta' : 'gasto';
+      const kind = 'gasto';
       openAdd(kind, t.dataset.mode || (hasPending(kind) ? 'pay' : 'new'));
       break;
     }
@@ -1965,7 +1862,7 @@ document.addEventListener('click', async e => {
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
     case 'pick-today': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; closeSheet(); render(); break;
     case 'resumen': state.calDia = ''; state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
-    case 'sort': { const k = t.dataset.col, key = state.view === 'metas' ? 'sortMetas' : 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
+    case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': state.calDia = ''; state.filter = t.dataset.filter; render(); break;
     case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
@@ -2101,7 +1998,7 @@ document.addEventListener('keydown', e => {
   document.addEventListener('touchend', e => {
     if (!tracking) return;
     tracking = false;
-    if ((state.view !== 'gastos' && state.view !== 'todo') || !sheet.el.hidden) return;
+    if (state.view !== 'gastos' || !sheet.el.hidden) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - sx, dy = t.clientY - sy;
     if (Date.now() - t0 > 700 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
@@ -2118,6 +2015,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { if
   setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
 })();
 $('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
+await absorberPlanes();
 render();
 if (!dbOk) toast('No se pudo abrir el almacenamiento de este dispositivo');
 
@@ -2127,7 +2025,6 @@ if (deep) {
   history.replaceState(null, '', location.pathname);
   const id = decodeURIComponent(deep[2]);
   if (listOf(deep[1]).some(m => m.id === id)) {
-    if (deep[1] === 'meta') setView('metas');
     openDetail(deep[1], id);
   }
 }
