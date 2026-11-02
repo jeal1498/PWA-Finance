@@ -74,7 +74,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v124';
+const APP_VERSION = 'v125';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -174,8 +174,8 @@ function autoSync() {
   if (!cfg.auto || !sync.connection()) return;
   clearTimeout(autoTimer);
   autoTimer = setTimeout(async () => {
-    try { await sync.push(movimientos, metas, { dbOk }); }
-    catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); }
+    try { await sincronizar(); }
+    catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); }
   }, 4000);
 }
 /* Varias pestañas: cada cambio avisa a las demás para que vuelvan a leer la base (si no, la que quedó vieja pisaría los abonos). */
@@ -202,6 +202,7 @@ async function persist(kind, item) {
     item.updatedAt = Date.now();
     if (!item.createdAt) item.createdAt = item.updatedAt;
     await db.put(storeOf(kind), item);
+    sync.quitarBorrado([`${storeOf(kind)}:${item.id}`]);
     avisar();
     autoSync();
     return true;
@@ -210,6 +211,7 @@ async function persist(kind, item) {
 async function unpersist(kind, id) {
   try {
     await db.remove(storeOf(kind), id);
+    sync.marcarBorrado(`${storeOf(kind)}:${id}`);
     avisar();
     autoSync();
     return true;
@@ -991,7 +993,7 @@ function submitAbono() {
     : monto > falta ? `Máximo ${fmtMoney(falta)}, que es lo que falta.`
     : !fecha ? 'Selecciona la fecha del pago.' : '';
   if (err) { formError('abono-error', monto > 0 && monto <= falta ? 'abono-fecha' : 'abono', err); return; }
-  (m.pagos = m.pagos || []).push({ fecha, monto, quien: quienSel() });
+  (m.pagos = m.pagos || []).push({ fecha, monto, quien: quienSel(), t: Date.now() });
   syncAbo(m);
   finish(kind, m, m.abo >= m.imp ? (isMeta ? 'Listo, ya lo tienes' : 'Pagado por completo') : `${isMeta ? 'Ahorro registrado' : 'Abono registrado'}: ${fmtMoney(monto)}`);
 }
@@ -1216,7 +1218,7 @@ function submitForm() {
   } else {
     item = { id: (isMeta ? 'm' : '') + Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
     if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
-    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp, quien: quienDef() }); syncAbo(item); }
+    if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: toISO(HOY), monto: imp, quien: quienDef(), t: Date.now() }); syncAbo(item); }
     list.push(item);
     lsSet(KEYS.cat, cat);
   }
@@ -1609,7 +1611,7 @@ function openSync(note) {
     </form>
     ${conn ? `<div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-push" id="sync-push">Sincronizar ahora</button></div>
     <div class="btn-row"><button type="button" class="btn btn-soft" data-action="sync-pull">Traer de la hoja</button></div>
-    <p class="hint">«Traer de la hoja» reemplaza lo que hay en este teléfono por la última copia.</p>` : ''}`);
+    <p class="hint">«Sincronizar ahora» junta lo de este teléfono con lo de la hoja (sirve para dos teléfonos con la misma hoja y clave). «Traer de la hoja» reemplaza todo lo de este teléfono por la copia.</p>` : ''}`);
   sheet.panel.focus({ preventScroll: true });
 }
 
@@ -1628,7 +1630,7 @@ async function syncRapido(btn) {
   if (!sync.connection()) { openSync(); return; }
   btn.classList.add('girando'); btn.disabled = true;
   try {
-    try { await sync.push(movimientos, metas, { dbOk }); }
+    try { await sincronizar(); }
     catch (e) {
       if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
       await sync.push(movimientos, metas, { dbOk, force: true });
@@ -1642,16 +1644,45 @@ async function syncRapido(btn) {
   }
 }
 
+/* Sincronizar = traer la copia de la hoja, combinarla con lo de este teléfono y enviar el resultado.
+   Si no se puede leer la hoja no se envía nada (así un teléfono nunca pisa lo que subió el otro). */
+let sincronizando = null;
+function sincronizar() {
+  if (!sincronizando) sincronizando = (async () => {
+    if (!dbOk) throw new Error('No se pudo abrir el almacenamiento de este teléfono; no se sincroniza.');
+    await seriesWrite;
+    const data = await sync.pull();
+    if (data) {
+      const r = sync.combinar({ movimientos, metas, borrados: sync.borrados() },
+        { movimientos: sanear(data.movimientos), metas: sanear(data.metas), borrados: data.borrados && typeof data.borrados === 'object' ? data.borrados : {} });
+      sync.guardarBorrados(r.borrados);
+      const ops = {};
+      [['movimientos', movimientos, r.movimientos], ['metas', metas, r.metas]].forEach(([st, antes, despues]) => {
+        const ya = new Map(antes.map(x => [x.id, JSON.stringify(x)])), ids = new Set(despues.map(x => x.id));
+        const put = despues.filter(x => ya.get(x.id) !== JSON.stringify(x)), remove = antes.filter(x => !ids.has(x.id)).map(x => x.id);
+        if (put.length || remove.length) ops[st] = { put, remove };
+      });
+      if (Object.keys(ops).length) {
+        await dbBatch(ops);
+        movimientos = r.movimientos.sort(byFecha); metas = r.metas.sort(byFecha);
+        if (sheet.el.hidden) render(); else recargaPendiente = true;
+      }
+    }
+    await sync.push(movimientos, metas, { dbOk });
+  })().finally(() => { sincronizando = null; });
+  return sincronizando;
+}
+
 async function syncPush() {
   const btn = $('#sync-push');
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
   try {
-    try { await sync.push(movimientos, metas, { dbOk }); }
+    try { await sincronizar(); }
     catch (e) {
       if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
       await sync.push(movimientos, metas, { dbOk, force: true });
     }
-    openSync('Listo: tus pagos y planes ya están en la hoja.');
+    openSync('Listo: este teléfono y la hoja ya tienen lo mismo.');
   } catch (e) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
     openSync();
@@ -1664,7 +1695,7 @@ function sanear(list) {
   for (const x of Array.isArray(list) ? list : []) {
     if (!x || typeof x !== 'object' || typeof x.id !== 'string' || !x.id || ids.has(x.id)) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(x.fecha)) || typeof x.conc !== 'string' || !Number.isFinite(+x.imp) || +x.imp < 0) continue;
-    const pagos = Array.isArray(x.pagos) ? x.pagos.filter(p => p && Number.isFinite(+p.monto) && +p.monto > 0).map(p => ({ fecha: p.fecha || null, monto: +p.monto, ...(p.quien ? { quien: String(p.quien) } : {}) })) : [];
+    const pagos = Array.isArray(x.pagos) ? x.pagos.filter(p => p && Number.isFinite(+p.monto) && +p.monto > 0).map(p => ({ fecha: p.fecha || null, monto: +p.monto, ...(p.quien ? { quien: String(p.quien) } : {}), ...(Number.isFinite(+p.t) && +p.t > 0 ? { t: +p.t } : {}) })) : [];
     ids.add(x.id);
     ok.push({ ...x, imp: +x.imp, pagos, abo: r2(pagos.reduce((t, p) => t + p.monto, 0)) });
   }
@@ -1769,6 +1800,11 @@ async function applyImport() {
       return stamp({ ...(conservar ? { ...x, pagos: ya.pagos, abo: ya.abo } : x), ...(ya.serie && !x.serie ? { serie: ya.serie, repite: ya.repite, freq: ya.freq, fin: ya.fin } : {}), createdAt: ya.createdAt });
     });
     await dbBatch({ movimientos: { clear: replace, put: unir(p.movimientos, movimientos) }, metas: { clear: replace, put: unir(p.metas, metas) } });
+    if (replace) {
+      const b = sync.borrados(), traen = new Set([...p.movimientos.map(x => 'movimientos:' + x.id), ...p.metas.map(x => 'metas:' + x.id)]);
+      [...movimientos.map(x => 'movimientos:' + x.id), ...metas.map(x => 'metas:' + x.id)].forEach(k => { if (!traen.has(k)) b[k] = now; });
+      sync.guardarBorrados(b);
+    }
     movimientos = (await db.all('movimientos')).sort(byFecha);
     metas = (await db.all('metas')).sort(byFecha);
     autoSync();
@@ -1782,6 +1818,7 @@ async function applyImport() {
 async function undoImport(snap) {
   try {
     await dbBatch({ movimientos: { clear: true, put: snap.mov }, metas: { clear: true, put: snap.met } });
+    sync.quitarBorrado([...snap.mov.map(x => `movimientos:${x.id}`), ...snap.met.map(x => `metas:${x.id}`)]);
   } catch (e) {
     return toast('No se pudo deshacer');
   }
@@ -1942,13 +1979,13 @@ document.addEventListener('click', async e => {
     case 'abono-del': {
       const { kind, id, idx } = sheet.ctx;
       const m = listOf(kind).find(x => x.id === id);
-      if (m && m.pagos && m.pagos[idx]) { m.pagos.splice(idx, 1); syncAbo(m); finish(kind, m, kind === 'meta' ? 'Ahorro eliminado' : 'Abono eliminado'); }
+      if (m && m.pagos && m.pagos[idx]) { const [q] = m.pagos.splice(idx, 1); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); finish(kind, m, kind === 'meta' ? 'Ahorro eliminado' : 'Abono eliminado'); }
       break;
     }
     case 'reopen': {
       const { kind, id } = sheet.ctx;
       const m = listOf(kind).find(x => x.id === id);
-      if (m && m.pagos && m.pagos.length) { m.pagos.pop(); syncAbo(m); const ok = await persist(kind, m); closeSheet(); render(); toast(ok ? 'Último abono deshecho' : 'No se pudo guardar en este dispositivo'); }
+      if (m && m.pagos && m.pagos.length) { const q = m.pagos.pop(); if (q.t) sync.marcarBorrado(`p:${q.t}`); syncAbo(m); const ok = await persist(kind, m); closeSheet(); render(); toast(ok ? 'Último abono deshecho' : 'No se pudo guardar en este dispositivo'); }
       break;
     }
     case 'edit': openForm(sheet.ctx.kind, sheet.ctx.id); break;

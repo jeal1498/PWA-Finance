@@ -93,7 +93,7 @@ function fromJSON(text, cats) {
     if (imp == null || imp < 0 || (kind === 'pago' && imp === 0)) return out.skipped.push({ where: `${where} (${conc})`, reason: 'Importe no válido' });
     let pagos;
     if (Array.isArray(x.pagos)) {
-      pagos = x.pagos.map((p) => ({ fecha: p && p.fecha ? parseDate(p.fecha) : null, monto: r2(parseAmount(p && p.monto) || 0), ...(p && p.quien ? { quien: String(p.quien) } : {}) })).filter((p) => p.monto > 0);
+      pagos = x.pagos.map((p) => ({ fecha: p && p.fecha ? parseDate(p.fecha) : null, monto: r2(parseAmount(p && p.monto) || 0), ...(p && p.quien ? { quien: String(p.quien) } : {}), ...(p && Number.isFinite(+p.t) && +p.t > 0 ? { t: +p.t } : {}) })).filter((p) => p.monto > 0);
     } else {
       const abo = parseAmount(x.abo) || 0;
       pagos = abo > 0 ? [{ fecha: null, monto: r2(abo) }] : [];
