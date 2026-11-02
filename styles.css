@@ -363,7 +363,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 
 /* ---------- Más opciones, importar y exportar ---------- */
 .menu { display: grid; gap: 4px; margin-top: 4px; }
-.menu-row { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 8px 14px; border: 0; border-radius: 14px; background: none; text-align: left; color: var(--ink); }
+.menu-row { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 8px 14px; border: 0; border-radius: 14px; background: none; text-align: center; color: var(--ink); }
 .menu-row:active { background: var(--surface-2); }
 @media (hover: hover) { .menu-row:hover { background: var(--surface-2); } }
 .menu-row b { display: block; font-size: 16px; font-weight: 600; }
@@ -527,7 +527,7 @@ body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .pt-sort.on { color: var(--ink); }
 .pt-sort.desc .ic { transform: rotate(180deg); }
 
-.pt-row { align-items: center; padding-block: 10px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; color: inherit; font-family: var(--sans); cursor: pointer; }
+.pt-row { align-items: center; padding-block: 10px; border: 0; border-top: 1px solid var(--line); background: none; text-align: center; color: inherit; font-family: var(--sans); cursor: pointer; }
 .pt-th + .pt-row { border-top: 0; }
 .pt-row.v { background: var(--danger-bg); }
 .pt-row:active { background: var(--surface-2); }
@@ -992,11 +992,12 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 
 
 /* Gasto rápido (+): monto grande, concepto y categorías en mosaicos con ícono */
-.q-meta { margin: 0; text-align: right; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sheet-head h2:has(.q-meta) { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.q-meta { margin: 0; font-weight: 400; text-align: right; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .qform { display: flex; flex-direction: column; gap: 8px; }
 .q-monto { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 4px 0; }
 .q-monto span { font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 26px; color: var(--muted); }
-.qform .q-monto input { width: 7ch; max-width: 100%; height: auto; min-height: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; text-align: left; font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 44px; line-height: 1.1; color: var(--ink); }
+.qform .q-monto input { width: 1ch; max-width: 100%; height: auto; min-height: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; text-align: center; font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 44px; line-height: 1.1; color: var(--ink); }
 .qform .q-monto input:focus { outline: none; box-shadow: none; }
 .qform .q-monto input::placeholder { color: rgba(244, 244, 239, .25); }
 .q-lab { margin: 2px 0 -2px; font-family: var(--font-data); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
