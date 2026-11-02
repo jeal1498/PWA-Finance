@@ -990,3 +990,24 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .ap-bal b { color: var(--ink); font-weight: 600; }
 .ap-cv { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
 
+
+/* Gasto rápido (+): monto grande, concepto y categorías en mosaicos con ícono */
+.q-meta { margin: 0; text-align: right; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.qform { display: flex; flex-direction: column; gap: 8px; }
+.q-monto { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 4px 0; }
+.q-monto span { font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 26px; color: var(--muted); }
+.qform .q-monto input { width: 7ch; max-width: 100%; height: auto; min-height: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; text-align: left; font-family: var(--font-display, 'Bricolage Grotesque', sans-serif); font-weight: 800; font-size: 44px; line-height: 1.1; color: var(--ink); }
+.qform .q-monto input:focus { outline: none; box-shadow: none; }
+.qform .q-monto input::placeholder { color: rgba(244, 244, 239, .25); }
+.q-lab { margin: 2px 0 -2px; font-family: var(--font-data); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.q-cats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.q-cat { position: relative; display: flex; margin: 0; cursor: pointer; }
+.q-cat input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.q-cat span { width: 100%; height: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; border-radius: 12px; border: 1.5px solid #3A3A45; color: #C9C9C2; font-size: 10.5px; font-weight: 500; line-height: 1.1; }
+.q-cat .ic { width: 18px; height: 18px; }
+.q-cat .mono { width: 18px; height: 18px; font-size: 10px; }
+.q-cat input:checked + span { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.q-cat input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+.qform .form-error { min-height: 0; margin: 0; }
+.q-link { align-self: center; padding: 0 0 1px; border: 0; border-bottom: 1px solid #3A3A45; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.q-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }

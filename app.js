@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v134';
+const APP_VERSION = 'v135';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -865,7 +865,6 @@ function submitAbono() {
 }
 
 /* ----- Agregar movimiento: (+) ----- */
-const hasPending = () => movimientos.some(m => m.imp > 0 && m.abo < m.imp);
 const isDirty = () => { const c = sheet.ctx; return !!(c && c.type === 'form' && !c.id && ($('#f-conc').value.trim() || $('#f-imp').value)); };
 function dismissDiscard() { const b = $('#discard'); if (b) b.remove(); const f = $('#f-conc'); if (f) f.focus(); }
 function askDiscard(onYes) {
@@ -938,6 +937,44 @@ function openPayDetail(id) {
     ${abonoFormHTML(i.pend)}
     ${historialHTML(m)}`);
   sheet.panel.focus({ preventScroll: true });
+}
+
+/* ----- Gasto rápido: (+) anota algo que ya se pagó hoy ----- */
+function openQuick() {
+  const last = lsGet(KEYS.cat), sel = CATS.some(c => catString(c) === last) ? catLabelOf(last) : CATS[0].id;
+  const dia = `${DIAS[HOY.getDay()].slice(0, 3)} ${HOY.getDate()} ${MESES_CORTO[HOY.getMonth()]}`;
+  sheet.ctx = { type: 'quick' };
+  openSheet('Gasto de hoy', `<p class="q-meta">${dia} · pagado</p>
+    <form id="quick-form" class="qform" novalidate>
+      <div class="q-monto"><span aria-hidden="true">$</span><input id="q-imp" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Monto"></div>
+      <label class="q-lab" for="q-conc">Concepto</label>
+      <label class="fld" for="q-conc"><input id="q-conc" type="text" autocomplete="off" placeholder="Ej. Tacos"></label>
+      <span class="q-lab" id="q-cat-l">Categoría</span>
+      <div class="q-cats" role="radiogroup" aria-labelledby="q-cat-l">${CATS.map(c => `<label class="q-cat"><input type="radio" name="q-cat" value="${c.id}"${c.id === sel ? ' checked' : ''}><span>${catIcon(c)}${esc(c.id)}</span></label>`).join('')}</div>
+      <p class="form-error" id="q-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary">Guardar gasto</button>
+      <button type="button" class="q-link" data-action="quick-prog">Programar un pago futuro</button>
+    </form>`);
+  $('#q-imp').focus({ preventScroll: true });
+}
+
+/* Guarda el gasto ya pagado (fecha de hoy) y deja la hoja lista para anotar el siguiente. */
+async function submitQuick() {
+  const imp = r2(parseFloat($('#q-imp').value.replace(',', '.')));
+  if (!(imp > 0)) { formError('q-error', 'q-imp', 'Escribe el monto.'); return; }
+  const cat = catString(CATS.find(c => c.id === $('input[name=q-cat]:checked').value));
+  const escrito = $('#q-conc').value.trim() || 'Gasto', hoy = toISO(HOY), now = Date.now();
+  /* Si el nombre ya existe, se conserva como estaba escrito (mayúsculas y acentos). */
+  const conc = (sugerencias(escrito).find(x => llave(x.nombre) === llave(escrito)) || { nombre: escrito }).nombre;
+  const item = { id: String(now), fecha: hoy, cat, conc, imp, abo: imp, pagos: [{ fecha: hoy, monto: imp, quien: quienDef(), t: now }] };
+  movimientos.push(item); movimientos.sort(byFecha);
+  lsSet(KEYS.cat, cat);
+  const ok = await persist(item);
+  reveal(item); render();
+  $('#q-imp').value = ''; $('#q-conc').value = ''; $('#q-error').textContent = '';
+  $$('[aria-invalid]', sheet.body).forEach(el => el.removeAttribute('aria-invalid'));
+  $('#q-imp').focus();
+  toast(ok ? `Guardado: ${conc} ${fmtMoney(imp)}` : 'No se pudo guardar en este dispositivo');
 }
 
 /* ----- Formulario ----- */
@@ -1767,7 +1804,7 @@ document.addEventListener('click', async e => {
     case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
-      openAdd(t.dataset.mode || (hasPending() ? 'pay' : 'new'));
+      if (t.dataset.mode) openAdd(t.dataset.mode); else openQuick();
       break;
     }
     case 'add-mode': {
@@ -1776,6 +1813,7 @@ document.addEventListener('click', async e => {
       askDiscard(() => openAdd(mode));
       break;
     }
+    case 'quick-prog': openForm(null); break;
     case 'discard-no': dismissDiscard(); break;
     case 'discard-yes': { const go = sheet.discard; $('#discard').remove(); if (go) go(); break; }
     case 'pay-pick': openPayDetail(t.dataset.id); break;
@@ -1870,7 +1908,16 @@ document.addEventListener('click', async e => {
   }
 });
 
-document.addEventListener('input', e => { if (e.target.id === 'f-conc') pintarSugerencias(); });
+document.addEventListener('input', e => {
+  if (e.target.id === 'f-conc') pintarSugerencias();
+  if (e.target.id === 'q-imp') e.target.value = e.target.value.replace(/[^\d.,]/g, '');
+  /* Gasto rápido: si el nombre ya existe, se marca la categoría que ya tenía. */
+  if (e.target.id === 'q-conc') {
+    const s = sugerencias(e.target.value).find(x => llave(x.nombre) === llave(e.target.value));
+    const r = s && $(`input[name=q-cat][value="${catOf(s.cat).id}"]`);
+    if (r) r.checked = true;
+  }
+});
 
 document.addEventListener('change', e => {
   if (['f-rep', 'f-fecha', 'f-fin', 'f-imp', 'f-paid'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
@@ -1885,6 +1932,7 @@ document.addEventListener('change', e => {
 
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
+  else if (e.target.id === 'quick-form') { e.preventDefault(); submitQuick(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
   else if (e.target.id === 'sync-form') { e.preventDefault(); syncSave(e.target); }
