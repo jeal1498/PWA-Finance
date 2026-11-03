@@ -1041,3 +1041,7 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .an-hero-n b { font-family: var(--font-title); font-weight: 800; font-size: 30px; line-height: 1.05; letter-spacing: -.02em; }
 .an-more { align-self: flex-start; margin-top: 8px; padding: 0 0 1px; border: 0; border-bottom: 1px solid #3A3A45; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
 .an-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+
+/* Tablet: ocupa todo el ancho y agranda todo en proporción (misma vista que el teléfono). */
+@media (min-width: 768px) { .app { max-width: none; zoom: 1.3; } }
+@media (min-width: 1000px) { .app { zoom: 1.6; } }
