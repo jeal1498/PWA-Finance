@@ -1058,22 +1058,23 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .mini-sw[aria-checked="true"]::after { transform: translateX(18px); background: var(--on-ink); }
 .mini-sw:disabled { opacity: .35; cursor: default; }
 
-/* Provisional: ¡Pagar ya!, cifras del mes, Día | Semana y calendario con pliegue. */
-.pv-ya, .pv-mes, .pv-per > div { background: var(--surface); border-radius: 16px; box-shadow: inset 0 0 0 1px #3A3A45; }
-.pv-ya { height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; margin-top: 8px; }
-.pv-ya b { font-family: var(--font-title); font-weight: 800; font-size: 30px; line-height: 1.05; letter-spacing: -.03em; }
+/* Provisional: mismas medidas que Pagos y Apartar (54 px); los mosaicos son filtros. */
+.pv-ya, .pv-mes, .pv-t { background: var(--surface); border-radius: 16px; box-shadow: inset 0 0 0 1px #3A3A45; color: var(--ink); font: inherit; border: 0; }
+.pv-ya { width: 100%; height: 54px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; padding: 0 14px; }
+.pv-ya b { font-family: var(--font-title); font-weight: 800; font-size: 22px; line-height: 1.15; letter-spacing: -.03em; }
 .pv-l { font-family: var(--font-data); font-weight: 600; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
 .pv-l.danger { color: var(--danger-text); }
-.pv-mes { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr); align-items: center; height: 78px; margin-top: 8px; text-align: center; }
-.pv-mes > i { height: 34px; background: var(--line); }
-.pv-mes > div { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
-.pv-mes .pv-l { font-size: 9.5px; letter-spacing: .1em; }
-.pv-mes b { font-family: var(--font-title); font-weight: 800; font-size: 19px; line-height: 1.1; letter-spacing: -.03em; }
-.pv-mes .ok .pv-l { color: var(--ok); } .pv-mes .warn .pv-l { color: var(--warn); }
+.pv-mes { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr); align-items: stretch; height: 54px; margin-top: 8px; text-align: center; }
+.pv-mes > i { align-self: center; height: 26px; background: var(--line); }
+.pv-c { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; padding: 0 4px; border: 0; border-radius: 16px; background: none; color: var(--ink); font: inherit; }
+.pv-c .pv-l { font-size: 9.5px; letter-spacing: .1em; line-height: 1.2; }
+.pv-c b { font-family: var(--font-title); font-weight: 800; font-size: 19px; line-height: 1.15; letter-spacing: -.03em; }
+.pv-c.ok .pv-l { color: var(--ok); } .pv-c.warn .pv-l { color: var(--warn); }
 .pv-per { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
-.pv-per > div { height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-.pv-per b { font-size: 14px; font-weight: 700; line-height: 1.2; }
-.pv-per span { font-family: var(--font-data); font-weight: 700; font-size: 19px; line-height: 1.2; letter-spacing: -.04em; }
+.pv-t { height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.pv-t b { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.pv-t span { font-family: var(--font-data); font-weight: 700; font-size: 19px; line-height: 1.2; letter-spacing: -.04em; }
+.pv-ya[aria-pressed="true"], .pv-t[aria-pressed="true"], .pv-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
 .cal-grid.wk { padding: 4px 6px 0; }
 .cal-grid.wk .cal-d { height: 46px; gap: 2px; }
 .cal-d .cal-wd { line-height: 12px; }

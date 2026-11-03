@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v153';
+const APP_VERSION = 'v154';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -276,6 +276,7 @@ const state = {
   /* Pagar: tabla o calendario del mes (y el día elegido en el calendario). */
   calDia: '',
   provMes: false,
+  provF: [],
   provOff: 0
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
@@ -612,17 +613,20 @@ function renderProvisional() {
   const lim = diasHastaDomingo();
   const sem = fut.filter(m => daysFromToday(m.date) <= lim).reduce((t, m) => t + m.pendiente, 0);
   const $$m = n => fmtMoney(Math.round(n));
+  const F = state.provF, on = k => F.includes(k);
+  const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
   $('#kpi-dash').innerHTML = `
-    <div class="pv-ya"><span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b></div>
-    <div class="pv-mes"><div class="ok"><span class="pv-l">PAGADO</span><b>${$$m(abo)}</b></div><i aria-hidden="true"></i><div class="warn"><span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b></div></div>
-    <div class="pv-per"><div><b>Día</b><span>${$$m(dia)}</span></div><div><b>Semana</b><span>${$$m(sem)}</span></div></div>`;
+    ${btn('ya', 'pv-ya', `<span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b>`, 'Pagar ya: mostrar atrasados y lo de hoy')}
+    <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo que falta por pagar')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
+    <div class="pv-per">${btn('dia', 'pv-t', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: pendientes con fecha futura')}${btn('semana', 'pv-t', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: lo que vence hasta el domingo')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
+  const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
   let cal;
   if (state.provMes) {
     cal = calendarioHTML(b, `<button type="button" class="cal-fold up" data-action="prov-mes" aria-label="Ver solo la semana">${FOLD_ARROW}</button>`);
   } else {
-    const lun = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), dom = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() + 6);
+    const lun = lunes, dom = domingo;
     const todos = movimientos.map(procesar), hoy = toISO(HOY);
     const cells = [];
     for (let i = 0; i < 7; i++) {
@@ -634,8 +638,11 @@ function renderProvisional() {
     cal = `<div class="pt cal"><div class="cal-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="cal-grid wk">${cells.join('')}</div><button type="button" class="cal-fold" data-action="prov-mes" aria-label="Ver mes completo">${FOLD_ARROW}</button></div>`;
   }
   if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
-  if (base.length) { $('#list').innerHTML = cal + pagosTable(b, false); return; }
-  $('#list').innerHTML = cal + `<div class="empty"><strong>Nada en ${MESES[state.month.month].toLowerCase()}</strong>Agrega el primer pago de este mes.<button type="button" class="btn btn-primary" data-action="add" data-mode="new">Anotar pago</button></div>`;
+  /* Sin mosaico encendido: lo que entra en el calendario a la vista (semana o mes). «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
+  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 && d <= lim : true; };
+  const items = F.includes('total') ? base : F.length ? base.filter(m => F.some(f => pasa(m, f))) : state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  if (items.length) { $('#list').innerHTML = cal + pagosTable({ base, items }, false); return; }
+  $('#list').innerHTML = cal + `<div class="empty"><strong>${F.length || state.provMes ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length ? 'Prueba con otro mosaico.' : 'Toca el mes para ver todos o anota un pago.'}</div>`;
 }
 
 function renderList(groups, caption, countText, emptyKind, baseEmpty) {
@@ -1725,6 +1732,7 @@ function setView(v) {
   state.view = v;
   lsSet(KEYS.view, v);
   state.filter = [];
+  state.provF = [];
   state.search = '';
   $('#search').value = '';
   $('#search-bar').hidden = true;
@@ -1806,6 +1814,7 @@ document.addEventListener('click', async e => {
     case 'resumen': state.calDia = ''; state.filter = []; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
+    case 'prov-f': { state.calDia = ''; const f = t.dataset.f; state.provF = f === 'total' ? (state.provF.includes('total') ? [] : ['total']) : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF.filter(x => x !== 'total'), f]; render(); break; }
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
     case 'prov-sem': state.provOff += Number(t.dataset.d); state.calDia = ''; render(); break;
     case 'apartar-prev': state.apPrev = !state.apPrev; renderApartar(); break;
