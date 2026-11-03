@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v185';
+const APP_VERSION = 'v186';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -178,6 +178,18 @@ function autoSync() {
     try { await sincronizar(); }
     catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); }
   }, 4000);
+}
+/* Sincronización automática (si «Sincronizar sola» está encendido): al abrir y al volver a la app, cada 2 minutos con la app a la vista,
+   y al cerrar una hoja. No corre con una hoja abierta ni sin internet; el envío tras cada cambio es autoSync(). */
+let ultimoAuto = 0;
+async function autoSincronizar() {
+  const cfg = sync.getCfg();
+  if (!cfg.auto || !sync.connection() || !dbOk) return;
+  if (document.hidden || !sheet.el.hidden || sincronizando || navigator.onLine === false) return;
+  if (Date.now() - ultimoAuto < 15000) return;
+  ultimoAuto = Date.now();
+  try { await sincronizar(); }
+  catch (e) { if (navigator.onLine !== false) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); } }
 }
 /* Varias pestañas: cada cambio avisa a las demás para que vuelvan a leer la base (si no, la que quedó vieja pisaría los abonos). */
 const canal = typeof BroadcastChannel === 'function' ? new BroadcastChannel('finanzas-datos') : null;
@@ -713,6 +725,7 @@ function closeSheet() {
   if (state.view === 'provisional') renderProvisional();
   if (state.view === 'calendario') renderCalendario();
   if (recargaPendiente) recargarDatos();
+  setTimeout(autoSincronizar, 500);
 }
 
 let toastTimer;
@@ -1437,7 +1450,7 @@ function openSync(note) {
       ${cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : msg}
       <button type="button" class="btn btn-primary" data-action="sync-push" id="sync-push">Sincronizar ahora</button>
     </div>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>${msg}`}
-    <label class="switch-row s-auto" for="sync-auto"><span>Sincronizar sola tras cada cambio</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
+    <label class="switch-row s-auto" for="sync-auto"><span>Sincronizar sola (al abrir, cada 2 min y tras cada cambio)</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
     <button type="button" class="acc" data-action="acc" aria-expanded="${!conn}" aria-controls="acc-conn"><b>Conexión</b><span>URL y clave ›</span></button>
     <div class="acc-p" id="acc-conn"${conn ? ' hidden' : ''}>${form}</div>
     ${conn ? `<button type="button" class="s-link" data-action="sync-pull">Traer de la hoja</button>
@@ -1908,7 +1921,10 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Inicio
    ========================================================= */
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); autoSincronizar(); } });
+setInterval(autoSincronizar, 120000);
+addEventListener('online', autoSincronizar);
+setTimeout(autoSincronizar, 2000);
 (function programarMedianoche() {
   const sig = new Date(); sig.setHours(24, 0, 5, 0);
   setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
