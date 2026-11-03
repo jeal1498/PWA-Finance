@@ -726,8 +726,8 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .list-head { display: none; }
 
 /* Barra de 5 secciones y botón «+» como burbuja flotante. */
-.bottom-nav-inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); }
-.nav-btn { font-size: 11px; letter-spacing: -.01em; }
+.bottom-nav-inner { grid-template-columns: repeat(3, minmax(0, 1fr)) 64px repeat(3, minmax(0, 1fr)); }
+.nav-btn { font-size: 10px; letter-spacing: -.02em; }
 .nav-add { justify-self: center; width: 52px; height: 52px; margin-top: -24px; border: 4px solid var(--bg); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); }
 
 /* Frecuencia de repetición */
