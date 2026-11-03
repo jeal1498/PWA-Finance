@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v151';
+const APP_VERSION = 'v152';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -265,6 +265,7 @@ const state = {
   view: vista0,
   filter: [],
   apYa: true,
+  apPrev: true,
   apLista: true,
   grouping: lsGet(KEYS.group) === 'urgencia' ? 'urgencia' : 'categoria',
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
@@ -1075,13 +1076,14 @@ function renderPerfil() {
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
    (solo los próximos 30 días). Monto ÷ periodos completos que faltan; atrasados y de hoy van aparte. */
 /* Apartar mira los próximos 15 días corridos (pagos). */
-const APARTAR_DIAS = 15;
-const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quince', '15 Días', 15]];
+/* Ventana: lo que falta del mes en curso, mínimo 15 días. */
+const apDias = () => Math.max(15, daysFromToday(new Date(HOY.getFullYear(), HOY.getMonth() + 1, 0)));
+const APARTAR = [['dia', 'Día', 1], ['semana', 'Semana', 7], ['quince', 'Mes', 0]];
 /* Semana = la del calendario (lunes a domingo) y «15 Días» = 15 días corridos desde hoy: suman el monto completo de lo que vence en ese lapso; «Día» reparte entre los días que faltan. */
 const APARTAR_FILAS = 20;
 const diasHastaDomingo = () => (7 - HOY.getDay()) % 7;
 function apartarItems() {
-  return movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, pend: m.pendiente })).map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= APARTAR_DIAS).sort((a, c) => a.date - c.date);
+  return movimientos.map(procesar).filter(m => m.pendiente > 0).map(m => ({ ...m, pend: m.pendiente })).map(m => ({ ...m, d: daysFromToday(m.date) })).filter(m => m.d <= apDias()).sort((a, c) => a.date - c.date);
 }
 const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / len)));
 
@@ -1093,18 +1095,21 @@ const desglose = lista => plural(lista.length, 'pago', 'pagos');
 function datosFondoApartar() {
   const all = apartarItems(), fut = all.filter(m => m.d > 0);
   const k = (APARTAR.find(p => p[0] === state.apartar) || APARTAR[0])[0];
-  const lim = k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : APARTAR_DIAS;
+  const lim = k === 'semana' ? diasHastaDomingo() : apDias();
   const meta = k === 'dia' ? fut.reduce((t, m) => t + apartarMonto(m, 1), 0) : fut.filter(m => m.d <= lim).reduce((t, m) => t + m.pend, 0);
   const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= APARTAR_DIAS) || m.estado === 'Vencido');
+  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= apDias()) || m.estado === 'Vencido');
   const pct = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
-  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'A 15 DÍAS'}`, meta, dias: APARTAR_DIAS, pct, porv: all.filter(m => m.d >= 0).length };
+  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'DEL MES'}`, meta, dias: apDias(), pct, porv: all.filter(m => m.d >= 0).length };
 }
 
 function renderApartar() {
-  const all = apartarItems(), ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
+  const inicioMes = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
+  const todos = apartarItems(), hayPrev = todos.some(m => m.d < 0 && m.date < inicioMes);
+  const all = state.apPrev || !hayPrev ? todos : todos.filter(m => !(m.d < 0 && m.date < inicioMes));
+  const ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
   const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
-  const limite = k => k === 'semana' ? diasHastaDomingo() : k === 'quince' ? 15 : APARTAR_DIAS;
+  const limite = k => k === 'semana' ? diasHastaDomingo() : apDias();
   const enPer = (m, k) => m.d <= limite(k);
   const lista = fut.filter(m => enPer(m, per[0]));
   const monto = m => per[0] === 'dia' ? apartarMonto(m, 1) : m.pend;
@@ -1115,11 +1120,11 @@ function renderApartar() {
   const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0] && state.apLista}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>
-    <button type="button" class="kpi-ya${ya.length ? '' : ' ok'}" data-action="apartar-ya" aria-pressed="${state.apYa}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></button>`;
+    <div class="kpi-ya${ya.length ? '' : ' ok'}${state.apYa ? ' on' : ''}"><button type="button" class="kpi-ya-main" data-action="apartar-ya" aria-pressed="${state.apYa}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></button><button type="button" role="switch" class="mini-sw" data-action="apartar-prev" aria-checked="${hayPrev && state.apPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
-  if (!lista.length && !ya.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'dia' ? 'No hay pagos pendientes con fecha futura.' : per[0] === 'semana' ? 'Nada más vence esta semana.' : 'Nada vence en los próximos 15 días.'}</div>`; return; }
+  if (!lista.length && !ya.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'dia' ? 'No hay pagos pendientes con fecha futura.' : per[0] === 'semana' ? 'Nada más vence esta semana.' : 'Nada vence en lo que resta del mes.'}</div>`; return; }
   const head = [['Fecha', ''], ['Est.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
   /* Primero los atrasados (y lo que vence hoy), del más antiguo al más reciente, con el monto completo que falta; luego el periodo normal. */
   /* La tabla muestra como máximo APARTAR_FILAS renglones (atrasados primero); los totales siguen contando todo. */
@@ -1144,7 +1149,7 @@ function renderApartar() {
     <span class="pt-amt"><b>${fmtMoney(monto(m))}</b></span>
   </button>`;
   }).join('');
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en 15 días'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${APARTAR_DIAS} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>`;
+  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en el mes'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${apDias()} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>`;
 }
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
@@ -1746,6 +1751,7 @@ document.addEventListener('click', async e => {
     case 'resumen': state.calDia = ''; state.filter = []; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
+    case 'apartar-prev': state.apPrev = !state.apPrev; renderApartar(); break;
     case 'apartar-ya': state.apYa = !state.apYa; renderApartar(); break;
     case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
