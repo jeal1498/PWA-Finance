@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v174';
+const APP_VERSION = 'v175';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -615,8 +615,9 @@ function renderProvisional() {
   const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const dia = fut.reduce((t, m) => t + Math.ceil(m.pendiente / daysFromToday(m.date)), 0);
-  /* Semana: cada pendiente se reparte entre las semanas (de 7 días, hacia arriba) que faltan para su fecha. */
-  const sem = fut.reduce((t, m) => t + Math.ceil(m.pendiente / Math.ceil(daysFromToday(m.date) / 7)), 0);
+  /* Semana: lo que vence de mañana al domingo (semana lunes–domingo), el monto completo que falta de cada pago. */
+  const limSem = diasHastaDomingo(), enSemana = m => m.pendiente > 0 && daysFromToday(m.date) > 0 && daysFromToday(m.date) <= limSem;
+  const sem = base.filter(enSemana).reduce((t, m) => t + m.pendiente, 0);
   const $$m = n => fmtMoney(Math.round(n));
   /* Sin atrasados, ¡Pagar ya! se atenúa y no se puede encender; Pendiente enciende solo Por vencer. */
   const yaVacio = !ya.length;
@@ -631,14 +632,15 @@ function renderProvisional() {
     <div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Atrasados: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">ATRASADOS</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
-    <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: ver el monto a apartar por día')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: ver el monto a apartar por semana')}</div>`;
+    <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: ver el monto a apartar por día')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: mostrar lo que vence de mañana al domingo')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Inicio'; $('#list-count').textContent = '';
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
   const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'porvencer' ? m.pendiente > 0 && d > 0 : true; };
   let items = F.length ? base.filter(m => F.some(f => pasa(m, f))) : base;
-  /* Día y Semana no filtran: con uno elegido, el monto de cada pendiente futuro es lo que hay que apartar por día o por semana hasta su fecha. */
-  if (per) items = items.map(m => { const d = daysFromToday(m.date); return m.pendiente > 0 && d > 0 ? { ...m, ap: Math.ceil(m.pendiente / (per === 'dia' ? d : Math.ceil(d / 7))) } : m; });
+  /* Semana filtra: solo lo que vence de mañana al domingo, con su monto completo. Día no filtra: el monto de cada pendiente futuro es lo que hay que apartar por día hasta su fecha. */
+  if (per === 'semana') items = items.filter(enSemana);
+  if (per === 'dia') items = items.map(m => { const d = daysFromToday(m.date); return m.pendiente > 0 && d > 0 ? { ...m, ap: Math.ceil(m.pendiente / d) } : m; });
   if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
   $('#list').innerHTML = `<div class="empty"><strong>Sin pagos</strong>${F.length ? 'Prueba con otro mosaico.' : 'Anota un pago con el botón +.'}</div>`;
 }
