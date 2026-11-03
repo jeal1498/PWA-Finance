@@ -1095,3 +1095,19 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pt-pa { display: inline-grid; grid-template-columns: auto auto; column-gap: 6px; row-gap: 1px; justify-items: end; align-items: baseline; }
 .pt-pa em { font-style: normal; font-size: 10.5px; font-weight: 500; color: var(--muted); letter-spacing: -.03em; }
 .pt-pa b { margin: 0; }
+
+/* Provisional: Pendiente (padre) con ¡Pagar ya! y Por vencer debajo, lado a lado. */
+.pv-hijos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.pv-hijos .pv-ya { margin-top: 0; padding: 0 8px 0 0; }
+.pv-hijos .pv-ya-main { flex-direction: column; gap: 2px; }
+.pv-hijos .pv-ya-main b, .pv-v b { font-family: var(--font-title); font-weight: 800; font-size: 19px; line-height: 1.15; letter-spacing: -.03em; }
+.pv-hijos .pv-l { font-size: 9.5px; letter-spacing: .1em; line-height: 1.2; }
+.pv-hijos .mini-sw { width: 36px; height: 22px; }
+.pv-hijos .mini-sw::after { width: 14px; height: 14px; }
+.pv-hijos .mini-sw[aria-checked="true"]::after { transform: translateX(14px); }
+.pv-v { height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--surface); border: 0; border-radius: 16px; box-shadow: inset 0 0 0 1px #3A3A45; color: var(--ink); font: inherit; }
+.pv-v[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.pv-l.warn { color: var(--warn); }
+.pv-mes { padding: 3px; }
+.pv-mes > i { margin: 0; }
+.pv-c { margin: 0; }
