@@ -1171,3 +1171,6 @@ body[data-view="calendario"] .cal-d { font-family: var(--font); font-weight: 700
 body[data-view="calendario"] .cal-d span { font-family: var(--font); }
 body[data-view="calendario"] .cal-head, body[data-view="calendario"] .cal-fold { border-color: rgba(244, 244, 239, .28); }
 body[data-view="calendario"] .cal-tit b { font-family: var(--font); }
+
+/* Día ×N / Semana ×N: el divisor va pequeño junto al nombre. */
+body[data-view="provisional"] .pv-t b small { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
