@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v157';
+const APP_VERSION = 'v158';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -275,8 +275,9 @@ const state = {
   apartar: 'dia',
   /* Pagar: tabla o calendario del mes (y el día elegido en el calendario). */
   calDia: '',
-  provMes: false,
+  provMes: true,
   provF: [],
+  provPer: '',
   provPrev: true,
   provOff: 0
 };
@@ -519,7 +520,7 @@ function pagoRow(m) {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
-    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : i.pend)}</b>${i.done || !(m.abo > 0) ? '' : `<small class="pt-ap">de ${fmtMoney(m.imp)}</small>`}</span>
+    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : m.ap != null ? m.ap : i.pend)}</b>${i.done ? '' : m.ap != null ? `<small class="pt-ap">de ${fmtMoney(i.pend)}</small>` : !(m.abo > 0) ? '' : `<small class="pt-ap">de ${fmtMoney(m.imp)}</small>`}</span>
   </button>`;
 }
 
@@ -618,18 +619,22 @@ function renderProvisional() {
   const $$m = n => fmtMoney(Math.round(n));
   const F = state.provF, on = k => F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
+  const per = state.provPer, btnP = (k, html, lab) => `<button type="button" class="pv-t" data-action="prov-per" data-per="${k}" aria-pressed="${per === k}" aria-label="${lab}">${html}</button>`;
   $('#kpi-dash').innerHTML = `
     <div class="pv-ya${on('ya') ? ' on' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}" aria-label="Pagar ya: mostrar atrasados y lo de hoy"><span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo que falta por pagar')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
-    <div class="pv-per">${btn('dia', 'pv-t', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: apartar por día los pendientes con fecha futura')}${btn('semana', 'pv-t', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: apartar por semana los pendientes con fecha futura')}</div>`;
+    <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: monto a apartar por día para cada pendiente con fecha futura')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: monto a apartar por semana para cada pendiente con fecha futura')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
   const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7)), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
   /* Sin mosaico encendido: los pagos de la semana en curso. «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
-  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 : true; };
-  const items = F.includes('total') ? base : F.length ? base.filter(m => F.some(f => pasa(m, f))) : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'per' ? m.pendiente > 0 && d > 0 : true; };
+  const fs = per ? [...F, 'per'] : F;
+  let items = F.includes('total') ? base : fs.length ? base.filter(m => fs.some(f => pasa(m, f))) : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  /* Con Día o Semana elegido, el monto de cada pendiente futuro es lo que hay que apartar por día o por semana hasta su fecha. */
+  if (per) items = items.map(m => { const d = daysFromToday(m.date); return m.pendiente > 0 && d > 0 ? { ...m, ap: Math.ceil(m.pendiente / (per === 'dia' ? d : Math.ceil(d / 7))) } : m; });
   if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
-  $('#list').innerHTML = `<div class="empty"><strong>${F.length ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length ? 'Prueba con otro mosaico.' : 'Toca «Total del mes» para ver todos.'}</div>`;
+  $('#list').innerHTML = `<div class="empty"><strong>${F.length || per ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length || per ? 'Prueba con otro mosaico.' : 'Toca «Total del mes» para ver todos.'}</div>`;
 }
 
 /* Calendario: semana (con flechas) o mes completo (pliegue), y debajo los pagos de lo que se ve; tocar un día muestra solo los suyos. */
@@ -1752,6 +1757,7 @@ function setView(v) {
   lsSet(KEYS.view, v);
   state.filter = [];
   state.provF = [];
+  state.provPer = '';
   state.calDia = '';
   state.search = '';
   $('#search').value = '';
@@ -1836,6 +1842,7 @@ document.addEventListener('click', async e => {
     case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
     case 'prov-f': { state.calDia = ''; const f = t.dataset.f; state.provF = f === 'total' ? (state.provF.includes('total') ? [] : ['total']) : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF.filter(x => x !== 'total'), f]; render(); break; }
     case 'prov-prev': state.provPrev = !state.provPrev; render(); break;
+    case 'prov-per': state.provPer = state.provPer === t.dataset.per ? '' : t.dataset.per; render(); break;
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
     case 'prov-sem': state.provOff += Number(t.dataset.d); state.calDia = ''; render(); break;
     case 'apartar-prev': state.apPrev = !state.apPrev; renderApartar(); break;
