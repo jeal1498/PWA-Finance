@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v158';
+const APP_VERSION = 'v159';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -617,7 +617,7 @@ function renderProvisional() {
   /* Semana: cada pendiente se reparte entre las semanas (de 7 días, hacia arriba) que faltan para su fecha. */
   const sem = fut.reduce((t, m) => t + Math.ceil(m.pendiente / Math.ceil(daysFromToday(m.date) / 7)), 0);
   const $$m = n => fmtMoney(Math.round(n));
-  const F = state.provF, on = k => F.includes(k);
+  const F = state.provF, on = k => k === 'total' ? !F.length && !state.provPer : F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
   const per = state.provPer, btnP = (k, html, lab) => `<button type="button" class="pv-t" data-action="prov-per" data-per="${k}" aria-pressed="${per === k}" aria-label="${lab}">${html}</button>`;
   $('#kpi-dash').innerHTML = `
@@ -626,15 +626,14 @@ function renderProvisional() {
     <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: monto a apartar por día para cada pendiente con fecha futura')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: monto a apartar por semana para cada pendiente con fecha futura')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
-  const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7)), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
-  /* Sin mosaico encendido: los pagos de la semana en curso. «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
+  /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
   const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'per' ? m.pendiente > 0 && d > 0 : true; };
   const fs = per ? [...F, 'per'] : F;
-  let items = F.includes('total') ? base : fs.length ? base.filter(m => fs.some(f => pasa(m, f))) : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  let items = fs.length ? base.filter(m => fs.some(f => pasa(m, f))) : base;
   /* Con Día o Semana elegido, el monto de cada pendiente futuro es lo que hay que apartar por día o por semana hasta su fecha. */
   if (per) items = items.map(m => { const d = daysFromToday(m.date); return m.pendiente > 0 && d > 0 ? { ...m, ap: Math.ceil(m.pendiente / (per === 'dia' ? d : Math.ceil(d / 7))) } : m; });
   if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
-  $('#list').innerHTML = `<div class="empty"><strong>${F.length || per ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length || per ? 'Prueba con otro mosaico.' : 'Toca «Total del mes» para ver todos.'}</div>`;
+  $('#list').innerHTML = `<div class="empty"><strong>Sin pagos</strong>${F.length || per ? 'Prueba con otro mosaico.' : 'Anota un pago con el botón +.'}</div>`;
 }
 
 /* Calendario: semana (con flechas) o mes completo (pliegue), y debajo los pagos de lo que se ve; tocar un día muestra solo los suyos. */
@@ -1840,7 +1839,7 @@ document.addEventListener('click', async e => {
     case 'resumen': state.calDia = ''; state.filter = []; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
-    case 'prov-f': { state.calDia = ''; const f = t.dataset.f; state.provF = f === 'total' ? (state.provF.includes('total') ? [] : ['total']) : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF.filter(x => x !== 'total'), f]; render(); break; }
+    case 'prov-f': { state.calDia = ''; if (t.dataset.f === 'total') state.provPer = ''; const f = t.dataset.f; state.provF = f === 'total' ? [] : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF.filter(x => x !== 'total'), f]; render(); break; }
     case 'prov-prev': state.provPrev = !state.provPrev; render(); break;
     case 'prov-per': state.provPer = state.provPer === t.dataset.per ? '' : t.dataset.per; render(); break;
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
