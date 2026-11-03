@@ -726,7 +726,8 @@ input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger); }
 .list-head { display: none; }
 
 /* Barra de 5 secciones y botón «+» como burbuja flotante. */
-.bottom-nav-inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 72px minmax(0, 1fr) minmax(0, 1fr); }
+.bottom-nav-inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr); }
+.nav-btn { font-size: 11px; letter-spacing: -.01em; }
 .nav-add { justify-self: center; width: 52px; height: 52px; margin-top: -24px; border: 4px solid var(--bg); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); }
 
 /* Frecuencia de repetición */
@@ -1056,3 +1057,27 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .mini-sw[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
 .mini-sw[aria-checked="true"]::after { transform: translateX(18px); background: var(--on-ink); }
 .mini-sw:disabled { opacity: .35; cursor: default; }
+
+/* Provisional: ¡Pagar ya!, cifras del mes, Día | Semana y calendario con pliegue. */
+.pv-ya, .pv-mes, .pv-per > div { background: var(--surface); border-radius: 16px; box-shadow: inset 0 0 0 1px #3A3A45; }
+.pv-ya { height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; margin-top: 8px; }
+.pv-ya b { font-family: var(--font-title); font-weight: 800; font-size: 30px; line-height: 1.05; letter-spacing: -.03em; }
+.pv-l { font-family: var(--font-data); font-weight: 600; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+.pv-l.danger { color: var(--danger-text); }
+.pv-mes { display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr); align-items: center; height: 78px; margin-top: 8px; text-align: center; }
+.pv-mes > i { height: 34px; background: var(--line); }
+.pv-mes > div { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; }
+.pv-mes .pv-l { font-size: 9.5px; letter-spacing: .1em; }
+.pv-mes b { font-family: var(--font-title); font-weight: 800; font-size: 19px; line-height: 1.1; letter-spacing: -.03em; }
+.pv-mes .ok .pv-l { color: var(--ok); } .pv-mes .warn .pv-l { color: var(--warn); }
+.pv-per { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.pv-per > div { height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.pv-per b { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.pv-per span { font-family: var(--font-data); font-weight: 700; font-size: 19px; line-height: 1.2; letter-spacing: -.04em; }
+.cal-grid.wk { padding: 4px 6px 0; }
+.cal-grid.wk .cal-d { height: 46px; gap: 2px; }
+.cal-d .cal-wd { line-height: 12px; }
+.cal-fold { display: flex; align-items: center; justify-content: center; width: 100%; height: 26px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--muted); }
+.cal-fold .ic { width: 18px; height: 18px; transition: transform .15s; }
+.cal-fold.up .ic { transform: rotate(180deg); }
+.cal span.pt-mes { cursor: default; }
