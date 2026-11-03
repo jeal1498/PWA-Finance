@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v165';
+const APP_VERSION = 'v166';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -279,6 +279,7 @@ const state = {
   provF: [],
   provPer: '',
   provPrev: true,
+  provYaVacio: false,
   provOff: 0
 };
 const isCurrentMonth = () => state.month.year === HOY.getFullYear() && state.month.month === HOY.getMonth();
@@ -617,14 +618,18 @@ function renderProvisional() {
   /* Semana: cada pendiente se reparte entre las semanas (de 7 días, hacia arriba) que faltan para su fecha. */
   const sem = fut.reduce((t, m) => t + Math.ceil(m.pendiente / Math.ceil(daysFromToday(m.date) / 7)), 0);
   const $$m = n => fmtMoney(Math.round(n));
-  const F = state.provF, on = k => k === 'total' ? !F.length : k === 'pend' ? F.includes('ya') && F.includes('porvencer') : F.includes(k);
+  /* Sin atrasados, ¡Pagar ya! se atenúa y no se puede encender; Pendiente enciende solo Por vencer. */
+  const yaVacio = !ya.length;
+  state.provYaVacio = yaVacio;
+  if (yaVacio && state.provF.includes('ya')) state.provF = state.provF.filter(x => x !== 'ya');
+  const F = state.provF, on = k => k === 'total' ? !F.length : k === 'pend' ? (yaVacio || F.includes('ya')) && F.includes('porvencer') : F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
   const per = state.provPer, btnP = (k, html, lab) => `<button type="button" class="pv-t" data-action="prov-per" data-per="${k}" aria-pressed="${per === k}" aria-label="${lab}">${html}</button>`;
   const porV = sum(fut, 'pendiente');
   /* Pendiente es el «padre»: enciende Por vencer y ¡Pagar ya! juntos; cada uno se apaga solo. Pagado + Por vencer + ¡Pagar ya! = Total. Día y Semana solo cambian el monto. */
   $('#kpi-dash').innerHTML = `
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL ${MESES_CORTO[state.month.month].toUpperCase()}</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
-    <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}" aria-label="Pagar ya: mostrar atrasados y lo de hoy"><span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
+    <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Pagar ya: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">¡PAGAR YA!</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
     <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: ver el monto a apartar por día')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: ver el monto a apartar por semana')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
@@ -1840,7 +1845,7 @@ document.addEventListener('click', async e => {
     case 'resumen': state.calDia = ''; state.filter = []; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
     case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
-    case 'prov-f': { state.calDia = ''; const f = t.dataset.f, ya = state.provF.includes('ya'), pv = state.provF.includes('porvencer'); state.provF = f === 'total' ? [] : f === 'pend' ? (ya && pv ? state.provF.filter(x => x !== 'ya' && x !== 'porvencer') : [...new Set([...state.provF, 'ya', 'porvencer'])]) : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF, f]; render(); break; }
+    case 'prov-f': { state.calDia = ''; const f = t.dataset.f, ya = state.provF.includes('ya'), pv = state.provF.includes('porvencer'); state.provF = f === 'total' ? [] : f === 'pend' ? (state.provYaVacio ? (pv ? state.provF.filter(x => x !== 'porvencer') : [...new Set([...state.provF, 'porvencer'])]) : ya && pv ? state.provF.filter(x => x !== 'ya' && x !== 'porvencer') : [...new Set([...state.provF, 'ya', 'porvencer'])]) : state.provF.includes(f) ? state.provF.filter(x => x !== f) : [...state.provF, f]; render(); break; }
     case 'prov-prev': state.provPrev = !state.provPrev; render(); break;
     case 'prov-per': state.provPer = state.provPer === t.dataset.per ? '' : t.dataset.per; render(); break;
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
