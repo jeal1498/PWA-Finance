@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v184';
+const APP_VERSION = 'v185';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -591,14 +591,13 @@ function renderProvisional() {
   if (yaVacio && state.provF.includes('ya')) state.provF = state.provF.filter(x => x !== 'ya');
   const F = state.provF, on = k => !F.length ? !(k === 'ya' && yaVacio) : k === 'total' ? false : k === 'pend' ? (yaVacio || F.includes('ya')) && F.includes('porvencer') : F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
-  const btnP = (k, html, lab) => `<div class="pv-t" role="group" aria-label="${lab}">${html}</div>`;
   const porV = sum(fut, 'pendiente');
   /* Pendiente es el «padre»: enciende Por vencer y ¡Pagar ya! juntos; cada uno se apaga solo. Pagado + Por vencer + ¡Pagar ya! = Total. Día y Semana solo cambian el monto. */
   $('#kpi-dash').innerHTML = `
     <div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Atrasados: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">ATRASADOS</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><span class="pv-sw${hayPrev ? '' : ' off'}"><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button><small>Anteriores</small></span></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
-    <div class="pv-per">${btnP('dia', `<b>Día <small>×${nDias}</small></b><span>${$$m(dia)}</span>`, 'Día: lo pendiente repartido entre ' + nDias + ' días')}${btnP('semana', `<b>Semana <small>×${nSem}</small></b><span>${$$m(sem)}</span>`, 'Semana: lo pendiente repartido entre las ' + nSem + ' semanas del mes')}</div>`;
+    <div class="pv-metas" role="group" aria-label="Metas: lo pendiente repartido entre ${nDias} días y entre ${nSem} semanas"><div><span class="pv-l">Meta diaria <small>×${nDias}</small></span><b>${$$m(dia)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">Meta semanal <small>×${nSem}</small></span><b>${$$m(sem)}</b></div></div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Inicio'; $('#list-count').textContent = '';
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
