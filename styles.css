@@ -1123,3 +1123,8 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pv-ya.vacio { opacity: .55; }
 .pv-hijos .pv-ya.vacio .pv-ya-main b { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
 .pv-ya-main:disabled { cursor: default; }
+
+/* Provisional: fila de mes con flechas arriba (como Pagos). */
+.pv-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; height: 44px; }
+.pv-head .cal-arr { height: 44px; }
+.pv-head .pt-mes { border-bottom: 0; height: 44px; }
