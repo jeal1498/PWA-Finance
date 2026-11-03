@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v181';
+const APP_VERSION = 'v182';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -625,7 +625,7 @@ function renderProvisional() {
   const yaVacio = !ya.length;
   state.provYaVacio = yaVacio;
   if (yaVacio && state.provF.includes('ya')) state.provF = state.provF.filter(x => x !== 'ya');
-  const F = state.provF, on = k => k === 'total' ? !F.length : k === 'pend' ? (yaVacio || F.includes('ya')) && F.includes('porvencer') : F.includes(k);
+  const F = state.provF, on = k => !F.length ? !(k === 'ya' && yaVacio) : k === 'total' ? false : k === 'pend' ? (yaVacio || F.includes('ya')) && F.includes('porvencer') : F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
   const btnP = (k, html, lab) => `<div class="pv-t" role="group" aria-label="${lab}">${html}</div>`;
   const porV = sum(fut, 'pendiente');
