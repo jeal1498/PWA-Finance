@@ -1118,3 +1118,8 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pv-c { background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; border-radius: 16px; }
 .pv-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
 .pv-c .pv-l { white-space: nowrap; }
+
+/* ¡Pagar ya! sin atrasados: atenuado y sin encender. */
+.pv-ya.vacio { opacity: .55; }
+.pv-hijos .pv-ya.vacio .pv-ya-main b { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.pv-ya-main:disabled { cursor: default; }
