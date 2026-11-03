@@ -1137,3 +1137,15 @@ body[data-view="provisional"] .pt-th { background: #22222A; border-bottom-color:
 body[data-view="provisional"] .pt-row, body[data-view="provisional"] .pt-row[data-cat] { background: #22222A; border-top-color: #16161C; }
 body[data-view="provisional"] .pt-row.v, body[data-view="provisional"] .pt-row.v[data-cat] { background: #35242B; }
 body[data-view="provisional"] .pt-foot { background: #22222A; border-top-color: rgba(244, 244, 239, .28); }
+
+/* Provisional · tipografía A: mismas familias, más grandes; los siete mosaicos con la misma cifra (Bricolage 800 · 21 px). */
+body[data-view="provisional"] .pv-l { font-family: var(--font-data); font-weight: 600; font-size: 10.5px; letter-spacing: .08em; line-height: 1.2; }
+body[data-view="provisional"] .pv-c b, body[data-view="provisional"] .pv-hijos .pv-ya-main b, body[data-view="provisional"] .pv-v b, body[data-view="provisional"] .pv-t span { font-family: var(--font-title); font-weight: 800; font-size: 21px; line-height: 1.1; letter-spacing: -.03em; }
+body[data-view="provisional"] .pv-hijos .pv-ya.vacio .pv-ya-main b { font-family: var(--font); font-size: 12px; font-weight: 500; letter-spacing: 0; }
+body[data-view="provisional"] .pv-t b { font-size: 15px; }
+body[data-view="provisional"] .pt-sort { font-size: 10.5px; font-weight: 600; }
+body[data-view="provisional"] .pt-fecha b { font-size: 21px; }
+body[data-view="provisional"] .pt-fecha small { font-size: 11.5px; }
+body[data-view="provisional"] .pt-conc { font-size: 15.5px; }
+body[data-view="provisional"] .pt-nota { font-size: 13.5px; }
+body[data-view="provisional"] .pt-amt b, body[data-view="provisional"] .pt-pa b { font-size: 15.5px; }
