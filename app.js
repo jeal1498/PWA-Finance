@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v177';
+const APP_VERSION = 'v178';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -614,9 +614,9 @@ function renderProvisional() {
   const abo = sum(base, 'abo'), pend = sum(base, 'pendiente'), tot = sum(base, 'imp');
   const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
-  /* Semana: lo pendiente ÷ las semanas (domingo–sábado) que toca el mes. Día: lo pendiente ÷ los días hábiles (lunes a sábado) que aún quedan del mes, contando hoy. Cada pago se reparte igual, hacia arriba. */
-  const y = state.month.year, mo = state.month.month, ultimo = new Date(y, mo + 1, 0).getDate(), primerDow = new Date(y, mo, 1).getDay();
-  const nSem = Math.ceil((primerDow + ultimo) / 7);
+  /* Semana: lo pendiente ÷ 4 (siempre cuatro semanas por mes). Día: lo pendiente ÷ los días hábiles (lunes a sábado) que aún quedan del mes, contando hoy. Cada pago se reparte igual, hacia arriba. */
+  const y = state.month.year, mo = state.month.month, ultimo = new Date(y, mo + 1, 0).getDate();
+  const nSem = 4;
   const desde = (y === HOY.getFullYear() && mo === HOY.getMonth()) ? HOY.getDate() : (y * 12 + mo > HOY.getFullYear() * 12 + HOY.getMonth() ? 1 : ultimo + 1);
   let nDias = 0; for (let dd = desde; dd <= ultimo; dd++) if (new Date(y, mo, dd).getDay() !== 0) nDias++;
   const delDia = m => Math.ceil(m.pendiente / nDias), delSem = m => Math.ceil(m.pendiente / nSem);
