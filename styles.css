@@ -1179,3 +1179,8 @@ body[data-view="provisional"] .pv-t b small { font-size: 10.5px; font-weight: 60
 .pv-sw { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
 .pv-sw small { font-size: 9px; font-weight: 600; letter-spacing: 0; color: var(--muted); line-height: 1; }
 .pv-sw.off { opacity: .6; }
+
+/* Inicio: el contorno al seleccionar repite el color de cada mosaico (Pagado verde, Pendiente y Por vencer amarillo, Atrasados rojo, Total blanco). */
+body[data-view="provisional"] .pv-c.ok[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ok); }
+body[data-view="provisional"] .pv-c.warn[aria-pressed="true"], body[data-view="provisional"] .pv-v[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--warn); }
+body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--danger); }
