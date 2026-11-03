@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v148';
+const APP_VERSION = 'v149';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -263,7 +263,9 @@ const VISTAS = ['gastos', 'apartar', 'analisis', 'perfil'];
 const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
   view: vista0,
-  filter: 'todos',
+  filter: [],
+  apYa: true,
+  apLista: true,
   grouping: lsGet(KEYS.group) === 'urgencia' ? 'urgencia' : 'categoria',
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
   open: {},
@@ -352,7 +354,7 @@ function buildGastos() {
   const base = monthItems();
   const q = state.search.trim().toLowerCase();
   const items = base.filter(m =>
-    (state.filter === 'todos' || pasaFiltro(m, state.filter)) &&
+    (!state.filter.length || state.filter.some(f => pasaFiltro(m, f))) &&
     (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q))
   );
   return { all, base, items, isUrg, q };
@@ -794,7 +796,7 @@ function openDetail(id) {
 /* Deja visible lo recién guardado: limpia filtro/búsqueda que lo esconderían y abre su grupo. */
 function reveal(raw) {
   const d = parseDate(raw.fecha); state.month = { year: d.getFullYear(), month: d.getMonth() };
-  if (!(state.filter === 'todos' || procesar(raw).estado.toLowerCase() === state.filter)) state.filter = 'todos';
+  if (state.filter.length && !state.filter.some(f => pasaFiltro(procesar(raw), f))) state.filter = [];
   const q = state.search.trim().toLowerCase();
   if (q && !`${raw.conc} ${raw.cat}`.toLowerCase().includes(q)) {
     state.search = ''; $('#search').value = ''; $('#search-bar').hidden = true;
@@ -1110,10 +1112,10 @@ function renderApartar() {
   const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
   const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
   const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
-  const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0]}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
+  const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0] && state.apLista}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
   $('#kpi-dash').innerHTML = `
     <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>
-    <div class="kpi-ya${ya.length ? '' : ' ok'}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></div>`;
+    <button type="button" class="kpi-ya${ya.length ? '' : ' ok'}" data-action="apartar-ya" aria-pressed="${state.apYa}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></button>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
   $('#list-count').textContent = '';
@@ -1121,7 +1123,8 @@ function renderApartar() {
   const head = [['Fecha', ''], ['Est.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
   /* Primero los atrasados (y lo que vence hoy), del más antiguo al más reciente, con el monto completo que falta; luego el periodo normal. */
   /* La tabla muestra como máximo APARTAR_FILAS renglones (atrasados primero); los totales siguen contando todo. */
-  const verYa = ya.slice(0, APARTAR_FILAS), verLista = lista.slice(0, APARTAR_FILAS - verYa.length);
+  const mostrarYa = state.apYa || !state.apLista, mostrarLista = state.apLista || !state.apYa;
+  const verYa = mostrarYa ? ya.slice(0, APARTAR_FILAS) : [], verLista = mostrarLista ? lista.slice(0, APARTAR_FILAS - verYa.length) : [];
   const rowsYa = verYa.map(m => {
     const c = catOf(m.cat), atr = m.d < 0, n = -m.d;
     const nota = atr ? `${n === 1 ? '1 día atrasado' : `${n} días atrasados`}` : 'Vence hoy';
@@ -1388,16 +1391,16 @@ function kpiDashboard(base, todo = false) {
     { k: 'c', filter: 'pendiente', label: 'Por vencer', v: porVencer },
     { k: 'b', filter: 'vencido', label: 'Pagar ya', v: atrasado }
   ].map(t => {
-    const on = state.filter === t.filter;
-    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${on ? 'todos' : t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span></span></button>`;
+    const on = state.filter.includes(t.filter);
+    return `<button type="button" class="kpi-lg lg-${t.k}" data-action="filter" data-filter="${t.filter}" aria-pressed="${on}"><span class="kpi-lg-t">${t.label}</span><span><span class="kpi-lg-m">${fmtMoney(t.v)}</span></span></button>`;
   }).join('');
 
   return `
     <div class="kpi-legend sin-sub">${tiles}</div>
     <div class="kpi-split pagar">
-      <button type="button" class="kpi-half" data-action="resumen" aria-label="Total del mes: mostrar todo" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></button>
+      <button type="button" class="kpi-half" data-action="resumen" aria-label="Total del mes: mostrar todo" aria-pressed="${!state.filter.length && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">TOTAL</span><span class="kpi-pv">${fmtMoney(totalImp)}</span></button>
       <span class="kpi-div" aria-hidden="true"></span>
-      <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${state.filter === 'todos' && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">${todo ? 'PENDIENTE' : 'POR PAGAR'}</span><span class="kpi-pv">${fmtMoney(pend)}</span></button>
+      <button type="button" class="kpi-half" data-action="resumen" aria-pressed="${!state.filter.length && state.sort.col === 'fecha' && state.sort.asc}"><span class="kpi-sec">${todo ? 'PENDIENTE' : 'POR PAGAR'}</span><span class="kpi-pv">${fmtMoney(pend)}</span></button>
     </div>`;
 }
 
@@ -1653,7 +1656,7 @@ function setView(v) {
   closeSheet();
   state.view = v;
   lsSet(KEYS.view, v);
-  state.filter = 'todos';
+  state.filter = [];
   state.search = '';
   $('#search').value = '';
   $('#search-bar').hidden = true;
@@ -1719,7 +1722,7 @@ document.addEventListener('click', async e => {
       else if (state.search) { state.search = ''; $('#search').value = ''; render(); }
       break;
     }
-    case 'apartar-per': state.apartar = t.dataset.per; renderApartar(); break;
+    case 'apartar-per': if (state.apartar === t.dataset.per) state.apLista = !state.apLista; else { state.apartar = t.dataset.per; state.apLista = true; } renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
       openForm(null);
@@ -1732,9 +1735,10 @@ document.addEventListener('click', async e => {
     case 'month-picker': openMonthPicker(); break;
     case 'pick-month': state.month = { year: +t.dataset.year, month: +t.dataset.month }; closeSheet(); render(); break;
     case 'pick-today': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; closeSheet(); render(); break;
-    case 'resumen': state.calDia = ''; state.filter = 'todos'; state.sort = { col: 'fecha', asc: true }; render(); break;
+    case 'resumen': state.calDia = ''; state.filter = []; state.sort = { col: 'fecha', asc: true }; render(); break;
     case 'sort': { const k = t.dataset.col, key = 'sort'; state[key] = { col: k, asc: state[key].col === k ? !state[key].asc : true }; render(); break; }
-    case 'filter': state.calDia = ''; state.filter = t.dataset.filter; render(); break;
+    case 'filter': { state.calDia = ''; const f = t.dataset.filter; state.filter = state.filter.includes(f) ? state.filter.filter(x => x !== f) : [...state.filter, f]; render(); break; }
+    case 'apartar-ya': state.apYa = !state.apYa; renderApartar(); break;
     case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
     case 'toggle-group': {
