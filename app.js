@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v150';
+const APP_VERSION = 'v151';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1381,11 +1381,18 @@ function renderAnalisis() {
 
 function kpiDashboard(base, todo = false, vis = base) {
   /* Mosaicos con todo el mes; Total y Por pagar siguen los filtros encendidos. */
-  const totalAbo = sum(base, 'abo'), totalImp = sum(vis, 'imp'), pend = sum(vis, 'pendiente');
+  const totalAbo = sum(base, 'abo');
+  let totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
   const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const porVencerL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const atrasado = sum(yaL, 'pendiente');
   const porVencer = sum(porVencerL, 'pendiente');
+  /* Con filtros encendidos, Total y Por pagar suman exactamente los mosaicos encendidos (Pagado = abonado; los otros, lo que falta). */
+  const fs = state.filter;
+  if (fs.length) {
+    const p = fs.includes('vencido') ? atrasado : 0, v = fs.includes('pendiente') ? porVencer : 0;
+    pend = p + v; totalImp = pend + (fs.includes('pagado') ? totalAbo : 0);
+  }
 
   const tiles = [
     { k: 'a', filter: 'pagado', label: todo ? 'Cubierto' : 'Pagado', v: totalAbo },
