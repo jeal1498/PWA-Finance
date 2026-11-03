@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v149';
+const APP_VERSION = 'v150';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -364,7 +364,7 @@ function buildGastos() {
    Render: resumen
    ========================================================= */
 function renderHeroGastos(b) {
-  $('#kpi-dash').innerHTML = kpiDashboard(b.base);
+  $('#kpi-dash').innerHTML = kpiDashboard(b.base, false, b.items);
   $('#kpi-dash').hidden = false;
 }
 
@@ -1379,8 +1379,9 @@ function renderAnalisis() {
     </section>`;
 }
 
-function kpiDashboard(base, todo = false) {
-  const totalAbo = sum(base, 'abo'), totalImp = sum(base, 'imp'), pend = sum(base, 'pendiente');
+function kpiDashboard(base, todo = false, vis = base) {
+  /* Mosaicos con todo el mes; Total y Por pagar siguen los filtros encendidos. */
+  const totalAbo = sum(base, 'abo'), totalImp = sum(vis, 'imp'), pend = sum(vis, 'pendiente');
   const yaL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const porVencerL = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const atrasado = sum(yaL, 'pendiente');
