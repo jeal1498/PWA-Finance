@@ -1083,3 +1083,10 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .cal-fold .ic { width: 18px; height: 18px; transition: transform .15s; }
 .cal-fold.up .ic { transform: rotate(180deg); }
 .cal span.pt-mes { cursor: default; }
+
+/* Pagos con abono: «Pendiente: $x» arriba y «Abonado: $x» debajo. */
+.pt-pa { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px; white-space: nowrap; font-family: var(--font-data); letter-spacing: -.03em; }
+.pt-pa b { font-size: 14.5px; font-weight: 600; letter-spacing: -.04em; color: var(--ink); }
+.pt-pa b em { font-style: normal; font-size: 10.5px; font-weight: 500; color: var(--muted); letter-spacing: -.03em; margin-right: 5px; }
+.pt-pa small { font-size: 10.5px; color: var(--muted); }
+.pt-cols:has(.pt-pa) { grid-template-columns: 40px 30px minmax(0, 1fr) max-content; }
