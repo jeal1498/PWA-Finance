@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v154';
+const APP_VERSION = 'v155';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -610,15 +610,15 @@ function renderProvisional() {
   const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const dia = fut.reduce((t, m) => t + Math.ceil(m.pendiente / daysFromToday(m.date)), 0);
-  const lim = diasHastaDomingo();
-  const sem = fut.filter(m => daysFromToday(m.date) <= lim).reduce((t, m) => t + m.pendiente, 0);
+  /* Semana: cada pendiente se reparte entre las semanas (de 7 días, hacia arriba) que faltan para su fecha. */
+  const sem = fut.reduce((t, m) => t + Math.ceil(m.pendiente / Math.ceil(daysFromToday(m.date) / 7)), 0);
   const $$m = n => fmtMoney(Math.round(n));
   const F = state.provF, on = k => F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
   $('#kpi-dash').innerHTML = `
     ${btn('ya', 'pv-ya', `<span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b>`, 'Pagar ya: mostrar atrasados y lo de hoy')}
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo que falta por pagar')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
-    <div class="pv-per">${btn('dia', 'pv-t', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: pendientes con fecha futura')}${btn('semana', 'pv-t', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: lo que vence hasta el domingo')}</div>`;
+    <div class="pv-per">${btn('dia', 'pv-t', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: apartar por día los pendientes con fecha futura')}${btn('semana', 'pv-t', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: apartar por semana los pendientes con fecha futura')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
   const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
@@ -639,7 +639,7 @@ function renderProvisional() {
   }
   if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
   /* Sin mosaico encendido: lo que entra en el calendario a la vista (semana o mes). «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
-  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 && d <= lim : true; };
+  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 : true; };
   const items = F.includes('total') ? base : F.length ? base.filter(m => F.some(f => pasa(m, f))) : state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
   if (items.length) { $('#list').innerHTML = cal + pagosTable({ base, items }, false); return; }
   $('#list').innerHTML = cal + `<div class="empty"><strong>${F.length || state.provMes ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length ? 'Prueba con otro mosaico.' : 'Toca el mes para ver todos o anota un pago.'}</div>`;
