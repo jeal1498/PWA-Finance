@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v179';
+const APP_VERSION = 'v180';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -627,7 +627,7 @@ function renderProvisional() {
   if (yaVacio && state.provF.includes('ya')) state.provF = state.provF.filter(x => x !== 'ya');
   const F = state.provF, on = k => k === 'total' ? !F.length : k === 'pend' ? (yaVacio || F.includes('ya')) && F.includes('porvencer') : F.includes(k);
   const btn = (k, cls, html, lab) => `<button type="button" class="${cls}" data-action="prov-f" data-f="${k}" aria-pressed="${on(k)}" aria-label="${lab}">${html}</button>`;
-  const per = state.provPer, btnP = (k, html, lab) => `<button type="button" class="pv-t" data-action="prov-per" data-per="${k}" aria-pressed="${per === k}" aria-label="${lab}">${html}</button>`;
+  const btnP = (k, html, lab) => `<div class="pv-t" role="group" aria-label="${lab}">${html}</div>`;
   const porV = sum(fut, 'pendiente');
   /* Pendiente es el «padre»: enciende Por vencer y ¡Pagar ya! juntos; cada uno se apaga solo. Pagado + Por vencer + ¡Pagar ya! = Total. Día y Semana solo cambian el monto. */
   $('#kpi-dash').innerHTML = `
@@ -640,8 +640,7 @@ function renderProvisional() {
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
   const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'porvencer' ? m.pendiente > 0 && d > 0 : true; };
   let items = F.length ? base.filter(m => F.some(f => pasa(m, f))) : base;
-  /* Día y Semana no filtran: cambian el monto de cada pendiente a su parte por día hábil o por semana. */
-  if (per) items = items.map(m => m.pendiente > 0 ? { ...m, ap: per === 'dia' ? delDia(m) : delSem(m) } : m);
+  /* Día y Semana son solo informativos: la tabla no cambia. */
   if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
   $('#list').innerHTML = `<div class="empty"><strong>Sin pagos</strong>${F.length ? 'Prueba con otro mosaico.' : 'Anota un pago con el botón +.'}</div>`;
 }
