@@ -1174,3 +1174,8 @@ body[data-view="calendario"] .cal-tit b { font-family: var(--font); }
 
 /* Día ×N / Semana ×N: el divisor va pequeño junto al nombre. */
 body[data-view="provisional"] .pv-t b small { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+
+/* Interruptor de atrasados de meses anteriores: etiqueta breve debajo. */
+.pv-sw { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
+.pv-sw small { font-size: 9px; font-weight: 600; letter-spacing: 0; color: var(--muted); line-height: 1; }
+.pv-sw.off { opacity: .6; }
