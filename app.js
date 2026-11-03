@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v176';
+const APP_VERSION = 'v177';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -614,12 +614,14 @@ function renderProvisional() {
   const abo = sum(base, 'abo'), pend = sum(base, 'pendiente'), tot = sum(base, 'imp');
   const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
-  /* Semana de domingo a sábado: los pagos pendientes del mes que se ve con fecha en esta semana, incluidos los atrasados que caen en ella. Día = lo que hay que juntar cada día (hoy al sábado) para cubrirlos. */
-  const dow = HOY.getDay(), diasRest = 7 - dow, dom0 = toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - dow)), sab0 = toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - dow + 6));
-  const enSemana = m => m.pendiente > 0 && enMes(m.date) && toISO(m.date) >= dom0 && toISO(m.date) <= sab0;
-  const delDia = m => Math.ceil(m.pendiente / diasRest);
-  const semL = base.filter(enSemana);
-  const sem = sum(semL, 'pendiente'), dia = semL.reduce((t, m) => t + delDia(m), 0);
+  /* Semana: lo pendiente ÷ las semanas (domingo–sábado) que toca el mes. Día: lo pendiente ÷ los días hábiles (lunes a sábado) que aún quedan del mes, contando hoy. Cada pago se reparte igual, hacia arriba. */
+  const y = state.month.year, mo = state.month.month, ultimo = new Date(y, mo + 1, 0).getDate(), primerDow = new Date(y, mo, 1).getDay();
+  const nSem = Math.ceil((primerDow + ultimo) / 7);
+  const desde = (y === HOY.getFullYear() && mo === HOY.getMonth()) ? HOY.getDate() : (y * 12 + mo > HOY.getFullYear() * 12 + HOY.getMonth() ? 1 : ultimo + 1);
+  let nDias = 0; for (let dd = desde; dd <= ultimo; dd++) if (new Date(y, mo, dd).getDay() !== 0) nDias++;
+  const delDia = m => Math.ceil(m.pendiente / nDias), delSem = m => Math.ceil(m.pendiente / nSem);
+  const pendL = base.filter(m => m.pendiente > 0);
+  const sem = pendL.reduce((t, m) => t + delSem(m), 0), dia = nDias ? pendL.reduce((t, m) => t + delDia(m), 0) : 0;
   const $$m = n => fmtMoney(Math.round(n));
   /* Sin atrasados, ¡Pagar ya! se atenúa y no se puede encender; Pendiente enciende solo Por vencer. */
   const yaVacio = !ya.length;
@@ -634,15 +636,14 @@ function renderProvisional() {
     <div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL DEL MES</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Atrasados: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">ATRASADOS</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
-    <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: lo que hay que juntar cada día para cubrir los pagos de la semana')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: pagos de domingo a sábado, incluidos los atrasados de la semana')}</div>`;
+    <div class="pv-per">${btnP('dia', `<b>Día <small>×${nDias}</small></b><span>${nDias ? $$m(dia) : '—'}</span>`, 'Día: lo pendiente repartido entre los ' + nDias + ' días hábiles que quedan del mes')}${btnP('semana', `<b>Semana <small>×${nSem}</small></b><span>${$$m(sem)}</span>`, 'Semana: lo pendiente repartido entre las ' + nSem + ' semanas del mes')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Inicio'; $('#list-count').textContent = '';
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
   const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'porvencer' ? m.pendiente > 0 && d > 0 : true; };
   let items = F.length ? base.filter(m => F.some(f => pasa(m, f))) : base;
-  /* Semana y Día filtran a los pagos de la semana; Día además cambia el monto de cada uno a lo que hay que juntar por día. */
-  if (per) items = items.filter(enSemana);
-  if (per === 'dia') items = items.map(m => ({ ...m, ap: delDia(m) }));
+  /* Día y Semana no filtran: cambian el monto de cada pendiente a su parte por día hábil o por semana. */
+  if (per && (per === 'semana' || nDias)) items = items.map(m => m.pendiente > 0 ? { ...m, ap: per === 'dia' ? delDia(m) : delSem(m) } : m);
   if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
   $('#list').innerHTML = `<div class="empty"><strong>Sin pagos</strong>${F.length ? 'Prueba con otro mosaico.' : 'Anota un pago con el botón +.'}</div>`;
 }
