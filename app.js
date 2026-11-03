@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v159';
+const APP_VERSION = 'v160';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -520,7 +520,7 @@ function pagoRow(m) {
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
-    <span class="pt-amt${i.done ? ' done' : ''}"><b>${fmtMoney(i.done ? m.imp : m.ap != null ? m.ap : i.pend)}</b>${i.done ? '' : m.ap != null ? `<small class="pt-ap">de ${fmtMoney(i.pend)}</small>` : !(m.abo > 0) ? '' : `<small class="pt-ap">de ${fmtMoney(m.imp)}</small>`}</span>
+    <span class="pt-amt${i.done ? ' done' : ''}">${!i.done && m.ap == null && m.abo > 0 ? `<span class="pt-rs"><span>${fmtMoney(m.imp)}</span><span>-${fmtMoney(m.abo)}</span><i></i><b>${fmtMoney(i.pend)}</b></span>` : `<b>${fmtMoney(i.done ? m.imp : m.ap != null ? m.ap : i.pend)}</b>${i.done || m.ap == null ? '' : `<small class="pt-ap">de ${fmtMoney(i.pend)}</small>`}`}</span>
   </button>`;
 }
 
