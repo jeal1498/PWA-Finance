@@ -1128,3 +1128,12 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pv-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; height: 44px; }
 .pv-head .cal-arr { height: 44px; }
 .pv-head .pt-mes { border-bottom: 0; height: 44px; }
+
+/* Provisional: mosaicos, encabezado y filas con el mismo gris elevado #22222A y borde hueso tenue; las atrasadas conservan su tinte rojo. */
+body[data-view="provisional"] .pv-c, body[data-view="provisional"] .pv-ya, body[data-view="provisional"] .pv-v, body[data-view="provisional"] .pv-t { background: #22222A; box-shadow: inset 0 0 0 1px rgba(244, 244, 239, .28); }
+body[data-view="provisional"] .pv-c[aria-pressed="true"], body[data-view="provisional"] .pv-ya.on, body[data-view="provisional"] .pv-v[aria-pressed="true"], body[data-view="provisional"] .pv-t[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+body[data-view="provisional"] .pt { background: #22222A; border-color: rgba(244, 244, 239, .28); }
+body[data-view="provisional"] .pt-th { background: #22222A; border-bottom-color: rgba(244, 244, 239, .28); }
+body[data-view="provisional"] .pt-row, body[data-view="provisional"] .pt-row[data-cat] { background: #22222A; border-top-color: #16161C; }
+body[data-view="provisional"] .pt-row.v, body[data-view="provisional"] .pt-row.v[data-cat] { background: #35242B; }
+body[data-view="provisional"] .pt-foot { background: #22222A; border-top-color: rgba(244, 244, 239, .28); }
