@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v183';
+const APP_VERSION = 'v184';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -259,14 +259,11 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
 
-const VISTAS = ['gastos', 'apartar', 'calendario', 'provisional', 'analisis', 'perfil'];
-const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
+const VISTAS = ['calendario', 'provisional', 'analisis', 'perfil'];
+const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'provisional';
 const state = {
   view: vista0,
   filter: [],
-  apYa: true,
-  apPrev: true,
-  apLista: true,
   grouping: lsGet(KEYS.group) === 'urgencia' ? 'urgencia' : 'categoria',
   month: { year: HOY.getFullYear(), month: HOY.getMonth() },
   open: {},
@@ -355,36 +352,12 @@ function pasaFiltro(m, f) {
   return m.estado.toLowerCase() === f;
 }
 
-function buildGastos() {
-  const all = movimientos.map(procesar);
-  const isUrg = state.grouping === 'urgencia';
-  const base = monthItems();
-  const q = state.search.trim().toLowerCase();
-  const items = base.filter(m =>
-    (!state.filter.length || state.filter.some(f => pasaFiltro(m, f))) &&
-    (!q || `${m.conc} ${m.cat}`.toLowerCase().includes(q))
-  );
-  return { all, base, items, isUrg, q };
-}
 
-/* =========================================================
-   Render: resumen
-   ========================================================= */
-function renderHeroGastos(b) {
-  $('#kpi-dash').innerHTML = kpiDashboard(b.base, false, b.items);
-  $('#kpi-dash').hidden = false;
-}
 
 /* =========================================================
    Render: filtros
    ========================================================= */
 
-function renderMonthControls() {
-  const urg = state.grouping === 'urgencia';
-  $('#month-text').textContent = `${MESES[state.month.month]} ${state.month.year}`;
-  $('#g-cat').setAttribute('aria-pressed', String(!urg));
-  $('#g-urg').setAttribute('aria-pressed', String(urg));
-}
 
 /* =========================================================
    Render: filas y grupos
@@ -594,15 +567,6 @@ function diaHTML(b) {
     ${dia.length ? pagosTable({ items: dia }, false) : `<div class="empty"><strong>Sin pagos este día</strong></div>`}`;
 }
 
-function renderPagos(b) {
-  $('#list-caption').textContent = 'Movimientos';
-  $('#list-count').textContent = '';
-  const cal = calendarioHTML(b);
-  if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
-  if (b.items.length) { $('#list').innerHTML = cal + pagosTable(b, false); return; }
-  renderList([], '', '', 'gastos', b.base.length === 0);
-  $('#list').insertAdjacentHTML('afterbegin', cal);
-}
 
 
 /* Provisional: Pagar ya, las tres cifras del mes, Día | Semana, calendario (semana o mes) y la tabla de pagos. */
@@ -689,25 +653,21 @@ function render() {
   marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
-  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis', isV = state.view === 'provisional', isC = state.view === 'calendario';
+  const isP = state.view === 'perfil', isN = state.view === 'analisis', isV = state.view === 'provisional', isC = state.view === 'calendario';
   document.body.dataset.view = state.view;
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
   $$('#view-switch .nav-btn').forEach(b => { if (b.dataset.view === state.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  $('#month-label').disabled = !isG;
+  $('#month-label').disabled = true;
   $('.controls').hidden = true;
   $('#seg').hidden = true;
-  const addBtn = $('.nav-add'), addLabel = isG || isA || isN || isV || isC ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
+  const addBtn = $('.nav-add'), addLabel = isN || isV || isC ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
   addBtn.setAttribute('aria-label', addLabel); addBtn.title = addLabel;
 
   if (isP) {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Ajustes';
     renderPerfil();
-  } else if (isA) {
-    $('#search-bar').hidden = true;
-    $('#month-text').textContent = 'Apartar';
-    renderApartar();
   } else if (isC) {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Calendario';
@@ -720,11 +680,6 @@ function render() {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Análisis';
     renderAnalisis();
-  } else if (isG) {
-    const b = buildGastos();
-    renderHeroGastos(b);
-    renderMonthControls();
-    renderPagos(b);
   }
 }
 
@@ -756,7 +711,6 @@ function closeSheet() {
   setInert(false);
   if (sheet.last && document.contains(sheet.last)) { try { sheet.last.focus({ preventScroll: true }); } catch (e) {} }
   if (state.view === 'perfil') renderPerfil();
-  if (state.view === 'apartar') renderApartar();
   if (state.view === 'provisional') renderProvisional();
   if (state.view === 'calendario') renderCalendario();
   if (recargaPendiente) recargarDatos();
@@ -1197,54 +1151,6 @@ function datosFondoApartar() {
   return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'DEL MES'}`, meta, dias: apDias(), pct, porv: all.filter(m => m.d >= 0).length };
 }
 
-function renderApartar() {
-  const inicioMes = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const todos = apartarItems(), hayPrev = todos.some(m => m.d < 0 && m.date < inicioMes);
-  const all = state.apPrev || !hayPrev ? todos : todos.filter(m => !(m.d < 0 && m.date < inicioMes));
-  const ya = all.filter(m => m.d <= 0), fut = all.filter(m => m.d > 0);
-  const per = APARTAR.find(p => p[0] === state.apartar) || APARTAR[0];
-  const limite = k => k === 'semana' ? diasHastaDomingo() : apDias();
-  const enPer = (m, k) => m.d <= limite(k);
-  const lista = fut.filter(m => enPer(m, per[0]));
-  const monto = m => per[0] === 'dia' ? apartarMonto(m, 1) : m.pend;
-  const totPer = k => k === 'dia' ? fut.reduce((t, m) => t + apartarMonto(m, 1), 0) : fut.filter(m => enPer(m, k)).reduce((t, m) => t + m.pend, 0);
-  const pLabel = per[0] === 'dia' ? 'DÍA' : per[1].toUpperCase();
-  const vencidos = ya.filter(m => m.d < 0).length, hoy = ya.length - vencidos;
-  const nota = [vencidos && plural(vencidos, 'atrasado', 'atrasados'), hoy && `${hoy} ${hoy === 1 ? 'vence' : 'vencen'} hoy`].filter(Boolean).join(' · ');
-  const tiles = APARTAR.map(([k, l]) => `<button type="button" class="kpi-lg lg-p" data-action="apartar-per" data-per="${k}" aria-pressed="${k === per[0] && state.apLista}"><span class="kpi-lg-t">${k === 'dia' ? '1 Día' : l}</span><span><span class="kpi-lg-m">${fmtMoney(totPer(k))}</span></span></button>`).join('');
-  $('#kpi-dash').innerHTML = `
-    <div class="kpi-legend ap4" role="group" aria-label="Periodo">${tiles}</div>
-    <div class="kpi-ya${ya.length ? '' : ' ok'}${state.apYa ? ' on' : ''}"><button type="button" class="kpi-ya-main" data-action="apartar-ya" aria-pressed="${state.apYa}"><span class="kpi-ya-t">PAGAR YA</span><b>${ya.length ? fmtMoney(ya.reduce((t, m) => t + m.pend, 0)) : '$0'}</b><span>${ya.length ? (nota || plural(ya.length, 'pago', 'pagos')) : 'nada atrasado'}</span></button><button type="button" role="switch" class="mini-sw" data-action="apartar-prev" aria-checked="${hayPrev && state.apPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>`;
-  $('#kpi-dash').hidden = false;
-  $('#list-caption').textContent = `Por ${per[0] === 'dia' ? 'día' : per[1].toLowerCase()}`;
-  $('#list-count').textContent = '';
-  if (!lista.length && !ya.length) { $('#list').innerHTML = `<div class="empty"><strong>Nada por apartar</strong>${per[0] === 'dia' ? 'No hay pagos pendientes con fecha futura.' : per[0] === 'semana' ? 'Nada más vence esta semana.' : 'Nada vence en lo que resta del mes.'}</div>`; return; }
-  const head = [['Fecha', ''], ['Est.', ''], ['Concepto', ''], ['Monto', ' r']].map(([l, r]) => `<span class="pt-h${r}"><span class="pt-sort">${l}</span></span>`).join('');
-  /* Primero los atrasados (y lo que vence hoy), del más antiguo al más reciente, con el monto completo que falta; luego el periodo normal. */
-  /* La tabla muestra como máximo APARTAR_FILAS renglones (atrasados primero); los totales siguen contando todo. */
-  const mostrarYa = state.apYa || !state.apLista, mostrarLista = state.apLista || !state.apYa;
-  const verYa = mostrarYa ? ya.slice(0, APARTAR_FILAS) : [], verLista = mostrarLista ? lista.slice(0, APARTAR_FILAS - verYa.length) : [];
-  const rowsYa = verYa.map(m => {
-    const c = catOf(m.cat), atr = m.d < 0, n = -m.d;
-    const nota = atr ? `${n === 1 ? '1 día atrasado' : `${n} días atrasados`}` : 'Vence hoy';
-    return `<button type="button" class="pt-cols pt-row v" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${nota.toLowerCase()}, pagar ya ${fmtMoney(m.pend)}`)}">
-    <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
-    <span class="pt-est danger" role="img" aria-label="${atr ? 'Atrasado' : 'Vence hoy'}">${svg(BADGE_ICON.Vencido)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota danger">${nota}</span></span>
-    <span class="pt-amt"><b>${fmtMoney(m.pend)}</b></span>
-  </button>`;
-  }).join('');
-  const rows = rowsYa + verLista.map(m => {
-    const c = catOf(m.cat), t = m.d <= 7 ? 'warn' : 'muted';
-    return `<button type="button" class="pt-cols pt-row" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.d === 1 ? 'falta 1 día' : `faltan ${m.d} días`}, apartar ${fmtMoney(monto(m))} de ${fmtMoney(m.pend)}`)}">
-    <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
-    <span class="pt-est ${t}" role="img" aria-label="Pendiente">${svg(BADGE_ICON.Pendiente)}</span>
-    <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}</span><span class="pt-nota ${t}">${m.d === 1 ? 'Falta 1 día' : `Faltan ${m.d} días`}</span></span>
-    <span class="pt-amt"><b>${fmtMoney(monto(m))}</b></span>
-  </button>`;
-  }).join('');
-  $('#list').innerHTML = `<div class="pt"><div class="pt-cols pt-th">${head}</div>${rows}<div class="pt-foot"><span>${plural(lista.length, 'pago', 'pagos')} · ${per[0] === 'dia' ? 'por día' : per[0] === 'semana' ? 'esta semana (lun–dom)' : 'en el mes'}</span><b>${fmtMoney(totPer(per[0]))}</b></div><div class="pt-foot pt-foot2"><span>Total ${apDias()} días · ${desglose(all)}</span><b>${fmtMoney(sum(all, 'pend'))}</b></div></div>`;
-}
 
 /* Imagen PNG del mes: la misma pantalla de Pagos (HTML + CSS de la app, tema actual) a 390 px de ancho
    y completa hasta el último pago. Se dibuja como SVG con foreignObject; fuentes e iconos van embebidos. */
@@ -1832,7 +1738,6 @@ document.addEventListener('click', async e => {
       else if (state.search) { state.search = ''; $('#search').value = ''; render(); }
       break;
     }
-    case 'apartar-per': if (state.apartar === t.dataset.per) state.apLista = !state.apLista; else { state.apartar = t.dataset.per; state.apLista = true; } renderApartar(); break;
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
     case 'add': {
       openForm(null);
@@ -1853,8 +1758,6 @@ document.addEventListener('click', async e => {
     case 'prov-per': state.provPer = state.provPer === t.dataset.per ? '' : t.dataset.per; render(); break;
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
     case 'prov-sem': state.provOff += Number(t.dataset.d); state.calDia = ''; render(); break;
-    case 'apartar-prev': state.apPrev = !state.apPrev; renderApartar(); break;
-    case 'apartar-ya': state.apYa = !state.apYa; renderApartar(); break;
     case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
     case 'toggle-group': {
