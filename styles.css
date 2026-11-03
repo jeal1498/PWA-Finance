@@ -1060,7 +1060,8 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 
 /* Provisional: mismas medidas que Pagos y Apartar (54 px); los mosaicos son filtros. */
 .pv-ya, .pv-mes, .pv-t { background: var(--surface); border-radius: 16px; box-shadow: inset 0 0 0 1px #3A3A45; color: var(--ink); font: inherit; border: 0; }
-.pv-ya { width: 100%; height: 54px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; padding: 0 14px; }
+.pv-ya { width: 100%; height: 54px; display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 10px 0 0; }
+.pv-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; padding: 0; }
 .pv-ya b { font-family: var(--font-title); font-weight: 800; font-size: 22px; line-height: 1.15; letter-spacing: -.03em; }
 .pv-l { font-family: var(--font-data); font-weight: 600; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
 .pv-l.danger { color: var(--danger-text); }
@@ -1074,7 +1075,7 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pv-t { height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 .pv-t b { font-size: 14px; font-weight: 700; line-height: 1.2; }
 .pv-t span { font-family: var(--font-data); font-weight: 700; font-size: 19px; line-height: 1.2; letter-spacing: -.04em; }
-.pv-ya[aria-pressed="true"], .pv-t[aria-pressed="true"], .pv-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.pv-ya.on, .pv-t[aria-pressed="true"], .pv-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
 .cal-grid.wk { padding: 4px 6px 0; }
 .cal-grid.wk .cal-d { height: 46px; gap: 2px; }
 .cal-d .cal-wd { line-height: 12px; }
