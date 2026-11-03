@@ -1083,3 +1083,19 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .cal-fold .ic { width: 18px; height: 18px; transition: transform .15s; }
 .cal-fold.up .ic { transform: rotate(180deg); }
 .cal span.pt-mes { cursor: default; }
+
+/* Filas a ×1.17 (56 px) y celda de resta en pagos con abono: total, -abono y lo que falta. */
+.pt-cols { grid-template-columns: 46px 34px minmax(0, 1fr) minmax(64px, max-content); }
+.pt-row { height: 56px; }
+.pt-fecha b { font-size: 23px; }
+.pt-fecha small { font-size: 14px; }
+.pt-est .ic { width: 26px; height: 26px; }
+.pt-est .ring { width: 28px; height: 28px; }
+.pt-conc { font-size: 17px; }
+.pt-nota { font-size: 15px; margin-top: 2px; }
+.pt-amt b { font-size: 17px; }
+.pt-amt small { font-size: 12px; }
+.pt-sort { min-height: 40px; }
+.pt-rs { display: inline-flex; flex-direction: column; align-items: flex-end; font-family: var(--font-data); font-size: 11px; line-height: 1.15; letter-spacing: -.03em; color: var(--muted); }
+.pt-rs i { align-self: stretch; height: 1px; margin: 1px 0 2px; background: #5A5A66; }
+.pt-rs b { font-size: 16px; line-height: 1.1; font-weight: 600; letter-spacing: -.04em; color: var(--ink); }
