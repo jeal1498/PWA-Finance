@@ -1151,3 +1151,23 @@ body[data-view="provisional"] .pt-conc { font-size: 15px; }
 body[data-view="provisional"] .pt-nota { font-size: 13px; }
 body[data-view="provisional"] .pt-amt b, body[data-view="provisional"] .pt-pa b { font-family: var(--font); font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; }
 body[data-view="provisional"] .pt-pa em, body[data-view="provisional"] .pt-pa small, body[data-view="provisional"] .pt-amt small { font-family: var(--font); letter-spacing: 0; }
+
+/* Calendario: mismo color (#22222A) y tipografía B (DM Sans) que Provisional. */
+body[data-view="calendario"] .pt { background: #22222A; border-color: rgba(244, 244, 239, .28); }
+body[data-view="calendario"] .pt-th { background: #22222A; border-bottom-color: rgba(244, 244, 239, .28); }
+body[data-view="calendario"] .pt-row, body[data-view="calendario"] .pt-row[data-cat] { background: #22222A; border-top-color: #16161C; }
+body[data-view="calendario"] .pt-row.v, body[data-view="calendario"] .pt-row.v[data-cat] { background: #35242B; }
+body[data-view="calendario"] .pt-foot { background: #22222A; border-top-color: rgba(244, 244, 239, .28); }
+body[data-view="calendario"] .pt-sort { font-family: var(--font); font-size: 10.5px; font-weight: 700; letter-spacing: .08em; }
+body[data-view="calendario"] .pt-fecha b { font-family: var(--font); font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+body[data-view="calendario"] .pt-fecha small { font-family: var(--font); font-size: 11px; font-weight: 600; }
+body[data-view="calendario"] .pt-conc { font-size: 15px; }
+body[data-view="calendario"] .pt-nota { font-size: 13px; }
+body[data-view="calendario"] .pt-amt b, body[data-view="calendario"] .pt-pa b { font-family: var(--font); font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; }
+body[data-view="calendario"] .pt-pa em, body[data-view="calendario"] .pt-pa small, body[data-view="calendario"] .pt-amt small { font-family: var(--font); letter-spacing: 0; }
+body[data-view="calendario"] .pt, body[data-view="calendario"] .cal-grid { font-variant-numeric: tabular-nums; }
+body[data-view="calendario"] .cal-wd { font-family: var(--font); font-weight: 700; font-size: 10.5px; letter-spacing: .08em; }
+body[data-view="calendario"] .cal-d { font-family: var(--font); font-weight: 700; font-size: 14px; }
+body[data-view="calendario"] .cal-d span { font-family: var(--font); }
+body[data-view="calendario"] .cal-head, body[data-view="calendario"] .cal-fold { border-color: rgba(244, 244, 239, .28); }
+body[data-view="calendario"] .cal-tit b { font-family: var(--font); }
