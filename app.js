@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v164';
+const APP_VERSION = 'v165';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -623,7 +623,7 @@ function renderProvisional() {
   const porV = sum(fut, 'pendiente');
   /* Pendiente es el «padre»: enciende Por vencer y ¡Pagar ya! juntos; cada uno se apaga solo. Pagado + Por vencer + ¡Pagar ya! = Total. Día y Semana solo cambian el monto. */
   $('#kpi-dash').innerHTML = `
-    <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL ${MESES[state.month.month].toUpperCase()}</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
+    <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL ${MESES_CORTO[state.month.month].toUpperCase()}</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}" aria-label="Pagar ya: mostrar atrasados y lo de hoy"><span class="pv-l danger">¡PAGAR YA!</span><b>${$$m(sum(ya, 'pendiente'))}</b></button><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
     <div class="pv-per">${btnP('dia', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: ver el monto a apartar por día')}${btnP('semana', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: ver el monto a apartar por semana')}</div>`;
   $('#kpi-dash').hidden = false;

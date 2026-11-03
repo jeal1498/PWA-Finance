@@ -1111,3 +1111,10 @@ button.kpi-ya-main { flex: 1; min-width: 0; height: 100%; display: flex; align-i
 .pv-mes { padding: 3px; }
 .pv-mes > i { margin: 0; }
 .pv-c { margin: 0; }
+
+/* Provisional: Pagado, Pendiente y Total son tres mosaicos separados (54 px, 8 px entre ellos). */
+.pv-mes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0; background: none; box-shadow: none; border-radius: 0; }
+.pv-mes > i { display: none; }
+.pv-c { background: var(--surface); box-shadow: inset 0 0 0 1px #3A3A45; border-radius: 16px; }
+.pv-c[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+.pv-c .pv-l { white-space: nowrap; }
