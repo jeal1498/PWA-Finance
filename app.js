@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v156';
+const APP_VERSION = 'v157';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -259,7 +259,7 @@ const syncAbo = m => { m.abo = r2((m.pagos || []).reduce((t, p) => t + p.monto, 
 /* Lo que ya tenía abonado y no tiene historial pasa a un solo abono sin fecha. */
 [movimientos, metas].forEach(list => list.forEach(m => { if (!Array.isArray(m.pagos)) m.pagos = m.abo > 0 ? [{ fecha: null, monto: m.abo }] : []; }));
 
-const VISTAS = ['gastos', 'apartar', 'provisional', 'analisis', 'perfil'];
+const VISTAS = ['gastos', 'apartar', 'calendario', 'provisional', 'analisis', 'perfil'];
 const vista0 = VISTAS.includes(lsGet(KEYS.view)) ? lsGet(KEYS.view) : 'gastos';
 const state = {
   view: vista0,
@@ -624,6 +624,19 @@ function renderProvisional() {
     <div class="pv-per">${btn('dia', 'pv-t', `<b>Día</b><span>${$$m(dia)}</span>`, 'Día: apartar por día los pendientes con fecha futura')}${btn('semana', 'pv-t', `<b>Semana</b><span>${$$m(sem)}</span>`, 'Semana: apartar por semana los pendientes con fecha futura')}</div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Provisional'; $('#list-count').textContent = '';
+  const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7)), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
+  /* Sin mosaico encendido: los pagos de la semana en curso. «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
+  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 : true; };
+  const items = F.includes('total') ? base : F.length ? base.filter(m => F.some(f => pasa(m, f))) : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  if (items.length) { $('#list').innerHTML = pagosTable({ base, items }, false); return; }
+  $('#list').innerHTML = `<div class="empty"><strong>${F.length ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length ? 'Prueba con otro mosaico.' : 'Toca «Total del mes» para ver todos.'}</div>`;
+}
+
+/* Calendario: semana (con flechas) o mes completo (pliegue), y debajo los pagos de lo que se ve; tocar un día muestra solo los suyos. */
+function renderCalendario() {
+  const base = monthItems(), b = { base, items: base };
+  $('#kpi-dash').hidden = true;
+  $('#list-caption').textContent = 'Calendario'; $('#list-count').textContent = '';
   const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
   let cal;
   if (state.provMes) {
@@ -641,11 +654,9 @@ function renderProvisional() {
     cal = `<div class="pt cal"><div class="cal-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="cal-grid wk">${cells.join('')}</div><button type="button" class="cal-fold" data-action="prov-mes" aria-label="Ver mes completo">${FOLD_ARROW}</button></div>`;
   }
   if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
-  /* Sin mosaico encendido: lo que entra en el calendario a la vista (semana o mes). «Total»: todo el mes. Otros mosaicos: filtran todo el mes. */
-  const pasa = (m, f) => { const d = daysFromToday(m.date); return f === 'ya' ? m.pendiente > 0 && d <= 0 : f === 'pagado' ? m.abo > 0 : f === 'pend' ? m.pendiente > 0 : f === 'dia' ? m.pendiente > 0 && d > 0 : f === 'semana' ? m.pendiente > 0 && d > 0 : true; };
-  const items = F.includes('total') ? base : F.length ? base.filter(m => F.some(f => pasa(m, f))) : state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
+  const items = state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
   if (items.length) { $('#list').innerHTML = cal + pagosTable({ base, items }, false); return; }
-  $('#list').innerHTML = cal + `<div class="empty"><strong>${F.length || state.provMes ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${F.length ? 'Prueba con otro mosaico.' : 'Toca el mes para ver todos o anota un pago.'}</div>`;
+  $('#list').innerHTML = cal + `<div class="empty"><strong>${state.provMes ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${state.provMes ? '' : 'Despliega el mes para ver todos.'}</div>`;
 }
 
 function renderList(groups, caption, countText, emptyKind, baseEmpty) {
@@ -665,7 +676,7 @@ function render() {
   marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
-  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis', isV = state.view === 'provisional';
+  const isG = state.view === 'gastos', isP = state.view === 'perfil', isA = state.view === 'apartar', isN = state.view === 'analisis', isV = state.view === 'provisional', isC = state.view === 'calendario';
   document.body.dataset.view = state.view;
   ['.hero', '.list-head', '#list'].forEach(sel => { $(sel).hidden = isP; });
   $('#perfil').hidden = !isP;
@@ -673,7 +684,7 @@ function render() {
   $('#month-label').disabled = !isG;
   $('.controls').hidden = true;
   $('#seg').hidden = true;
-  const addBtn = $('.nav-add'), addLabel = isG || isA || isN || isV ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
+  const addBtn = $('.nav-add'), addLabel = isG || isA || isN || isV || isC ? 'Agregar pago o abono' : 'Agregar meta o ahorro';
   addBtn.setAttribute('aria-label', addLabel); addBtn.title = addLabel;
 
   if (isP) {
@@ -684,6 +695,10 @@ function render() {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Apartar';
     renderApartar();
+  } else if (isC) {
+    $('#search-bar').hidden = true;
+    $('#month-text').textContent = 'Calendario';
+    renderCalendario();
   } else if (isV) {
     $('#search-bar').hidden = true;
     $('#month-text').textContent = 'Provisional';
@@ -730,6 +745,7 @@ function closeSheet() {
   if (state.view === 'perfil') renderPerfil();
   if (state.view === 'apartar') renderApartar();
   if (state.view === 'provisional') renderProvisional();
+  if (state.view === 'calendario') renderCalendario();
   if (recargaPendiente) recargarDatos();
 }
 
@@ -1736,6 +1752,7 @@ function setView(v) {
   lsSet(KEYS.view, v);
   state.filter = [];
   state.provF = [];
+  state.calDia = '';
   state.search = '';
   $('#search').value = '';
   $('#search-bar').hidden = true;
