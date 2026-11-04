@@ -48,3 +48,8 @@ PWA de uso propio para llevar **pagos con abonos** (el ahorro es una categoría 
 - **Importar** (`datos.js`): JSON `{app:'secondbrain', movimientos, metas}` o CSV (Tipo, Fecha, Concepto, Categoría, Importe, Abonado, Id; acepta `,` `;` tab, fechas `AAAA-MM-DD` o `DD/MM/AAAA`; renglones «Ingreso» se omiten). Modo **Agregar** (por id; sin id, hash de tipo+fecha+concepto+importe+categoría) o **Reemplazar todo**, en una transacción con toast Deshacer.
 
 ## Ideas pendientes
+En este orden:
+1. **Integración directa con Supabase** (reemplazar/complementar la sincronización por Google Sheets).
+2. **Login con Google** (vía Supabase Auth).
+3. **Ajustes → Compartir finanzas con alguien más** (ideal para parejas).
+4. **Después de todo lo anterior: empaquetarla como APK** (p. ej. TWA/Capacitor).
