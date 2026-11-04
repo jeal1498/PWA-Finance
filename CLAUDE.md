@@ -49,7 +49,7 @@ PWA de uso propio para llevar **pagos con abonos** (el ahorro es una categoría 
 
 ## Ideas pendientes
 En este orden:
-1. **Integración directa con Supabase** (reemplazar/complementar la sincronización por Google Sheets).
+1. **Integración directa con Supabase**, que **reemplazará** la sincronización con Google Sheets (se quita Sheets cuando Supabase funcione).
 2. **Login con Google** (vía Supabase Auth).
 3. **Ajustes → Compartir finanzas con alguien más** (ideal para parejas).
 4. **Después de todo lo anterior: empaquetarla como APK** (p. ej. TWA/Capacitor).
