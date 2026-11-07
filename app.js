@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v198';
+const APP_VERSION = 'v199';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -253,18 +253,19 @@ const r2 = n => Math.round(n * 100) / 100;
    los datos: pagos[].quien y resp). El nombre es el «alias» que cada quien se pone en Ajustes; sin alias, el primer nombre de su cuenta
    de Google. Se guardan en este teléfono para que funcione sin internet. */
 const PERSONAS = {}, PERSONAS_EMAIL = {};
-const KEY_PERSONAS = 'finanzas_personas';
-function aplicarPersonas(lista) {
+const KEY_PERSONAS = 'finanzas_personas2';
+function aplicarPersonas(por) {
   Object.keys(PERSONAS).forEach(k => { delete PERSONAS[k]; delete PERSONAS_EMAIL[k]; });
-  ['e', 'k'].forEach((k, i) => { if (lista[i] && lista[i].nombre) { PERSONAS[k] = lista[i].nombre; PERSONAS_EMAIL[k] = lista[i].email || ''; } });
+  ['e', 'k'].forEach(k => { if (por[k] && por[k].nombre) { PERSONAS[k] = por[k].nombre; PERSONAS_EMAIL[k] = por[k].email || ''; } });
 }
-try { aplicarPersonas(JSON.parse(lsGet(KEY_PERSONAS) || '[]')); } catch (e) { /* sin guardado */ }
+try { aplicarPersonas(JSON.parse(lsGet(KEY_PERSONAS) || '{}')); } catch (e) { /* sin guardado */ }
 /* Recibe los miembros de la nube; si cambiaron nombres o personas, los guarda y vuelve a dibujar. */
 function aplicarMiembros(miembros) {
-  const lista = miembros.map(m => ({ nombre: String(m.alias || String(m.nombre || '').trim().split(/\s+/)[0] || String(m.email || '').split('@')[0]).trim(), email: String(m.email || '').toLowerCase() }));
-  const antes = lsGet(KEY_PERSONAS) || '[]', ahora = JSON.stringify(lista);
+  const por = {};
+  miembros.forEach(m => { if (m.slot === 'e' || m.slot === 'k') por[m.slot] = { nombre: String(m.alias || String(m.nombre || '').trim().split(/\s+/)[0] || String(m.email || '').split('@')[0]).trim(), email: String(m.email || '').toLowerCase() }; });
+  const antes = lsGet(KEY_PERSONAS) || '{}', ahora = JSON.stringify(por);
   if (antes === ahora) return;
-  lsSet(KEY_PERSONAS, ahora); aplicarPersonas(lista);
+  lsSet(KEY_PERSONAS, ahora); aplicarPersonas(por);
   if (sheet.el.hidden) render();
 }
 async function refrescarPersonas() {
@@ -1596,10 +1597,21 @@ async function submitInvitar() {
   }
 }
 async function salirCompartir() {
-  if (!window.confirm('¿Dejar de compartir? Te quedas con una copia de lo que hay ahora y ya no verás lo que anote la otra persona.')) return;
-  try { await comp.salir(); sync.olvidarHogar(); refrescarPersonas(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
+  if (!window.confirm('¿Dejar de compartir? Te quedas solo con los pagos donde eres el responsable; los demás se quedan con la otra persona, y ya no verán lo que anote el otro.')) return;
+  try { await comp.salir(); sync.olvidarHogar(); await refrescarPersonas(); toast('Dejaste de compartir'); try { await sincronizar(); } catch (e) { /* se sincroniza sola después */ } renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
 }
 /* Invitación recibida: pantalla completa al entrar (y al volver a la app) si alguien invitó a este correo. */
+/* Mi letra (e/k) en la cuenta compartida, según los miembros que devuelve la nube. */
+const slotMio = miembros => { const yo = usuario() ? usuario().email.toLowerCase() : '', m = miembros.find(x => String(x.email).toLowerCase() === yo); return m && m.slot === 'k' ? 'k' : 'e'; };
+/* Al unirme a otra cuenta mi letra puede cambiar (p. ej. de e a k): lo que ya tenía anotado a mi nombre pasa a la letra nueva. */
+async function remapearPersona(de, a) {
+  for (const m of movimientos) {
+    let cambio = false;
+    if (m.resp === de) { m.resp = a; cambio = true; }
+    (m.pagos || []).forEach(p => { if (p.quien === de) { p.quien = a; cambio = true; } });
+    if (cambio) await persist(m);
+  }
+}
 const invPospuestas = new Set();
 let invActual = null;
 async function revisarInvitaciones() {
@@ -1622,7 +1634,10 @@ $('#inv-no').addEventListener('click', () => { if (invActual) invPospuestas.add(
 $('#inv-si').addEventListener('click', async () => {
   const b = $('#inv-si'); b.disabled = true; b.textContent = 'Uniéndome…';
   try {
+    const antes = slotMio(await comp.miembros());
     await comp.aceptar(invActual.id);
+    const ahora = slotMio(await comp.miembros());
+    if (antes !== ahora) await remapearPersona(antes, ahora);
     sync.olvidarHogar();
     refrescarPersonas();
     $('#invita').hidden = true; toast('Ya comparten sus finanzas');
