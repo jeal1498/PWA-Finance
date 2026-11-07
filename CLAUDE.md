@@ -47,6 +47,9 @@ PWA de uso propio para llevar **pagos con abonos** (el ahorro es una categoría 
 - **Seguros de datos**: «Sincronizar» no envía con la base caída, vacía o con menos de la mitad de registros que la última copia (pide confirmar); «Traer de la hoja» valida los registros (`sanear()`), muestra cuántos trae contra cuántos hay y no vacía nada si la copia no es válida; «Agregar» al importar conserva los abonos que ya tiene la app.
 - **Importar** (`datos.js`): JSON `{app:'secondbrain', movimientos, metas}` o CSV (Tipo, Fecha, Concepto, Categoría, Importe, Abonado, Id; acepta `,` `;` tab, fechas `AAAA-MM-DD` o `DD/MM/AAAA`; renglones «Ingreso» se omiten). Modo **Agregar** (por id; sin id, hash de tipo+fecha+concepto+importe+categoría) o **Reemplazar todo**, en una transacción con toast Deshacer.
 
+## Login
+- **Portada de login** (v188, `#login` en `index.html`, `.lg-*` en `styles.css`, `mostrarLogin()` en `app.js`): logo, «Finanzas», muestra de tres pagos y botón «Continuar con Google». **Aún sin Supabase**: `AUTH_ON = false`, así que la app abre directo; la portada se ve con `#login` en la dirección y el botón solo avisa «Falta conectar Supabase». Al conectar Supabase: `AUTH_ON = true` y `haySesion()` lee la sesión.
+
 ## Ideas pendientes
 En este orden:
 1. **Integración directa con Supabase**, que **reemplazará** la sincronización con Google Sheets (se quita Sheets cuando Supabase funcione).
