@@ -7,12 +7,14 @@ const rpc = (fn, args = {}) => nube('/rest/v1/rpc/' + fn, { method: 'POST', body
 const json = async p => (await p).json();
 
 /* { miembros: [{ user_id, email, nombre }], enviadas: [{ email }] } de mi cuenta compartida. */
+export const miembros = () => json(nube('/rest/v1/miembros?select=user_id,email,nombre,alias,hogar_id&order=unido_at'));
 export async function estado() {
-  const miembros = await json(nube('/rest/v1/miembros?select=user_id,email,nombre,hogar_id&order=unido_at'));
+  const miembros = await json(nube('/rest/v1/miembros?select=user_id,email,nombre,alias,hogar_id&order=unido_at'));
   const h = miembros[0] && miembros[0].hogar_id;
   const enviadas = h ? await json(nube(`/rest/v1/invitaciones?select=email&estado=eq.pendiente&hogar_id=eq.${h}`)) : [];
   return { miembros, enviadas };
 }
+export const ponerAlias = alias => rpc('poner_alias', { p_alias: alias });
 export const invitar = email => rpc('invitar', { p_email: email });
 export const quitarInvitacion = email => rpc('quitar_invitacion', { p_email: email });
 export const misInvitaciones = () => json(rpc('mis_invitaciones'));
