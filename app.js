@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v186';
+const APP_VERSION = 'v187';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1226,7 +1226,7 @@ async function monthImages() {
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText);
   await img.decode();
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fbfaf6';
+  const bg = '#0C0C10'; // las imágenes de Compartir siempre van en oscuro
   return Promise.all(pages.map(([y0, y1]) => {
     const cv = document.createElement('canvas'); cv.width = W; cv.height = (y1 - y0) * IMG_SC;
     const x = cv.getContext('2d');
@@ -1345,7 +1345,7 @@ function renderAnalisis() {
   $('#kpi-dash').innerHTML = `<div class="an-hero">
       <span class="an-hero-t">${MESES[HOY.getMonth()]}</span>
       <div class="an-hero-b">
-        <div class="an-ring" role="img" aria-label="${pctMes} % pagado"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="#26262E" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#F4F4EF" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="${pctMes} 100"/></svg><span>${pctMes} %</span></div>
+        <div class="an-ring" role="img" aria-label="${pctMes} % pagado"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" style="stroke:var(--line-3)" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" style="stroke:var(--ink)" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="${pctMes} 100"/></svg><span>${pctMes} %</span></div>
         <div class="an-hero-n"><small>Falta por pagar</small><b>${fmtMoney(faltaMes)}</b><small>Abonado ${fmtMoney(aboMes)} de ${fmtMoney(totMes)}</small></div>
       </div>
     </div>
