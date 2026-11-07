@@ -78,7 +78,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v190';
+const APP_VERSION = 'v191';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1117,7 +1117,7 @@ function renderPerfil() {
   const fila = (accion, d, t, sub) => `<button type="button" class="aj-row" data-action="${accion}">${ic(d)}<span class="aj-t"><b>${t}</b><small>${sub}</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
   $('#perfil').innerHTML = `
     <div class="aj-card">
-      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin conexión con Google Sheets' : cfg.error ? 'Sin sincronizar' : 'Sincronización conectada'}</div>
+      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin conexión con Google Sheets' : cfg.error ? 'Sin sincronizar' : conn.nube ? 'Guardado en tu cuenta' : 'Sincronización conectada'}</div>
       <p class="s-sub">${!conn ? 'Conecta una hoja de tu Drive para respaldar tus pagos.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
       <button type="button" class="btn btn-primary" data-action="${conn ? 'sync-card' : 'open-sync'}">${conn ? 'Sincronizar ahora' : 'Conectar'}</button>
     </div>
@@ -1480,7 +1480,7 @@ async function syncRapido(btn) {
       if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
       await sync.push(movimientos, metas, { dbOk, force: true });
     }
-    toast('Sincronizado con Google Sheets');
+    toast(sync.connection().nube ? 'Sincronizado con tu cuenta' : 'Sincronizado con Google Sheets');
   } catch (e) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
     toast(e.message || 'No se pudo sincronizar');
