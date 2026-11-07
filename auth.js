@@ -52,3 +52,10 @@ export async function cerrarSesion() {
   try { if (s) await api('/auth/v1/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + s.access_token } }); } catch (e) { /* igual se cierra aquí */ }
   guardar(null);
 }
+
+/* Token vigente para llamar a la API (renueva si venció). Vacío si no hay sesión. */
+export async function accessToken() {
+  await renovar();
+  const s = leer();
+  return s && s.access_token ? s.access_token : '';
+}

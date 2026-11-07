@@ -2,10 +2,16 @@
    Escribe las pestañas «Finanzas · Pagos» y «Finanzas · Metas» y una copia exacta oculta para poder restaurar.
    La conexión (URL y clave) vive en este teléfono; con «auto» se envía sola después de cada cambio. */
 
+import { haySesion, accessToken, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
+
 const KEY = 'finanzas_sync';
 
 export function getCfg() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { /* vacío */ }
+  /* Con sesión de Supabase la sincronización sola viene encendida salvo que se apague a mano. */
+  if (c.auto === undefined && haySesion()) c.auto = true;
+  return c;
 }
 export function setCfg(patch) {
   const cfg = { ...getCfg(), ...patch };
@@ -105,7 +111,9 @@ async function call(url, opts) {
   try { return await res.json(); } catch (e) { throw new Error(NET_HELP); }
 }
 
+/* Con sesión de Google (Supabase) la copia vive en la tabla `copias` de la cuenta; si no, en la hoja de Google (Sheets). */
 export function connection() {
+  if (haySesion()) return { nube: true };
   const { url, token } = getCfg();
   return url && token ? { url, token } : null;
 }
@@ -126,6 +134,7 @@ export async function push(movimientos, metas, { force = false, dbOk = true } = 
     throw e;
   }
   const raw = JSON.stringify({ app: 'finanzas', movimientos, metas, borrados: borrados() });
+  if (cfg.nube) { await nubePush(JSON.parse(raw)); setCfg({ last: Date.now(), error: '', count: total }); return; }
   const out = await call(cfg.url, { method: 'POST', body: JSON.stringify({ token: cfg.token, tables: tables(movimientos, metas), raw, force }) });
   if (!out.ok) throw new Error(out.error || 'Error en la hoja');
   setCfg({ last: Date.now(), error: '', count: total });
@@ -135,7 +144,31 @@ export async function push(movimientos, metas, { force = false, dbOk = true } = 
 export async function pull() {
   const cfg = connection();
   if (!cfg) throw new Error('Primero conecta tu hoja');
+  if (cfg.nube) return nubePull();
   const out = await call(`${cfg.url}${cfg.url.includes('?') ? '&' : '?'}token=${encodeURIComponent(cfg.token)}`);
   if (!out.ok) throw new Error(out.error || 'Error en la hoja');
   return out.data;
+}
+
+/* ---- Supabase: una copia completa por cuenta (tabla `copias`, solo la ve su dueño por RLS) ---- */
+async function nube(ruta, opts = {}) {
+  const token = await accessToken();
+  if (!token) throw new Error('Tu sesión venció. Vuelve a iniciar sesión.');
+  const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined;
+  let res;
+  try {
+    res = await fetch(SUPABASE_URL + ruta, { ...opts, signal, headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+  } catch (e) { throw new Error(e && e.name === 'TimeoutError' ? 'La nube tardó demasiado en responder. Intenta de nuevo.' : navigator.onLine === false ? 'Sin conexión a internet' : 'No se pudo conectar con la nube.'); }
+  if (!res.ok) {
+    let msg = ''; try { msg = (await res.json()).message || ''; } catch (e) { /* sin cuerpo */ }
+    throw new Error(res.status === 401 ? 'Tu sesión venció. Vuelve a iniciar sesión.' : `La nube respondió ${res.status}${msg ? ': ' + msg : ''}`);
+  }
+  return res;
+}
+async function nubePull() {
+  const rows = await (await nube('/rest/v1/copias?select=datos')).json();
+  return rows.length ? rows[0].datos : null;
+}
+async function nubePush(datos) {
+  await nube('/rest/v1/copias?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ datos, updated_at: new Date().toISOString() }) });
 }
