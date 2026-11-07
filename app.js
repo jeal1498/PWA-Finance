@@ -77,7 +77,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v187';
+const APP_VERSION = 'v188';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1929,6 +1929,15 @@ setTimeout(autoSincronizar, 2000);
   const sig = new Date(); sig.setHours(24, 0, 5, 0);
   setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
 })();
+/* Portada de login. AUTH_ON se enciende cuando Supabase esté conectado (hasta entonces la app abre directo);
+   con #login en la dirección se puede ver la portada para probarla. */
+const AUTH_ON = false;
+const loginEl = $('#login');
+const haySesion = () => false; // se reemplaza por la sesión de Supabase
+function mostrarLogin() { loginEl.hidden = !(location.hash === '#login' || (AUTH_ON && !haySesion())); }
+$('#login-google').addEventListener('click', () => toast('Falta conectar Supabase'));
+addEventListener('hashchange', mostrarLogin);
+mostrarLogin();
 $('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
 await absorberPlanes();
 render();

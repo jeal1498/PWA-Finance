@@ -1236,3 +1236,23 @@ body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--dang
 .pv-metas .pv-l { white-space: nowrap; }
 .pv-metas .pv-l small { font-size: 10.5px; font-weight: 600; letter-spacing: 0; text-transform: none; margin-left: 2px; }
 .pv-metas b { font-family: var(--font); font-weight: 800; font-size: 20px; line-height: 1.1; letter-spacing: -.02em; }
+
+/* Portada de login (Supabase + Google): pantalla completa, mismos tokens que la app (claro/oscuro automático). */
+.login { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; padding: calc(28px + env(safe-area-inset-top)) 22px calc(22px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--ink); overflow-y: auto; }
+.login[hidden] { display: none; }
+.lg-mid { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; width: 100%; max-width: 420px; margin: 0 auto; }
+.lg-mark { width: 64px; height: 64px; border-radius: 18px; background: var(--tile); box-shadow: inset 0 0 0 1px var(--line-2); display: grid; place-items: center; color: var(--ink); }
+.lg-mark svg { width: 34px; height: 34px; }
+.lg-title { font-family: var(--font-title); font-weight: 800; font-size: 52px; line-height: .95; letter-spacing: -.02em; }
+.lg-tag { font-size: 17px; line-height: 1.35; color: var(--muted); max-width: 24ch; }
+.lg-prev { border-radius: 16px; background: var(--tile); box-shadow: inset 0 0 0 1px var(--line-2); overflow: hidden; }
+.lg-pr { height: 40px; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; font-weight: 600; border-top: 1px solid var(--line); }
+.lg-pr:first-child { border-top: 0; }
+.lg-pr b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lg-pr span { font-weight: 800; text-align: center; }
+.lg-pr.ok span { color: var(--ok); } .lg-pr.w span { color: var(--warn); } .lg-pr.b span { color: var(--danger); }
+.lg-btn { width: 100%; max-width: 420px; margin: 0 auto; height: 48px; border: 0; border-radius: 16px; background: var(--ink); color: var(--on-ink); font: 800 16px var(--font); display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; }
+.lg-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.lg-g { width: 26px; height: 26px; border-radius: 50%; background: #fff; display: grid; place-items: center; }
+.lg-g svg { width: 16px; height: 16px; }
+.lg-nota { max-width: 420px; margin: 12px auto 0; text-align: center; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
