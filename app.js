@@ -2,6 +2,7 @@ import * as db from './js/db.js';
 import * as sync from './sync.js';
 import { migrateFinance } from './js/migrar-finanzas.js';
 import { parseImport, exportJSON, exportCSV, templateCSV } from './datos.js';
+import * as comp from './compartir.js';
 import { haySesion, usuario, procesarRetorno, iniciarGoogle, renovar, cerrarSesion } from './auth.js';
 
 /* =========================================================
@@ -78,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v192';
+const APP_VERSION = 'v193';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1118,6 +1119,8 @@ function renderPerfil() {
       <p class="s-sub">${!conn ? 'Inicia sesión para guardar tus pagos en tu cuenta.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
       ${conn ? '<button type="button" class="btn btn-primary" data-action="sync-card">Sincronizar ahora</button>' : ''}
     </div>
+    <h2 class="perfil-h">Finanzas compartidas</h2>
+    <div class="aj-card" id="comp-box"><p class="s-sub">Cargando…</p></div>
     <h2 class="perfil-h">Compartir</h2>
     <div class="aj-tiles">
       <button type="button" class="aj-tile" data-action="share-month">${ic(IMG)}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()}</small></span></button>
@@ -1129,6 +1132,8 @@ function renderPerfil() {
       ${fila('export-json', DOWN, 'Exportar respaldo', 'Descarga un archivo JSON')}
     </div>
     ${usuario() ? `<button type="button" class="s-link" data-action="cerrar-sesion">Cerrar sesión · ${esc(usuario().email)}</button>` : ''}`;
+
+  cargarCompartir();
 }
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
@@ -1494,6 +1499,83 @@ function sanear(list) {
   return ok;
 }
 
+/* ---- Finanzas compartidas (compartir.js): lista de personas, invitar y salir ---- */
+const inicial = m => String(m.nombre || m.email || '?').trim().charAt(0).toUpperCase();
+async function cargarCompartir() {
+  const box = $('#comp-box');
+  if (!box) return;
+  try {
+    const { miembros, enviadas } = await comp.estado();
+    if (!$('#comp-box')) return;
+    const yo = usuario(), miEmail = yo ? yo.email.toLowerCase() : '';
+    const fila = m => { const soy = m.email.toLowerCase() === miEmail; return `<div class="mem"><i class="av ${soy ? 'av-e' : 'av-k'}">${esc(inicial(m))}</i><span><b>${esc(m.nombre || m.email)}</b><small>${soy ? 'tú · ' : ''}${esc(m.email)}</small></span><em class="mem-tag ok" style="font-style:normal">${soy ? '' : 'Activa'}</em></div>`; };
+    const pend = e => `<div class="mem"><i class="av av-k">${esc(e.email.charAt(0).toUpperCase())}</i><span><b>${esc(e.email)}</b><small>Invitación enviada</small></span><span><em class="mem-tag w" style="font-style:normal">Pendiente</em><button type="button" class="mem-x" data-action="quitar-inv" data-email="${esc(e.email)}">Quitar</button></span></div>`;
+    const dos = miembros.length >= 2;
+    box.innerHTML = `${miembros.map(fila).join('')}${enviadas.map(pend).join('')}
+      <p class="s-sub">${dos ? 'Lo que anota cualquiera de los dos aparece en los dos teléfonos.' : enviadas.length ? 'Cuando acepte, verán las mismas finanzas.' : 'Invita a tu pareja para llevar las mismas finanzas entre los dos.'}</p>
+      ${dos ? '<button type="button" class="s-link" data-action="salir-compartir">Dejar de compartir</button>' : !enviadas.length ? '<button type="button" class="btn btn-primary" data-action="invitar">Invitar a alguien</button>' : ''}`;
+  } catch (e) {
+    box.innerHTML = `<p class="s-sub">${esc(navigator.onLine === false ? 'Sin conexión: no se puede ver quién comparte.' : e.message || 'No se pudo cargar.')}</p>`;
+  }
+}
+function openInvitar() {
+  sheet.ctx = { type: 'invitar' };
+  openSheet('Invitar a alguien', `
+    <p class="note">Escribe el correo de Google de esa persona. No se envía ningún correo: la invitación le aparece en su app cuando entre con esa cuenta.</p>
+    <form id="invitar-form" class="s-form" autocomplete="off">
+      <label class="q-lab" for="inv-email">Correo</label>
+      <label class="fld" for="inv-email"><input id="inv-email" type="email" inputmode="email" autocomplete="off" placeholder="correo@gmail.com" required></label>
+      <p class="form-error" id="inv-form-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="inv-enviar">Invitar</button>
+    </form>`);
+  sheet.panel.focus({ preventScroll: true });
+}
+async function submitInvitar() {
+  const email = $('#inv-email').value.trim(), btn = $('#inv-enviar');
+  btn.disabled = true; btn.textContent = 'Invitando…';
+  try {
+    await comp.invitar(email);
+    closeSheet(); toast('Invitación lista: le aparecerá en su app'); if (state.view === 'perfil') renderPerfil();
+  } catch (e) {
+    $('#inv-form-error').textContent = e.message || 'No se pudo invitar';
+    btn.disabled = false; btn.textContent = 'Invitar';
+  }
+}
+async function salirCompartir() {
+  if (!window.confirm('¿Dejar de compartir? Te quedas con una copia de lo que hay ahora y ya no verás lo que anote la otra persona.')) return;
+  try { await comp.salir(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
+}
+/* Invitación recibida: pantalla completa al entrar (y al volver a la app) si alguien invitó a este correo. */
+const invPospuestas = new Set();
+let invActual = null;
+async function revisarInvitaciones() {
+  const el = $('#invita');
+  if (!haySesion() || navigator.onLine === false || !el.hidden || !$('#login').hidden) return;
+  try {
+    const lista = (await comp.misInvitaciones()).filter(i => !invPospuestas.has(i.id));
+    if (!lista.length || !el.hidden) return;
+    invActual = lista[0];
+    const nom = invActual.de_nombre || invActual.de_email;
+    $('#inv-de').textContent = `${nom.split(' ')[0]} te invitó`;
+    $('#inv-av').textContent = nom.charAt(0).toUpperCase();
+    $('#inv-nombre').textContent = nom; $('#inv-de-email').textContent = invActual.de_email;
+    $('#inv-pagos').textContent = invActual.pagos ? plural(invActual.pagos, 'pago', 'pagos') : 'Aún sin pagos';
+    $('#inv-error').textContent = '';
+    el.hidden = false;
+  } catch (e) { /* sin red o sin sesión: se revisa después */ }
+}
+$('#inv-no').addEventListener('click', () => { if (invActual) invPospuestas.add(invActual.id); $('#invita').hidden = true; });
+$('#inv-si').addEventListener('click', async () => {
+  const b = $('#inv-si'); b.disabled = true; b.textContent = 'Uniéndome…';
+  try {
+    await comp.aceptar(invActual.id);
+    $('#invita').hidden = true; toast('Ya comparten sus finanzas');
+    try { await sincronizar(); } catch (e) { /* ya se unió; se sincroniza sola en cuanto se pueda */ }
+    if (state.view === 'perfil') renderPerfil();
+  } catch (e) { $('#inv-error').textContent = e.message || 'No se pudo aceptar'; }
+  finally { b.disabled = false; b.textContent = 'Aceptar y unirme'; }
+});
+
 function download(name, text, type) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
@@ -1652,6 +1734,9 @@ document.addEventListener('click', async e => {
     case 'share-month': shareMonth(); break;
     case 'fondo': shareFondo(t.dataset); break;
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
+    case 'invitar': openInvitar(); break;
+    case 'salir-compartir': salirCompartir(); break;
+    case 'quitar-inv': comp.quitarInvitacion(t.dataset.email).then(() => cargarCompartir()).catch(e => toast(e.message || 'No se pudo quitar')); break;
     case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
     case 'open-import': openImport(); break;
     case 'export-json':
@@ -1788,6 +1873,7 @@ document.addEventListener('change', e => {
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
+  else if (e.target.id === 'invitar-form') { e.preventDefault(); submitInvitar(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
 });
 
@@ -1841,7 +1927,7 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Inicio
    ========================================================= */
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); autoSincronizar(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); autoSincronizar(); revisarInvitaciones(); } });
 setInterval(autoSincronizar, 120000);
 addEventListener('online', autoSincronizar);
 setTimeout(autoSincronizar, 2000);
@@ -1857,6 +1943,7 @@ $('#login-google').addEventListener('click', iniciarGoogle);
 addEventListener('hashchange', mostrarLogin);
 mostrarLogin();
 renovar();
+setTimeout(revisarInvitaciones, 1500);
 if (errLogin) toast('No se pudo iniciar sesión: ' + errLogin);
 $('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
 await absorberPlanes();

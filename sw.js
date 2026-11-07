@@ -1,5 +1,5 @@
 // Service worker: Finanzas funciona offline. Sube CACHE en cada cambio o el teléfono no se actualiza.
-const CACHE = 'finanzas-v192';
+const CACHE = 'finanzas-v193';
 const ASSETS = [
   './',
   'index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   'datos.js',
   'sync.js',
   'auth.js',
+  'compartir.js',
   'styles.css',
   'favicon.svg',
   'manifest.webmanifest',
