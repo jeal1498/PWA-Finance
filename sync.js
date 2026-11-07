@@ -104,7 +104,7 @@ export async function pull() {
 }
 
 /* ---- Supabase: una copia completa por cuenta (tabla `copias`, solo la ve su dueño por RLS) ---- */
-async function nube(ruta, opts = {}) {
+export async function nube(ruta, opts = {}) {
   const token = await accessToken();
   if (!token) throw new Error('Tu sesión venció. Vuelve a iniciar sesión.');
   const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined;
@@ -114,7 +114,7 @@ async function nube(ruta, opts = {}) {
   } catch (e) { throw new Error(e && e.name === 'TimeoutError' ? 'La nube tardó demasiado en responder. Intenta de nuevo.' : navigator.onLine === false ? 'Sin conexión a internet' : 'No se pudo conectar con la nube.'); }
   if (!res.ok) {
     let msg = ''; try { msg = (await res.json()).message || ''; } catch (e) { /* sin cuerpo */ }
-    throw new Error(res.status === 401 ? 'Tu sesión venció. Vuelve a iniciar sesión.' : `La nube respondió ${res.status}${msg ? ': ' + msg : ''}`);
+    throw new Error(res.status === 401 ? 'Tu sesión venció. Vuelve a iniciar sesión.' : msg || `La nube respondió ${res.status}`);
   }
   return res;
 }
@@ -122,6 +122,14 @@ async function nubePull() {
   const rows = await (await nube('/rest/v1/copias?select=datos')).json();
   return rows.length ? rows[0].datos : null;
 }
+/* Crea la cuenta (hogar) de quien entra por primera vez; una vez por carga de la app. */
+let hogarListo = false;
+async function asegurar() {
+  if (hogarListo) return;
+  await nube('/rest/v1/rpc/asegurar_hogar', { method: 'POST', body: '{}' });
+  hogarListo = true;
+}
 async function nubePush(datos) {
+  await asegurar();
   await nube('/rest/v1/copias?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ datos, updated_at: new Date().toISOString() }) });
 }
