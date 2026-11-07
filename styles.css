@@ -1272,3 +1272,15 @@ body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--dang
 /* Cuenta de una sola persona: sin columna de responsable. */
 .pt-cols.solo { grid-template-columns: 40px 30px minmax(0, 1fr) minmax(54px, max-content); }
 .pt-cols.solo:has(.pt-pa) { grid-template-columns: 40px 30px minmax(0, 1fr) max-content; }
+
+/* Ajustes: encabezado de cuenta, pastilla de sincronización y filas. */
+.aj-me { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 2px 2px; }
+.aj-me .av { width: 44px; height: 44px; font-size: 18px; font-style: normal; }
+.aj-meb b { display: block; font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aj-meb small { display: block; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.aj-pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 0; border-radius: 99px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.aj-pill.off { color: var(--danger-text); }
+.aj-pill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.aj-row .av { width: 34px; height: 34px; flex: none; font-size: 14px; font-style: normal; }
+.aj-salir { margin-top: 18px; }
+.aj-out { justify-content: center; color: var(--danger-text); font-weight: 700; }
