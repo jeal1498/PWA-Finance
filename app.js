@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v202';
+const APP_VERSION = 'v203';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -2058,6 +2058,24 @@ function mostrarLogin() { loginEl.hidden = haySesion() && location.hash !== '#lo
 $('#login-google').addEventListener('click', iniciarGoogle);
 addEventListener('hashchange', mostrarLogin);
 mostrarLogin();
+/* Cada cuenta de Google tiene sus propios datos en este teléfono: si entra otra, se vacía lo de la anterior (sigue en la nube) para no
+   mezclar pagos ni la lista de «borrados» de una cuenta con los de otra. La primera vez con esta versión solo se descarta la lista
+   vieja de borrados (la nube trae la buena). */
+async function verificarCuenta() {
+  const u = usuario();
+  if (!u) return;
+  const yo = u.email.toLowerCase(), antes = lsGet('finanzas_cuenta');
+  lsSet('finanzas_cuenta', yo);
+  if (antes === yo) return;
+  try { localStorage.removeItem('finanzas_borrados'); } catch (e) { /* sin almacenamiento */ }
+  if (!antes) return;
+  try { ['finanzas_sync', KEY_PERSONAS, 'finanzas_quien'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* sin almacenamiento */ }
+  aplicarPersonas({});
+  await dbBatch({ movimientos: { clear: true }, metas: { clear: true } });
+  movimientos = []; metas = [];
+  render();
+}
+await verificarCuenta();
 renovar();
 setTimeout(revisarInvitaciones, 1500);
 refrescarPersonas();
