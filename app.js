@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v195';
+const APP_VERSION = 'v196';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -177,7 +177,7 @@ function autoSync() {
   clearTimeout(autoTimer);
   autoTimer = setTimeout(async () => {
     try { await sincronizar(); }
-    catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); }
+    catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); }
   }, 4000);
 }
 /* Sincronización automática (con sesión iniciada): al abrir y al volver a la app, cada 2 minutos con la app a la vista,
@@ -189,7 +189,7 @@ async function autoSincronizar() {
   if (Date.now() - ultimoAuto < 15000) return;
   ultimoAuto = Date.now();
   try { await sincronizar(); }
-  catch (e) { if (navigator.onLine !== false) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); } }
+  catch (e) { if (navigator.onLine !== false) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); } }
 }
 /* Varias pestañas: cada cambio avisa a las demás para que vuelvan a leer la base (si no, la que quedó vieja pisaría los abonos). */
 const canal = typeof BroadcastChannel === 'function' ? new BroadcastChannel('finanzas-datos') : null;
@@ -661,7 +661,6 @@ function renderList(groups, caption, countText, emptyKind, baseEmpty) {
    ========================================================= */
 function render() {
   refrescarHoy();
-  marcaSync();
   const hoyIdx = HOY.getFullYear() * 12 + HOY.getMonth();
   generarRepetidos(hoyIdx + 1);
   const isP = state.view === 'perfil', isN = state.view === 'analisis', isV = state.view === 'provisional', isC = state.view === 'calendario';
@@ -1432,11 +1431,7 @@ function kpiDashboard(base, todo = false, vis = base) {
     </div>`;
 }
 
-/* Botón de sincronizar (arriba del «+»): sincroniza con tu cuenta de una vez. */
-function marcaSync() {
-  const b = $('#nav-sync');
-  if (b) b.classList.toggle('err', !!(sync.connection() && sync.getCfg().error));
-}
+/* «Sincronizar ahora» de Ajustes: sincroniza con tu cuenta de una vez. */
 async function syncRapido(btn) {
   if (!sync.connection()) return;
   btn.classList.add('girando'); btn.disabled = true;
@@ -1451,7 +1446,7 @@ async function syncRapido(btn) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
     toast(e.message || 'No se pudo sincronizar');
   } finally {
-    btn.classList.remove('girando'); btn.disabled = false; marcaSync();
+    btn.classList.remove('girando'); btn.disabled = false;
     if (state.view === 'perfil' && sheet.el.hidden) renderPerfil();
   }
 }
@@ -1797,7 +1792,6 @@ document.addEventListener('click', async e => {
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
     case 'conc-todos': state.conceptosTodos = !state.conceptosTodos; render(); break;
-    case 'sync-quick': syncRapido(t); break;
     case 'sync-card': t.textContent = 'Sincronizando…'; await syncRapido(t); break;
     case 'quien':
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));

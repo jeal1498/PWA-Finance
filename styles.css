@@ -832,13 +832,6 @@ button.hist-row { width: 100%; padding: 0; border: 0; border-top: 1px solid var(
 .hist-row b { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .hist-row .ic { width: 14px; height: 14px; color: var(--muted); }
 
-/* Botón de sincronizar: flota justo arriba del «+». */
-.nav-sync { position: fixed; right: 22px; bottom: calc(56px + 16px + env(safe-area-inset-bottom)); z-index: 30; width: 44px; height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink); border: 1px solid rgba(var(--ink-rgb), .28); box-shadow: 0 8px 22px rgba(0, 0, 0, .55); }
-.nav-sync .ic { width: 22px; height: 22px; stroke-width: 2; }
-.nav-sync.girando .ic { animation: gira 1s linear infinite; }
-.nav-sync.err::after { content: ""; position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }
-@keyframes gira { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .nav-sync.girando .ic { animation: none; opacity: .5; } }
 
 /* Conceptos con el mismo nombre: sugerencias al crear, historial en el detalle y resumen por concepto. */
 .cp-chips { display: flex; gap: 6px; margin-bottom: 12px; }
