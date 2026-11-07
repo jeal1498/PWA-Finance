@@ -1,7 +1,7 @@
 /* Sesión con Supabase Auth (Google) sin librerías: flujo implícito por redirección.
    Solo guarda la clave pública (publishable) del proyecto; la sesión vive en localStorage de este teléfono. */
-export const SUPABASE_URL = 'https://gqsadclvftkzwrihfipz.supabase.co';
-export const SUPABASE_KEY = 'sb_publishable_1s3ayMUeKWIjyuWUV1-PDQ_hXtGChV1';
+export const SUPABASE_URL = 'https://cnesinlvrvsmeflaqjkr.supabase.co';
+export const SUPABASE_KEY = 'sb_publishable_ldPwztEZ2iDzdDyhBz_3ng_rydg_FDJ';
 const LS = 'finanzas_sesion';
 const REDIRECT = 'https://jeal1498.github.io/PWA-Finance/';
 
