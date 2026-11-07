@@ -78,7 +78,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v191';
+const APP_VERSION = 'v192';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -169,23 +169,21 @@ function generarSeries(lista, store, hasta, soloSerie) {
     .catch(e => console.error('Pagos repetidos', e));
 }
 
-/* Guarda un registro (o lo borra). Con la hoja conectada y «auto», se envía sola unos segundos después. */
+/* Guarda un registro (o lo borra). Con sesión iniciada se envía sola unos segundos después. */
 let autoTimer;
 function autoSync() {
-  const cfg = sync.getCfg();
-  if (!cfg.auto || !sync.connection()) return;
+  if (!sync.connection()) return;
   clearTimeout(autoTimer);
   autoTimer = setTimeout(async () => {
     try { await sincronizar(); }
     catch (e) { sync.setCfg({ error: e.message || 'No se pudo sincronizar' }); marcaSync(); }
   }, 4000);
 }
-/* Sincronización automática (si «Sincronizar sola» está encendido): al abrir y al volver a la app, cada 2 minutos con la app a la vista,
+/* Sincronización automática (con sesión iniciada): al abrir y al volver a la app, cada 2 minutos con la app a la vista,
    y al cerrar una hoja. No corre con una hoja abierta ni sin internet; el envío tras cada cambio es autoSync(). */
 let ultimoAuto = 0;
 async function autoSincronizar() {
-  const cfg = sync.getCfg();
-  if (!cfg.auto || !sync.connection() || !dbOk) return;
+  if (!sync.connection() || !dbOk) return;
   if (document.hidden || !sheet.el.hidden || sincronizando || navigator.onLine === false) return;
   if (Date.now() - ultimoAuto < 15000) return;
   ultimoAuto = Date.now();
@@ -1111,15 +1109,14 @@ function renderPerfil() {
   const ic = d => `<span class="aj-ic">${svg(d)}</span>`;
   const IMG = '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/>';
   const PHONE = '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>';
-  const SYNC = '<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/>';
   const UP = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>';
   const DOWN = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>';
   const fila = (accion, d, t, sub) => `<button type="button" class="aj-row" data-action="${accion}">${ic(d)}<span class="aj-t"><b>${t}</b><small>${sub}</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
   $('#perfil').innerHTML = `
     <div class="aj-card">
-      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin conexión con Google Sheets' : cfg.error ? 'Sin sincronizar' : conn.nube ? 'Guardado en tu cuenta' : 'Sincronización conectada'}</div>
-      <p class="s-sub">${!conn ? 'Conecta una hoja de tu Drive para respaldar tus pagos.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
-      <button type="button" class="btn btn-primary" data-action="${conn ? 'sync-card' : 'open-sync'}">${conn ? 'Sincronizar ahora' : 'Conectar'}</button>
+      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin sesión' : cfg.error ? 'Sin sincronizar' : 'Guardado en tu cuenta'}</div>
+      <p class="s-sub">${!conn ? 'Inicia sesión para guardar tus pagos en tu cuenta.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
+      ${conn ? '<button type="button" class="btn btn-primary" data-action="sync-card">Sincronizar ahora</button>' : ''}
     </div>
     <h2 class="perfil-h">Compartir</h2>
     <div class="aj-tiles">
@@ -1130,7 +1127,6 @@ function renderPerfil() {
     <div class="aj-grp">
       ${fila('open-import', UP, 'Importar datos', 'Archivo JSON o CSV')}
       ${fila('export-json', DOWN, 'Exportar respaldo', 'Descarga un archivo JSON')}
-      ${fila('open-sync', SYNC, 'Conexión con Google Sheets', 'URL, clave y sincronizar sola')}
     </div>
     ${usuario() ? `<button type="button" class="s-link" data-action="cerrar-sesion">Cerrar sesión · ${esc(usuario().email)}</button>` : ''}`;
 }
@@ -1431,48 +1427,13 @@ function kpiDashboard(base, todo = false, vis = base) {
     </div>`;
 }
 
-/* Respaldo en tu hoja de Google (script en apps-script/Code.gs): conexión, envío manual y «auto». */
-const SCRIPT_URL = 'https://github.com/jeal1498/PWA-Finance/blob/main/apps-script/Code.gs';
-function openSync(note) {
-  sheet.ctx = { type: 'sync' };
-  const cfg = sync.getCfg(), conn = sync.connection();
-  const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
-  const msg = note ? `<p class="note" role="status">${esc(note)}</p>` : '';
-  const form = `<form id="sync-form" class="s-form" autocomplete="off">
-      <label class="q-lab" for="sync-url">URL de la aplicación web</label>
-      <label class="fld" for="sync-url"><input id="sync-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(cfg.url || '')}" required></label>
-      <label class="q-lab" for="sync-token">Clave</label>
-      <label class="fld" for="sync-token"><input id="sync-token" type="text" autocapitalize="off" spellcheck="false" value="${esc(cfg.token || '')}" required></label>
-      <button type="submit" class="btn ${conn ? 'btn-soft' : 'btn-primary'}">${conn ? 'Guardar conexión' : 'Conectar y sincronizar'}</button>
-    </form>`;
-  openSheet('Sincronizar', `
-    ${conn ? `<div class="s-card">
-      <div class="s-st"><span class="s-dot${cfg.error ? ' off' : ''}"></span>${cfg.error ? 'Sin sincronizar' : 'Conectado'}</div>
-      <p class="s-sub">Última sincronización: ${when}</p>
-      ${cfg.error ? `<p class="form-error" role="alert">${esc(cfg.error)}</p>` : msg}
-      <button type="button" class="btn btn-primary" data-action="sync-push" id="sync-push">Sincronizar ahora</button>
-    </div>` : `<p class="note">Conecta una hoja de tu Drive: crea una hoja nueva, pega ahí el <a href="${SCRIPT_URL}" target="_blank" rel="noopener">script</a> (Extensiones → Apps Script), cambia la clave, impleméntalo como aplicación web (acceso: cualquier persona) y copia aquí la URL y la clave.</p>${msg}`}
-    <label class="switch-row s-auto" for="sync-auto"><span>Sincronizar sola (al abrir, cada 2 min y tras cada cambio)</span><input type="checkbox" class="switch" id="sync-auto" role="switch"${cfg.auto ? ' checked' : ''}></label>
-    <button type="button" class="acc" data-action="acc" aria-expanded="${!conn}" aria-controls="acc-conn"><b>Conexión</b><span>URL y clave ›</span></button>
-    <div class="acc-p" id="acc-conn"${conn ? ' hidden' : ''}>${form}</div>
-    ${conn ? `<button type="button" class="s-link" data-action="sync-pull">Traer de la hoja</button>
-    <p class="s-sub s-c">Reemplaza todo lo de este teléfono por la copia de la hoja.</p>` : ''}`);
-  sheet.panel.focus({ preventScroll: true });
-}
-
-async function syncSave(form) {
-  const url = $('#sync-url', form).value.trim(), token = $('#sync-token', form).value.trim();
-  sync.setCfg({ url, token, auto: $('#sync-auto').checked, error: '' });
-  await syncPush();
-}
-
-/* Botón de sincronizar (arriba del «+»): envía de una vez; sin conexión a la hoja abre la pantalla para conectarla. */
+/* Botón de sincronizar (arriba del «+»): sincroniza con tu cuenta de una vez. */
 function marcaSync() {
   const b = $('#nav-sync');
   if (b) b.classList.toggle('err', !!(sync.connection() && sync.getCfg().error));
 }
 async function syncRapido(btn) {
-  if (!sync.connection()) { openSync(); return; }
+  if (!sync.connection()) return;
   btn.classList.add('girando'); btn.disabled = true;
   try {
     try { await sincronizar(); }
@@ -1480,7 +1441,7 @@ async function syncRapido(btn) {
       if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
       await sync.push(movimientos, metas, { dbOk, force: true });
     }
-    toast(sync.connection().nube ? 'Sincronizado con tu cuenta' : 'Sincronizado con Google Sheets');
+    toast('Sincronizado con tu cuenta');
   } catch (e) {
     sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
     toast(e.message || 'No se pudo sincronizar');
@@ -1520,22 +1481,6 @@ function sincronizar() {
   return sincronizando;
 }
 
-async function syncPush() {
-  const btn = $('#sync-push');
-  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
-  try {
-    try { await sincronizar(); }
-    catch (e) {
-      if (e.code !== 'drop' || !window.confirm(`${e.message}\n\n¿Enviar de todos modos?`)) throw e;
-      await sync.push(movimientos, metas, { dbOk, force: true });
-    }
-    openSync('Listo: este teléfono y la hoja ya tienen lo mismo.');
-  } catch (e) {
-    sync.setCfg({ error: e.message || 'No se pudo sincronizar' });
-    openSync();
-  }
-}
-
 /* Deja solo registros completos (id, fecha, concepto, importe); así uno malo nunca vacía la base a medias. */
 function sanear(list) {
   const ids = new Set(), ok = [];
@@ -1547,29 +1492,6 @@ function sanear(list) {
     ok.push({ ...x, imp: +x.imp, pagos, abo: r2(pagos.reduce((t, p) => t + p.monto, 0)) });
   }
   return ok;
-}
-
-async function syncPull() {
-  try {
-    const data = await sync.pull();
-    if (!data) return openSync('La hoja aún no tiene una copia. Sincroniza primero.');
-    const recibidos = (Array.isArray(data.movimientos) ? data.movimientos.length : 0) + (Array.isArray(data.metas) ? data.metas.length : 0);
-    const mov = sanear(data.movimientos), met = sanear(data.metas);
-    if (!mov.length && !met.length) return openSync('La copia de la hoja no trae registros válidos; no se cambió nada.');
-    const omitidos = recibidos - mov.length - met.length;
-    const msg = `La hoja trae ${plural(mov.length + met.length, 'pago', 'pagos')}${omitidos ? ` (${omitidos} no válidos se omiten)` : ''}.\nAquí hay ${plural(movimientos.length, 'pago', 'pagos')}.\n\n¿Reemplazar lo que hay en este teléfono por la copia de la hoja?`;
-    if (!window.confirm(msg)) return;
-    const snap = { mov: copyOf(movimientos), met: copyOf(metas) };
-    await dbBatch({ movimientos: { clear: true, put: mov }, metas: { clear: true, put: met } });
-    movimientos = (await db.all('movimientos')).sort(byFecha);
-    metas = (await db.all('metas')).sort(byFecha);
-    await absorberPlanes();
-    closeSheet();
-    setView(state.view);
-    toast('Copia traída de la hoja', { label: 'Deshacer', run: () => undoImport(snap) });
-  } catch (e) {
-    return openSync(e.message || 'No se pudo traer la copia');
-  }
 }
 
 function download(name, text, type) {
@@ -1730,10 +1652,7 @@ document.addEventListener('click', async e => {
     case 'share-month': shareMonth(); break;
     case 'fondo': shareFondo(t.dataset); break;
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
-    case 'open-sync': openSync(); break;
     case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
-    case 'sync-push': syncPush(); break;
-    case 'sync-pull': syncPull(); break;
     case 'open-import': openImport(); break;
     case 'export-json':
       download(`finanzas-${toISO(HOY)}.json`, exportJSON(movimientos, metas), 'application/json');
@@ -1854,7 +1773,6 @@ document.addEventListener('input', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'f-imp') { e.preventDefault(); $('#f-conc').focus(); } });
 
 document.addEventListener('change', e => {
-  if (e.target.id === 'sync-auto') { sync.setCfg({ auto: e.target.checked }); if (sync.connection() && e.target.checked) autoSync(); }
   if (e.target.id === 'f-paid') { sheet.ctx.pagadoManual = true; pintarFecha(); }
   else if (e.target.id === 'f-fecha') pintarFecha();
   else if (['f-rep', 'f-fin', 'f-imp'].includes(e.target.id) || e.target.name === 'f-freq') actualizarFin();
@@ -1871,7 +1789,6 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
-  else if (e.target.id === 'sync-form') { e.preventDefault(); syncSave(e.target); }
 });
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
