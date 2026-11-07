@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v199';
+const APP_VERSION = 'v200';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -272,6 +272,8 @@ async function refrescarPersonas() {
   if (!haySesion() || navigator.onLine === false) return;
   try { aplicarMiembros(await comp.miembros()); } catch (e) { /* se reintenta más tarde */ }
 }
+/* Con una sola persona en la cuenta no hace falta mostrar quién es el responsable: se oculta la columna y el selector (el dato se sigue guardando). */
+const dosPersonas = () => Object.keys(PERSONAS).length >= 2;
 const quienDef = () => { const q = lsGet('finanzas_quien'); return PERSONAS[q] ? q : Object.keys(PERSONAS)[0] || 'e'; };
 /* Quién soy: la persona cuyo correo es el de mi cuenta; si aún no se conoce, el último elegido en este teléfono. */
 function miPersona() {
@@ -284,9 +286,15 @@ function quienHTML(sel) {
 }
 /* Responsable del pago: por defecto, quien lo crea; se puede cambiar o quitar al tocar de nuevo. */
 function respHTML(sel) {
+  if (!dosPersonas()) return '';
   return `<div class="quien-f"><span class="quien-l" id="resp-l">Responsable</span><div class="mode quien" id="f-resp" role="group" aria-labelledby="resp-l">${Object.entries(PERSONAS).map(([k, n]) => `<button type="button" data-action="resp" data-q="${k}" aria-pressed="${k === sel}">${avatar(k)}${n}</button>`).join('')}</div></div>`;
 }
-const respSel = () => { const b = $('#f-resp [aria-pressed=true]'); return b ? b.dataset.q : ''; };
+const respSel = () => {
+  if ($('#f-resp')) { const b = $('#f-resp [aria-pressed=true]'); return b ? b.dataset.q : ''; }
+  if (!Object.keys(PERSONAS).length) return '';
+  const previo = sheet.ctx && sheet.ctx.id ? movimientos.find(m => m.id === sheet.ctx.id) : null;
+  return (previo && previo.resp) || miPersona();
+};
 const quienSel = () => { const b = $('.quien [aria-pressed=true]'); return b ? b.dataset.q : quienDef(); };
 /* Barra de lo abonado por persona (solo si algún abono dice quién lo puso). */
 function aportesBar(por, total) {
@@ -534,10 +542,10 @@ function juntarSeries(items) {
 
 function pagoRow(m) {
   const i = gastoInfo(m), c = catOf(m.cat), t = BADGE_TONE[m.estado], dias = m.meses ? `${m.meses} ${freqOf(m) === 'mensual' ? 'meses' : 'pagos'} · ${plural(-daysFromToday(m.date), 'día', 'días')}` : diasTexto(m, i);
-  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
+  return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}${dosPersonas() ? '' : ' solo'}" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
-    <span class="pt-resp">${avatar(m.resp)}</span>
+    ${dosPersonas() ? `<span class="pt-resp">${avatar(m.resp)}</span>` : ''}
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}">${!i.done && m.ap == null && m.abo > 0 ? `<span class="pt-pa"><em>Pendiente:</em><b>${fmtMoney(i.pend)}</b><em>Abonado:</em><small>${fmtMoney(m.abo)}</small></span>` : `<b>${fmtMoney(i.done ? m.imp : m.ap != null ? m.ap : i.pend)}</b>${i.done || m.ap == null ? '' : `<small class="pt-ap">de ${fmtMoney(i.pend)}</small>`}`}</span>
   </button>`;
@@ -558,12 +566,12 @@ function pagosTable(b, conMes = true) {
   calcularChips();
   const { col, asc } = state.sort;
   const items = juntarSeries(b.items).sort((a, c) => (SORTS[col](a, c) || porFechaYMonto(a, c)) * (asc ? 1 : -1));
-  const head = COLS.map(([k, l, sh]) => {
+  const head = COLS.filter(([k]) => k !== 'resp' || dosPersonas()).map(([k, l, sh]) => {
     const on = col === k;
     return `<span class="pt-h${k === 'monto' ? ' r' : ''}"><button type="button" class="pt-sort${on ? ' on' : ''}${on && !asc ? ' desc' : ''}" data-action="sort" data-col="${k}" aria-label="Ordenar por ${l.toLowerCase()}${on ? (asc ? ', de menor a mayor' : ', de mayor a menor') : ''}">${sh || l}</button></span>`;
   }).join('');
   const pend = sum(items, 'pendiente');
-  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>`;
+  return `<div class="pt">${conMes ? mesBar() : ''}<div class="pt-cols pt-th${dosPersonas() ? '' : ' solo'}">${head}</div>${items.map(pagoRow).join('')}<div class="pt-foot"><span>${plural(b.items.length, 'pago', 'pagos')} · por pagar</span><b>${fmtMoney(pend)}</b></div></div>`;
 }
 
 /* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
