@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v197';
+const APP_VERSION = 'v198';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -249,15 +249,33 @@ async function unpersist(id) {
 
 /* Historial de abonos: cada movimiento guarda pagos [{fecha, monto}]; abo es la suma. */
 const r2 = n => Math.round(n * 100) / 100;
-/* Quién aporta cada abono (pagos[].quien). Lo último que se eligió en este teléfono queda como predeterminado. */
-const PERSONAS = { e: 'Eduardo', k: 'Karen' };
-const quienDef = () => { const q = lsGet('finanzas_quien'); return PERSONAS[q] ? q : 'e'; };
-/* Quién soy: el nombre de la cuenta de Google que coincide con una persona (Eduardo/Karen); si no, el último elegido en este teléfono. */
-const sinAcentos = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/* Las personas salen de la cuenta compartida (miembros en Supabase): la primera en unirse es `e`, la segunda `k` (así se guardan en
+   los datos: pagos[].quien y resp). El nombre es el «alias» que cada quien se pone en Ajustes; sin alias, el primer nombre de su cuenta
+   de Google. Se guardan en este teléfono para que funcione sin internet. */
+const PERSONAS = {}, PERSONAS_EMAIL = {};
+const KEY_PERSONAS = 'finanzas_personas';
+function aplicarPersonas(lista) {
+  Object.keys(PERSONAS).forEach(k => { delete PERSONAS[k]; delete PERSONAS_EMAIL[k]; });
+  ['e', 'k'].forEach((k, i) => { if (lista[i] && lista[i].nombre) { PERSONAS[k] = lista[i].nombre; PERSONAS_EMAIL[k] = lista[i].email || ''; } });
+}
+try { aplicarPersonas(JSON.parse(lsGet(KEY_PERSONAS) || '[]')); } catch (e) { /* sin guardado */ }
+/* Recibe los miembros de la nube; si cambiaron nombres o personas, los guarda y vuelve a dibujar. */
+function aplicarMiembros(miembros) {
+  const lista = miembros.map(m => ({ nombre: String(m.alias || String(m.nombre || '').trim().split(/\s+/)[0] || String(m.email || '').split('@')[0]).trim(), email: String(m.email || '').toLowerCase() }));
+  const antes = lsGet(KEY_PERSONAS) || '[]', ahora = JSON.stringify(lista);
+  if (antes === ahora) return;
+  lsSet(KEY_PERSONAS, ahora); aplicarPersonas(lista);
+  if (sheet.el.hidden) render();
+}
+async function refrescarPersonas() {
+  if (!haySesion() || navigator.onLine === false) return;
+  try { aplicarMiembros(await comp.miembros()); } catch (e) { /* se reintenta más tarde */ }
+}
+const quienDef = () => { const q = lsGet('finanzas_quien'); return PERSONAS[q] ? q : Object.keys(PERSONAS)[0] || 'e'; };
+/* Quién soy: la persona cuyo correo es el de mi cuenta; si aún no se conoce, el último elegido en este teléfono. */
 function miPersona() {
-  const u = usuario(), n = sinAcentos(u && (u.nombre || u.email));
-  const k = Object.keys(PERSONAS).find(k => n.includes(sinAcentos(PERSONAS[k])));
-  return k || quienDef();
+  const u = usuario(), yo = u ? u.email.toLowerCase() : '';
+  return Object.keys(PERSONAS).find(k => PERSONAS_EMAIL[k] === yo) || quienDef();
 }
 const avatar = q => PERSONAS[q] ? `<span class="av av-${q}" aria-hidden="true">${PERSONAS[q][0]}</span>` : '';
 function quienHTML(sel) {
@@ -1514,15 +1532,16 @@ function sanear(list) {
 }
 
 /* ---- Finanzas compartidas (compartir.js): lista de personas, invitar y salir ---- */
-const inicial = m => String(m.nombre || m.email || '?').trim().charAt(0).toUpperCase();
+const inicial = m => String(m.alias || m.nombre || m.email || '?').trim().charAt(0).toUpperCase();
 async function cargarCompartir() {
   const box = $('#comp-box');
   if (!box) return;
   try {
     const { miembros, enviadas } = await comp.estado();
     if (!$('#comp-box')) return;
+    aplicarMiembros(miembros);
     const yo = usuario(), miEmail = yo ? yo.email.toLowerCase() : '';
-    const fila = m => { const soy = m.email.toLowerCase() === miEmail; return `<div class="mem"><i class="av ${soy ? 'av-e' : 'av-k'}">${esc(inicial(m))}</i><span><b>${esc(m.nombre || m.email)}</b><small>${soy ? 'tú · ' : ''}${esc(m.email)}</small></span><em class="mem-tag ok" style="font-style:normal">${soy ? '' : 'Activa'}</em></div>`; };
+    const fila = m => { const soy = m.email.toLowerCase() === miEmail; return `<div class="mem"><i class="av ${soy ? 'av-e' : 'av-k'}">${esc(inicial(m))}</i><span><b>${esc(m.alias || m.nombre || m.email)}</b><small>${soy ? 'tú · ' : ''}${esc(m.email)}</small></span>${soy ? '<button type="button" class="mem-x" data-action="alias">Cambiar nombre</button>' : '<em class="mem-tag ok" style="font-style:normal">Activa</em>'}</div>`; };
     const pend = e => `<div class="mem"><i class="av av-k">${esc(e.email.charAt(0).toUpperCase())}</i><span><b>${esc(e.email)}</b><small>Invitación enviada</small></span><span><em class="mem-tag w" style="font-style:normal">Pendiente</em><button type="button" class="mem-x" data-action="quitar-inv" data-email="${esc(e.email)}">Quitar</button></span></div>`;
     const dos = miembros.length >= 2;
     box.innerHTML = `${miembros.map(fila).join('')}${enviadas.map(pend).join('')}
@@ -1531,6 +1550,27 @@ async function cargarCompartir() {
   } catch (e) {
     box.innerHTML = `<p class="s-sub">${esc(navigator.onLine === false ? 'Sin conexión: no se puede ver quién comparte.' : e.message || 'No se pudo cargar.')}</p>`;
   }
+}
+function openAlias() {
+  const yo = usuario(), k = miPersona();
+  sheet.ctx = { type: 'alias' };
+  openSheet('Tu nombre', `
+    <p class="note">Así te verá la otra persona y así aparece en «Responsable» y «¿Quién aporta?». Déjalo vacío para usar el nombre de tu cuenta de Google.</p>
+    <form id="alias-form" class="s-form" autocomplete="off">
+      <label class="q-lab" for="alias-in">Nombre</label>
+      <label class="fld" for="alias-in"><input id="alias-in" type="text" maxlength="24" autocomplete="off" placeholder="${esc(yo && yo.nombre ? yo.nombre.split(' ')[0] : 'Tu nombre')}" value="${esc(PERSONAS[k] || '')}"></label>
+      <p class="form-error" id="alias-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="alias-ok">Guardar</button>
+    </form>`);
+  sheet.panel.focus({ preventScroll: true });
+}
+async function submitAlias() {
+  const btn = $('#alias-ok'), v = $('#alias-in').value.trim();
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await comp.ponerAlias(v);
+    closeSheet(); await refrescarPersonas(); toast('Nombre guardado'); render();
+  } catch (e) { $('#alias-error').textContent = e.message || 'No se pudo guardar'; btn.disabled = false; btn.textContent = 'Guardar'; }
 }
 function openInvitar() {
   sheet.ctx = { type: 'invitar' };
@@ -1557,7 +1597,7 @@ async function submitInvitar() {
 }
 async function salirCompartir() {
   if (!window.confirm('¿Dejar de compartir? Te quedas con una copia de lo que hay ahora y ya no verás lo que anote la otra persona.')) return;
-  try { await comp.salir(); sync.olvidarHogar(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
+  try { await comp.salir(); sync.olvidarHogar(); refrescarPersonas(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
 }
 /* Invitación recibida: pantalla completa al entrar (y al volver a la app) si alguien invitó a este correo. */
 const invPospuestas = new Set();
@@ -1584,6 +1624,7 @@ $('#inv-si').addEventListener('click', async () => {
   try {
     await comp.aceptar(invActual.id);
     sync.olvidarHogar();
+    refrescarPersonas();
     $('#invita').hidden = true; toast('Ya comparten sus finanzas');
     try { await sincronizar(); } catch (e) { /* ya se unió; se sincroniza sola en cuanto se pueda */ }
     if (state.view === 'perfil') renderPerfil();
@@ -1750,6 +1791,7 @@ document.addEventListener('click', async e => {
     case 'fondo': shareFondo(t.dataset); break;
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
     case 'invitar': openInvitar(); break;
+    case 'alias': openAlias(); break;
     case 'salir-compartir': salirCompartir(); break;
     case 'quitar-inv': comp.quitarInvitacion(t.dataset.email).then(() => cargarCompartir()).catch(e => toast(e.message || 'No se pudo quitar')); break;
     case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
@@ -1889,6 +1931,7 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
   else if (e.target.id === 'invitar-form') { e.preventDefault(); submitInvitar(); }
+  else if (e.target.id === 'alias-form') { e.preventDefault(); submitAlias(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
 });
 
@@ -1942,7 +1985,7 @@ document.addEventListener('keydown', e => {
 /* =========================================================
    Inicio
    ========================================================= */
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); autoSincronizar(); revisarInvitaciones(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (refrescarHoy()) render(); recargarDatos(); autoSincronizar(); revisarInvitaciones(); refrescarPersonas(); } });
 setInterval(autoSincronizar, 120000);
 addEventListener('online', autoSincronizar);
 setTimeout(autoSincronizar, 2000);
@@ -1959,6 +2002,7 @@ addEventListener('hashchange', mostrarLogin);
 mostrarLogin();
 renovar();
 setTimeout(revisarInvitaciones, 1500);
+refrescarPersonas();
 if (errLogin) toast('No se pudo iniciar sesión: ' + errLogin);
 $('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
 await absorberPlanes();
