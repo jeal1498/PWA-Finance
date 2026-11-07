@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v204';
+const APP_VERSION = 'v205';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -917,7 +917,7 @@ async function finish(raw, msg, otro = false) {
   }
   reveal(raw);
   /* Pago nuevo: la hoja queda vacía para anotar el siguiente sin volver a abrirla. */
-  if (otro) openForm(null); else closeSheet();
+  if (otro) (sheet.ctx && sheet.ctx.type === 'rapido' ? openRapido() : openForm(null)); else closeSheet();
   render();
   const row = !otro && $$('.row, .pt-row').find(r => r.dataset.id === raw.id);
   if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('flash'); }
@@ -980,6 +980,83 @@ function sugerencias(texto) {
 }
 const DATE_CHIPS = [['Ayer', -1], ['Hoy', 0], ['Mañana', 1]];
 const addDays = (n) => toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
+
+/* ---- Anotar rápido (v205): una línea «super 850»; todo lo demás sale por defecto ---- */
+/* Monto = el último número de la línea; concepto = el resto del texto. */
+function parsearLinea(txt) {
+  const t = String(txt || '').replace(/\$/g, ' ');
+  const nums = [...t.matchAll(/\d[\d,]*(?:\.\d+)?|\.\d+/g)];
+  if (!nums.length) return { conc: t.replace(/\s+/g, ' ').trim(), imp: 0 };
+  const m = nums[nums.length - 1];
+  const imp = r2(parseFloat(m[0].replace(/,/g, '')) || 0);
+  const conc = (t.slice(0, m.index) + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  return { conc, imp };
+}
+/* Lo que más se repite: nombre + categoría, con el monto más usado. */
+function frecuentes() {
+  const g = new Map();
+  for (const x of movimientos.slice().sort(byFecha)) {
+    const k = llaveC(x), e = g.get(k) || { nombre: x.conc, n: 0, imps: new Map() };
+    e.nombre = x.conc; e.n++; e.imps.set(x.imp, (e.imps.get(x.imp) || 0) + 1);
+    g.set(k, e);
+  }
+  return [...g.values()].sort((a, b) => b.n - a.n).slice(0, 5)
+    .map(e => ({ nombre: e.nombre, imp: [...e.imps.entries()].sort((a, b) => b[1] - a[1])[0][0] }));
+}
+function openRapido() {
+  const last = lsGet(KEYS.cat);
+  const cat = CATS.some(c => catString(c) === last) ? last : catString(CATS.find(c => c.id === 'Personal'));
+  sheet.ctx = { type: 'rapido', cat, catElegida: false, panel: false, off: 0, pagado: true, resp: Object.keys(PERSONAS).length ? miPersona() : '', fr: frecuentes() };
+  openSheet('Anotar gasto', `
+    <form id="rapido-form" class="r-form" novalidate autocomplete="off">
+      <label class="r-linea" for="r-linea"><input id="r-linea" type="text" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" placeholder="Ej. súper 850" aria-label="Concepto y monto"></label>
+      <div id="r-prev" class="r-prev" aria-live="polite"></div>
+      <p class="form-error" id="r-error" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="r-guardar" disabled>Guardar</button>
+      <button type="button" class="r-mas" data-action="r-mas">Más opciones (repetir, fecha, abono)</button>
+    </form>`);
+  pintarRapido();
+  sheet.panel.focus({ preventScroll: true });
+  requestAnimationFrame(() => { const i = $('#r-linea'); if (i) i.focus(); });
+}
+/* Qué entendió de la línea: pastillas que se tocan solo para cambiar algo. */
+function pintarRapido() {
+  const c = sheet.ctx, prev = $('#r-prev');
+  if (!c || c.type !== 'rapido' || !prev) return;
+  const { conc, imp } = parsearLinea($('#r-linea').value);
+  const hay = conc.length > 0 || imp > 0;
+  $('#r-guardar').disabled = !(imp > 0);
+  if (!hay) {
+    prev.innerHTML = c.fr.length ? `<span class="r-h">Frecuentes</span><div class="r-chips">${c.fr.map(f => `<button type="button" class="r-chip" data-action="r-fr" data-linea="${esc(`${f.nombre} ${f.imp}`)}">${esc(f.nombre)} <small>${fmtMoney(f.imp)}</small></button>`).join('')}</div>` : '';
+    return;
+  }
+  const conocida = conc ? sugerencias(conc).find(x => llave(x.nombre) === llave(conc)) : null;
+  const cat = c.catElegida ? c.cat : conocida ? conocida.cat : c.cat;
+  const nueva = !conocida && conc.length >= 2 && !c.catElegida;
+  const fechaTxt = c.off === -1 ? 'Ayer' : c.off === 1 ? 'Mañana' : 'Hoy';
+  prev.innerHTML = `<div class="r-chips">
+      <span class="r-chip on">${esc(conc || 'Gasto')} · ${imp > 0 ? fmtMoney(imp) : '$0'}</span>
+      <button type="button" class="r-chip" data-action="r-catpanel" aria-expanded="${c.panel || nueva}">${esc(catLabelOf(cat))}</button>
+      <button type="button" class="r-chip" data-action="r-fecha">${fechaTxt}</button>
+      <button type="button" class="r-chip" data-action="r-pag">${c.pagado ? 'Pagado' : 'Por pagar'}</button>
+      ${dosPersonas() && PERSONAS[c.resp] ? `<button type="button" class="r-chip" data-action="r-resp">${avatar(c.resp)}${esc(PERSONAS[c.resp])}</button>` : ''}
+    </div>
+    ${c.panel || nueva ? `<span class="r-h">${nueva ? 'Categoría (toca una)' : 'Categoría'}</span><div class="r-cats">${CATS.map(k => `<button type="button" class="r-cat" data-action="r-cat" data-cat="${esc(catString(k))}" aria-pressed="${catString(k) === cat}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>${esc(k.id)}</button>`).join('')}</div>` : ''}`;
+}
+function guardarRapido() {
+  const c = sheet.ctx, { conc, imp } = parsearLinea($('#r-linea').value);
+  if (!(imp > 0)) { $('#r-error').textContent = 'Escribe también el monto, por ejemplo «súper 850».'; return; }
+  const conocida = conc ? sugerencias(conc).find(x => llave(x.nombre) === llave(conc)) : null;
+  const cat = c.catElegida ? c.cat : conocida ? conocida.cat : c.cat;
+  const nombre = conocida ? conocida.nombre : (conc || 'Gasto');
+  const fecha = addDays(c.off);
+  const item = { id: Date.now().toString(), fecha, cat, conc: nombre, imp, abo: 0, pagos: [] };
+  if (c.resp && PERSONAS[c.resp]) item.resp = c.resp;
+  if (c.pagado) { item.pagos.push({ fecha: fecha < toISO(HOY) ? fecha : toISO(HOY), monto: imp, quien: PERSONAS[c.resp] ? c.resp : quienDef(), t: Date.now() }); syncAbo(item); }
+  movimientos.push(item); movimientos.sort(byFecha);
+  lsSet(KEYS.cat, cat);
+  finish(item, `Guardado: ${nombre} ${fmtMoney(imp)}`, true);
+}
 
 function openForm(id) {
   const editing = id ? movimientos.find(m => m.id === id) : null;
@@ -1874,8 +1951,18 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'view': if (t.dataset.view !== state.view) setView(t.dataset.view); break;
-    case 'add': {
+    case 'add': openRapido(); break;
+    case 'r-cat': { const c = sheet.ctx; c.cat = t.dataset.cat; c.catElegida = true; pintarRapido(); break; }
+    case 'r-catpanel': sheet.ctx.panel = !sheet.ctx.panel; pintarRapido(); break;
+    case 'r-fecha': { const c = sheet.ctx; c.off = c.off === 0 ? -1 : c.off === -1 ? 1 : 0; pintarRapido(); break; }
+    case 'r-pag': sheet.ctx.pagado = !sheet.ctx.pagado; pintarRapido(); break;
+    case 'r-resp': { const c = sheet.ctx, ks = Object.keys(PERSONAS); c.resp = ks[(ks.indexOf(c.resp) + 1) % ks.length]; pintarRapido(); break; }
+    case 'r-fr': { const i = $('#r-linea'); i.value = t.dataset.linea; i.focus(); pintarRapido(); break; }
+    case 'r-mas': {
+      const { conc, imp } = parsearLinea($('#r-linea').value);
       openForm(null);
+      if (imp > 0) $('#f-imp').value = String(imp);
+      if (conc) { const f = $('#f-conc'); f.value = conc; f.dispatchEvent(new Event('input', { bubbles: true })); }
       break;
     }
     case 'f-date': { $('#f-fecha').value = addDays(+t.dataset.off); pintarFecha(); break; }
@@ -1989,6 +2076,7 @@ document.addEventListener('change', e => {
 document.addEventListener('submit', e => {
   if (e.target.id === 'form') { e.preventDefault(); submitForm(); }
   else if (e.target.id === 'abono-form') { e.preventDefault(); submitAbono(); }
+  else if (e.target.id === 'rapido-form') { e.preventDefault(); guardarRapido(); }
   else if (e.target.id === 'invitar-form') { e.preventDefault(); submitInvitar(); }
   else if (e.target.id === 'alias-form') { e.preventDefault(); submitAlias(); }
   else if (e.target.id === 'abono-edit-form') { e.preventDefault(); submitAbonoEdit(); }
@@ -1996,6 +2084,7 @@ document.addEventListener('submit', e => {
 
 $('#search').addEventListener('input', e => { state.search = e.target.value; render(); });
 document.addEventListener('input', e => {
+  if (e.target.id === 'r-linea') pintarRapido();
   if (e.target.getAttribute('aria-invalid')) {
     e.target.removeAttribute('aria-invalid');
     const m = $('#' + e.target.getAttribute('aria-describedby'));
