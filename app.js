@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v201';
+const APP_VERSION = 'v202';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1149,35 +1149,59 @@ const ICO = {
 };
 
 
+const AJ_ICONOS = {
+  IMG: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/>',
+  PHONE: '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>',
+  UP: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  DOWN: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  SYNC: '<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/>',
+  PLUS: '<path d="M12 5v14M5 12h14"/>',
+  PENCIL: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'
+};
+const ajIc = d => `<span class="aj-ic">${svg(d)}</span>`;
+const ajFila = (accion, d, t, sub, extra = '') => `<button type="button" class="aj-row" data-action="${accion}"${extra}>${ajIc(d)}<span class="aj-t"><b>${t}</b><small>${sub}</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
+let ultimaPareja = { miembros: [], enviadas: [] };
+/* «Pareja»: con pareja, su nombre; con invitación enviada, «Pendiente»; si no, invitar. Más «Tu nombre». */
+function parejaHTML({ miembros, enviadas }) {
+  const yo = usuario() ? usuario().email.toLowerCase() : '';
+  const otro = miembros.find(m => String(m.email).toLowerCase() !== yo);
+  let fila;
+  if (otro) {
+    const n = otro.alias || otro.nombre || otro.email;
+    fila = `<button type="button" class="aj-row" data-action="pareja"><span class="av av-k" aria-hidden="true">${esc(inicial({ alias: n }))}</span><span class="aj-t"><b>${esc(n)}</b><small>Comparten las mismas finanzas</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
+  } else if (enviadas.length) fila = ajFila('pareja', AJ_ICONOS.PLUS, 'Invitación enviada', `${esc(enviadas[0].email)} · Pendiente`);
+  else fila = ajFila('invitar', AJ_ICONOS.PLUS, 'Invitar a tu pareja', 'Para llevar las mismas finanzas entre los dos');
+  const mi = PERSONAS[miPersona()] || (usuario() && usuario().nombre ? usuario().nombre.split(' ')[0] : '');
+  return fila + ajFila('alias', AJ_ICONOS.PENCIL, 'Tu nombre', esc(mi || 'Sin nombre'));
+}
 function renderPerfil() {
-  const cfg = sync.getCfg(), conn = sync.connection();
-  const when = cfg.last ? new Date(cfg.last).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
-  const ic = d => `<span class="aj-ic">${svg(d)}</span>`;
-  const IMG = '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/>';
-  const PHONE = '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>';
-  const UP = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>';
-  const DOWN = '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>';
-  const fila = (accion, d, t, sub) => `<button type="button" class="aj-row" data-action="${accion}">${ic(d)}<span class="aj-t"><b>${t}</b><small>${sub}</small></span><span class="aj-ch" aria-hidden="true">›</span></button>`;
+  const cfg = sync.getCfg(), conn = sync.connection(), u = usuario();
+  const cuando = cfg.last ? new Date(cfg.last) : null;
+  const hora = cuando ? cuando.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) : '';
+  const cuandoLargo = cuando ? cuando.toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : 'nunca';
+  const nombre = (PERSONAS[miPersona()] || (u && u.nombre ? u.nombre.split(' ')[0] : '') || (u ? u.email.split('@')[0] : '')).trim();
+  /* Con lo que ya se conoce de la cuenta (guardado en el teléfono) se dibuja de inmediato; luego se completa con la nube. */
+  const cache = Object.keys(PERSONAS).map(k => ({ email: PERSONAS_EMAIL[k], alias: PERSONAS[k] }));
   $('#perfil').innerHTML = `
-    <div class="aj-card">
-      <div class="aj-st"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin sesión' : cfg.error ? 'Sin sincronizar' : 'Guardado en tu cuenta'}</div>
-      <p class="s-sub">${!conn ? 'Inicia sesión para guardar tus pagos en tu cuenta.' : cfg.error ? esc(cfg.error) : `Última vez: ${when}`}</p>
-      ${conn ? '<button type="button" class="btn btn-primary" data-action="sync-card">Sincronizar ahora</button>' : ''}
+    <div class="aj-me">
+      <span class="av av-e" aria-hidden="true">${esc(inicial({ alias: nombre }))}</span>
+      <span class="aj-meb"><b>${esc(nombre || 'Tu cuenta')}</b><small>${esc(u ? u.email : 'Sin sesión')}</small></span>
+      <button type="button" class="aj-pill${conn && !cfg.error ? '' : ' off'}" data-action="sync-estado" aria-label="Estado de la sincronización"><span class="s-dot${conn && !cfg.error ? '' : ' off'}"></span>${!conn ? 'Sin sesión' : cfg.error ? 'Sin sincronizar' : hora || 'Pendiente'}</button>
     </div>
-    <h2 class="perfil-h">Finanzas compartidas</h2>
-    <div class="aj-card" id="comp-box"><p class="s-sub">Cargando…</p></div>
-    <h2 class="perfil-h">Compartir</h2>
+    <h2 class="perfil-h">Pareja</h2>
+    <div class="aj-grp" id="pareja-grp">${parejaHTML(ultimaPareja.miembros.length ? ultimaPareja : { miembros: cache, enviadas: [] })}</div>
+    <h2 class="perfil-h">Imágenes</h2>
     <div class="aj-tiles">
-      <button type="button" class="aj-tile" data-action="share-month">${ic(IMG)}<span><b>Compartir mes</b><small>Imagen de ${MESES[state.month.month].toLowerCase()}</small></span></button>
-      <button type="button" class="aj-tile" data-action="fondo-apartar">${ic(PHONE)}<span><b>Fondo de pantalla</b><small>Imagen 9:16</small></span></button>
+      <button type="button" class="aj-tile" data-action="share-month">${ajIc(AJ_ICONOS.IMG)}<span><b>Mes</b><small>Para enviar por WhatsApp</small></span></button>
+      <button type="button" class="aj-tile" data-action="fondo-apartar">${ajIc(AJ_ICONOS.PHONE)}<span><b>Fondo</b><small>Pantalla 9:16</small></span></button>
     </div>
     <h2 class="perfil-h">Datos</h2>
     <div class="aj-grp">
-      ${fila('open-import', UP, 'Importar datos', 'Archivo JSON o CSV')}
-      ${fila('export-json', DOWN, 'Exportar respaldo', 'Descarga un archivo JSON')}
+      ${ajFila('open-import', AJ_ICONOS.UP, 'Importar', 'JSON o CSV')}
+      ${ajFila('export-json', AJ_ICONOS.DOWN, 'Exportar respaldo', 'Archivo JSON')}
+      ${conn ? ajFila('sync-card', AJ_ICONOS.SYNC, 'Sincronizar ahora', cfg.error ? esc(cfg.error) : `Última vez: ${cuandoLargo}`) : ''}
     </div>
-    ${usuario() ? `<button type="button" class="s-link" data-action="cerrar-sesion">Cerrar sesión · ${esc(usuario().email)}</button>` : ''}`;
-
+    ${u ? '<div class="aj-grp aj-salir"><button type="button" class="aj-row aj-out" data-action="cerrar-sesion">Cerrar sesión</button></div>' : ''}`;
   cargarCompartir();
 }
 
@@ -1545,22 +1569,29 @@ function sanear(list) {
 /* ---- Finanzas compartidas (compartir.js): lista de personas, invitar y salir ---- */
 const inicial = m => String(m.alias || m.nombre || m.email || '?').trim().charAt(0).toUpperCase();
 async function cargarCompartir() {
-  const box = $('#comp-box');
-  if (!box) return;
+  if (!$('#pareja-grp')) return;
   try {
-    const { miembros, enviadas } = await comp.estado();
-    if (!$('#comp-box')) return;
-    aplicarMiembros(miembros);
-    const yo = usuario(), miEmail = yo ? yo.email.toLowerCase() : '';
-    const fila = m => { const soy = m.email.toLowerCase() === miEmail; return `<div class="mem"><i class="av ${soy ? 'av-e' : 'av-k'}">${esc(inicial(m))}</i><span><b>${esc(m.alias || m.nombre || m.email)}</b><small>${soy ? 'tú · ' : ''}${esc(m.email)}</small></span>${soy ? '<button type="button" class="mem-x" data-action="alias">Cambiar nombre</button>' : '<em class="mem-tag ok" style="font-style:normal">Activa</em>'}</div>`; };
-    const pend = e => `<div class="mem"><i class="av av-k">${esc(e.email.charAt(0).toUpperCase())}</i><span><b>${esc(e.email)}</b><small>Invitación enviada</small></span><span><em class="mem-tag w" style="font-style:normal">Pendiente</em><button type="button" class="mem-x" data-action="quitar-inv" data-email="${esc(e.email)}">Quitar</button></span></div>`;
-    const dos = miembros.length >= 2;
-    box.innerHTML = `${miembros.map(fila).join('')}${enviadas.map(pend).join('')}
-      <p class="s-sub">${dos ? 'Lo que anota cualquiera de los dos aparece en los dos teléfonos.' : enviadas.length ? 'Cuando acepte, verán las mismas finanzas.' : 'Invita a tu pareja para llevar las mismas finanzas entre los dos.'}</p>
-      ${dos ? '<button type="button" class="s-link" data-action="salir-compartir">Dejar de compartir</button>' : !enviadas.length ? '<button type="button" class="btn btn-primary" data-action="invitar">Invitar a alguien</button>' : ''}`;
-  } catch (e) {
-    box.innerHTML = `<p class="s-sub">${esc(navigator.onLine === false ? 'Sin conexión: no se puede ver quién comparte.' : e.message || 'No se pudo cargar.')}</p>`;
-  }
+    const r = await comp.estado();
+    ultimaPareja = r;
+    aplicarMiembros(r.miembros);
+    const g = $('#pareja-grp');
+    if (g) g.innerHTML = parejaHTML(r);
+  } catch (e) { /* sin red: se queda lo que ya se dibujó */ }
+}
+/* Hoja de «Pareja»: dejar de compartir, o quitar la invitación enviada. */
+function openPareja() {
+  const yo = usuario() ? usuario().email.toLowerCase() : '';
+  const otro = ultimaPareja.miembros.find(m => String(m.email).toLowerCase() !== yo), env = ultimaPareja.enviadas[0];
+  sheet.ctx = { type: 'pareja' };
+  if (otro) {
+    const n = otro.alias || otro.nombre || otro.email;
+    openSheet(n, `<p class="note">Comparten las mismas finanzas con <b>${esc(n)}</b> (${esc(otro.email)}). Lo que anota cualquiera aparece en los dos teléfonos.</p>
+      <button type="button" class="s-link" data-action="pareja-salir">Dejar de compartir</button>`);
+  } else if (env) {
+    openSheet('Invitación enviada', `<p class="note">La invitación para <b>${esc(env.email)}</b> le aparece en su app cuando entre con esa cuenta. Cuando la acepte, verán las mismas finanzas.</p>
+      <button type="button" class="s-link" data-action="pareja-quitar" data-email="${esc(env.email)}">Quitar invitación</button>`);
+  } else return;
+  sheet.panel.focus({ preventScroll: true });
 }
 function openAlias() {
   const yo = usuario(), k = miPersona();
@@ -1817,8 +1848,10 @@ document.addEventListener('click', async e => {
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
     case 'invitar': openInvitar(); break;
     case 'alias': openAlias(); break;
-    case 'salir-compartir': salirCompartir(); break;
-    case 'quitar-inv': comp.quitarInvitacion(t.dataset.email).then(() => cargarCompartir()).catch(e => toast(e.message || 'No se pudo quitar')); break;
+    case 'pareja': openPareja(); break;
+    case 'pareja-salir': closeSheet(); salirCompartir(); break;
+    case 'pareja-quitar': { const em = t.dataset.email; closeSheet(); comp.quitarInvitacion(em).then(() => cargarCompartir()).catch(e => toast(e.message || 'No se pudo quitar')); break; }
+    case 'sync-estado': { const c = sync.getCfg(); toast(c.error ? c.error : c.last ? `Sincronizado a las ${new Date(c.last).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })}` : 'Aún no se ha sincronizado'); break; }
     case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
     case 'open-import': openImport(); break;
     case 'export-json':
@@ -1878,7 +1911,7 @@ document.addEventListener('click', async e => {
     }
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
     case 'conc-todos': state.conceptosTodos = !state.conceptosTodos; render(); break;
-    case 'sync-card': t.textContent = 'Sincronizando…'; await syncRapido(t); break;
+    case 'sync-card': { const sm = $('small', t); if (sm) sm.textContent = 'Sincronizando…'; await syncRapido(t); break; }
     case 'resp': { const ya = t.getAttribute('aria-pressed') === 'true'; $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t && !ya))); break; }
     case 'quien':
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
