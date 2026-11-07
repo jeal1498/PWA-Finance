@@ -129,7 +129,17 @@ async function asegurar() {
   hogarId = await (await nube('/rest/v1/rpc/asegurar_hogar', { method: 'POST', body: '{}' })).json();
   return hogarId;
 }
+/* Al unirse o salir de una cuenta compartida el hogar cambia: se olvida el guardado. */
+export const olvidarHogar = () => { hogarId = ''; };
 async function nubePush(datos) {
-  const hogar_id = await asegurar();
-  await nube('/rest/v1/copias?on_conflict=hogar_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ hogar_id, datos, updated_at: new Date().toISOString() }) });
+  const enviar = async () => {
+    const hogar_id = await asegurar();
+    await nube('/rest/v1/copias?on_conflict=hogar_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ hogar_id, datos, updated_at: new Date().toISOString() }) });
+  };
+  try { await enviar(); }
+  catch (e) {
+    /* Si el hogar cambió desde otro teléfono (o por aceptar una invitación), se vuelve a preguntar una vez. */
+    if (!/row-level security/i.test(e.message || '')) throw e;
+    olvidarHogar(); await enviar();
+  }
 }

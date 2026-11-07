@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v194';
+const APP_VERSION = 'v195';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1543,7 +1543,7 @@ async function submitInvitar() {
 }
 async function salirCompartir() {
   if (!window.confirm('¿Dejar de compartir? Te quedas con una copia de lo que hay ahora y ya no verás lo que anote la otra persona.')) return;
-  try { await comp.salir(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
+  try { await comp.salir(); sync.olvidarHogar(); toast('Dejaste de compartir'); renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
 }
 /* Invitación recibida: pantalla completa al entrar (y al volver a la app) si alguien invitó a este correo. */
 const invPospuestas = new Set();
@@ -1569,6 +1569,7 @@ $('#inv-si').addEventListener('click', async () => {
   const b = $('#inv-si'); b.disabled = true; b.textContent = 'Uniéndome…';
   try {
     await comp.aceptar(invActual.id);
+    sync.olvidarHogar();
     $('#invita').hidden = true; toast('Ya comparten sus finanzas');
     try { await sincronizar(); } catch (e) { /* ya se unió; se sincroniza sola en cuanto se pueda */ }
     if (state.view === 'perfil') renderPerfil();
