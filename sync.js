@@ -120,7 +120,10 @@ export async function nube(ruta, opts = {}) {
 }
 async function nubePull() {
   const rows = await (await nube('/rest/v1/copias?select=datos')).json();
-  return rows.length ? rows[0].datos : null;
+  const datos = rows.length ? rows[0].datos : null;
+  /* La referencia del seguro «menos de la mitad» es lo que hay ahora en la nube (si la cuenta cambió, p. ej. al separarse, se actualiza sola). */
+  setCfg({ count: datos ? (Array.isArray(datos.movimientos) ? datos.movimientos.length : 0) + (Array.isArray(datos.metas) ? datos.metas.length : 0) : 0 });
+  return datos;
 }
 /* Crea la cuenta (hogar) de quien entra por primera vez; una vez por carga de la app. */
 let hogarId = '';

@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v200';
+const APP_VERSION = 'v201';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1522,6 +1522,8 @@ function sincronizar() {
         if (sheet.el.hidden) render(); else recargaPendiente = true;
       }
     }
+    /* Cuenta vacía a propósito (p. ej. tras separarse): no hay nada que enviar y no es un error. */
+    if (!movimientos.length && !metas.length) { sync.setCfg({ last: Date.now(), error: '', count: 0 }); return; }
     await sync.push(movimientos, metas, { dbOk });
   })().finally(() => { sincronizando = null; });
   return sincronizando;
