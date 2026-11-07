@@ -123,13 +123,13 @@ async function nubePull() {
   return rows.length ? rows[0].datos : null;
 }
 /* Crea la cuenta (hogar) de quien entra por primera vez; una vez por carga de la app. */
-let hogarListo = false;
+let hogarId = '';
 async function asegurar() {
-  if (hogarListo) return;
-  await nube('/rest/v1/rpc/asegurar_hogar', { method: 'POST', body: '{}' });
-  hogarListo = true;
+  if (hogarId) return hogarId;
+  hogarId = await (await nube('/rest/v1/rpc/asegurar_hogar', { method: 'POST', body: '{}' })).json();
+  return hogarId;
 }
 async function nubePush(datos) {
-  await asegurar();
-  await nube('/rest/v1/copias?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ datos, updated_at: new Date().toISOString() }) });
+  const hogar_id = await asegurar();
+  await nube('/rest/v1/copias?on_conflict=hogar_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ hogar_id, datos, updated_at: new Date().toISOString() }) });
 }
