@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v196';
+const APP_VERSION = 'v197';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -123,7 +123,7 @@ function generarSeries(lista, store, hasta, soloSerie) {
   const limitePasado = toISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - 92));
   const crear = (serie, ult, f, id) => {
     const now = Date.now();
-    nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.freq ? { freq: ult.freq } : {}), ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
+    nuevos.push({ id, fecha: f, cat: ult.cat, conc: ult.conc, imp: ult.imp, abo: 0, pagos: [], serie, repite: true, ...(ult.freq ? { freq: ult.freq } : {}), ...(ult.resp ? { resp: ult.resp } : {}), ...(ult.fin ? { fin: ult.fin } : {}), createdAt: now, updatedAt: now });
   };
   series.forEach((items, serie) => {
     if (soloSerie && serie !== soloSerie) return;
@@ -252,10 +252,22 @@ const r2 = n => Math.round(n * 100) / 100;
 /* Quién aporta cada abono (pagos[].quien). Lo último que se eligió en este teléfono queda como predeterminado. */
 const PERSONAS = { e: 'Eduardo', k: 'Karen' };
 const quienDef = () => { const q = lsGet('finanzas_quien'); return PERSONAS[q] ? q : 'e'; };
+/* Quién soy: el nombre de la cuenta de Google que coincide con una persona (Eduardo/Karen); si no, el último elegido en este teléfono. */
+const sinAcentos = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function miPersona() {
+  const u = usuario(), n = sinAcentos(u && (u.nombre || u.email));
+  const k = Object.keys(PERSONAS).find(k => n.includes(sinAcentos(PERSONAS[k])));
+  return k || quienDef();
+}
 const avatar = q => PERSONAS[q] ? `<span class="av av-${q}" aria-hidden="true">${PERSONAS[q][0]}</span>` : '';
 function quienHTML(sel) {
   return `<div class="quien-f"><span class="quien-l" id="quien-l">¿Quién aporta?</span><div class="mode quien" role="group" aria-labelledby="quien-l">${Object.entries(PERSONAS).map(([k, n]) => `<button type="button" data-action="quien" data-q="${k}" aria-pressed="${k === sel}">${avatar(k)}${n}</button>`).join('')}</div></div>`;
 }
+/* Responsable del pago: por defecto, quien lo crea; se puede cambiar o quitar al tocar de nuevo. */
+function respHTML(sel) {
+  return `<div class="quien-f"><span class="quien-l" id="resp-l">Responsable</span><div class="mode quien" id="f-resp" role="group" aria-labelledby="resp-l">${Object.entries(PERSONAS).map(([k, n]) => `<button type="button" data-action="resp" data-q="${k}" aria-pressed="${k === sel}">${avatar(k)}${n}</button>`).join('')}</div></div>`;
+}
+const respSel = () => { const b = $('#f-resp [aria-pressed=true]'); return b ? b.dataset.q : ''; };
 const quienSel = () => { const b = $('.quien [aria-pressed=true]'); return b ? b.dataset.q : quienDef(); };
 /* Barra de lo abonado por persona (solo si algún abono dice quién lo puso). */
 function aportesBar(por, total) {
@@ -466,12 +478,13 @@ function groupsGastos(b) {
 /* Pagos como tabla: columnas ordenables (un toque asc., otro desc.), vencidos teñidos y días debajo de cada pago. */
 const ESTADO_ORD = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 const SORTS = {
+  resp:    (a, c) => (a.resp || 'z').localeCompare(c.resp || 'z'),
   fecha:   (a, c) => a.date - c.date,
   estatus: (a, c) => ESTADO_ORD[a.estado] - ESTADO_ORD[c.estado],
   conc:    (a, c) => a.conc.localeCompare(c.conc, 'es'),
   monto:   (a, c) => a.imp - c.imp
 };
-const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['conc', 'Concepto'], ['monto', 'Monto']];
+const COLS = [['fecha', 'Fecha'], ['estatus', 'Estatus', 'Est.'], ['resp', 'Responsable', 'Resp.'], ['conc', 'Concepto'], ['monto', 'Monto']];
 const BADGE_ICON = {
   Vencido: '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   Pendiente: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -505,6 +518,7 @@ function pagoRow(m) {
   return `<button type="button" class="pt-cols pt-row${m.estado === 'Vencido' ? ' v' : ''}" data-cat="${esc(c.id)}" data-action="open" data-id="${esc(m.id)}" aria-label="${esc(`${m.date.getDate()} ${MESES_CORTO[m.date.getMonth()]}, ${m.conc}, ${c.id}, ${m.estado}${dias ? ', ' + dias : ''}, ${fmtMoney(i.done ? m.imp : i.pend)}`)}">
     <span class="pt-fecha"><b>${m.date.getDate()}</b><small>${MESES_CORTO[m.date.getMonth()]}</small></span>
     <span class="pt-est ${t}" role="img" aria-label="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}" title="${m.estado}${i.partial ? `, abonado ${i.pct}%` : ''}">${i.partial ? `<svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="tr" cx="12" cy="12" r="9" pathLength="100"/><circle class="pr" cx="12" cy="12" r="9" pathLength="100" style="--p:${i.pct}"/></svg>` : svg(BADGE_ICON[m.estado])}</span>
+    <span class="pt-resp">${avatar(m.resp)}</span>
     <span class="pt-cc"><span class="pt-conc"><span class="pt-name">${esc(m.conc)}</span>${repIcon(m)}${enMes(m.date) && (chipMes.get(llaveC(m)) || 0) > 1 ? `<em class="pt-tag" title="${chipMes.get(llaveC(m))} pagos con este nombre este mes">×${chipMes.get(llaveC(m))}</em>` : ''}</span>${dias ? `<span class="pt-nota ${t}">${dias}</span>` : ''}</span>
     <span class="pt-amt${i.done ? ' done' : ''}">${!i.done && m.ap == null && m.abo > 0 ? `<span class="pt-pa"><em>Pendiente:</em><b>${fmtMoney(i.pend)}</b><em>Abonado:</em><small>${fmtMoney(m.abo)}</small></span>` : `<b>${fmtMoney(i.done ? m.imp : m.ap != null ? m.ap : i.pend)}</b>${i.done || m.ap == null ? '' : `<small class="pt-ap">de ${fmtMoney(i.pend)}</small>`}`}</span>
   </button>`;
@@ -962,6 +976,7 @@ function openForm(id) {
       </div>
       <span class="q-lab" id="f-cat-l">Categoría</span>
       <div class="q-cats" role="radiogroup" aria-labelledby="f-cat-l">${CATS.map(c => `<label class="q-cat"><input type="radio" name="f-cat" value="${c.id}"${c.id === selected ? ' checked' : ''}><span>${catIcon(c)}${esc(c.id)}</span></label>`).join('')}</div>
+      ${respHTML(editing ? (PERSONAS[editing.resp] ? editing.resp : '') : miPersona())}
       <div class="rep-card">
         <label class="switch-row" for="f-rep"><span>Se repite</span><input type="checkbox" class="switch" id="f-rep" role="switch"${editing && editing.repite ? ' checked' : ''}></label>
         <div id="f-fin-wrap"${editing && editing.repite ? '' : ' hidden'}>
@@ -1047,7 +1062,9 @@ function submitForm() {
   let item;
   if (prev) {
     const concAntes = prev.conc;
+    const respAntes = prev.resp || '', resp = respSel();
     item = Object.assign(prev, { fecha, cat, conc, imp });
+    if (resp) item.resp = resp; else delete item.resp;
     {
       if ($('#f-rep').checked) { item.repite = true; if (!item.serie) item.serie = item.id; } else delete item.repite;
       if (fin) item.fin = fin; else delete item.fin;
@@ -1060,6 +1077,7 @@ function submitForm() {
       if (item.serie) list.filter(m => m.serie === item.serie && m !== item).forEach(m => {
         /* Si se cambió el nombre, las copias siguientes (de fecha posterior) lo toman también. */
         if (conc !== concAntes && m.fecha > item.fecha) m.conc = conc;
+        if (resp !== respAntes && m.fecha > item.fecha) { if (resp) m.resp = resp; else delete m.resp; }
         if (item.repite) m.repite = true; else delete m.repite;
         if (item.fin) m.fin = item.fin; else delete m.fin;
         if (item.freq) m.freq = item.freq; else delete m.freq;
@@ -1068,6 +1086,7 @@ function submitForm() {
     }
   } else {
     item = { id: Date.now().toString(), fecha, cat, conc, imp, abo: 0, pagos: [] };
+    if (respSel()) item.resp = respSel();
     if ($('#f-rep').checked) { item.repite = true; item.serie = item.id; if (fin) item.fin = fin; if (freq !== 'mensual') item.freq = freq; }
     if ($('#f-paid').checked && imp > 0) { item.pagos.push({ fecha: fecha < toISO(HOY) ? fecha : toISO(HOY), monto: imp, quien: quienDef(), t: Date.now() }); syncAbo(item); }
     list.push(item);
@@ -1793,6 +1812,7 @@ document.addEventListener('click', async e => {
     case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
     case 'conc-todos': state.conceptosTodos = !state.conceptosTodos; render(); break;
     case 'sync-card': t.textContent = 'Sincronizando…'; await syncRapido(t); break;
+    case 'resp': { const ya = t.getAttribute('aria-pressed') === 'true'; $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t && !ya))); break; }
     case 'quien':
       $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t)));
       if (sheet.ctx && sheet.ctx.type === 'detail') lsSet('finanzas_quien', t.dataset.q);
