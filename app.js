@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v203';
+const APP_VERSION = 'v204';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1639,7 +1639,7 @@ async function submitInvitar() {
 }
 async function salirCompartir() {
   if (!window.confirm('¿Dejar de compartir? Te quedas solo con los pagos donde eres el responsable; los demás se quedan con la otra persona, y ya no verán lo que anote el otro.')) return;
-  try { await comp.salir(); sync.olvidarHogar(); await refrescarPersonas(); toast('Dejaste de compartir'); try { await sincronizar(); } catch (e) { /* se sincroniza sola después */ } renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
+  try { await comp.salir(); sync.olvidarHogar(); sync.guardarBorrados({}); await refrescarPersonas(); toast('Dejaste de compartir'); try { await sincronizar(); } catch (e) { /* se sincroniza sola después */ } renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
 }
 /* Invitación recibida: pantalla completa al entrar (y al volver a la app) si alguien invitó a este correo. */
 /* Mi letra (e/k) en la cuenta compartida, según los miembros que devuelve la nube. */
@@ -1680,6 +1680,7 @@ $('#inv-si').addEventListener('click', async () => {
     const ahora = slotMio(await comp.miembros());
     if (antes !== ahora) await remapearPersona(antes, ahora);
     sync.olvidarHogar();
+    sync.guardarBorrados({}); /* los borrados de la cuenta anterior no valen en la nueva */
     refrescarPersonas();
     $('#invita').hidden = true; toast('Ya comparten sus finanzas');
     try { await sincronizar(); } catch (e) { /* ya se unió; se sincroniza sola en cuanto se pueda */ }
