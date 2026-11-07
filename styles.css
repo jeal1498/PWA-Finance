@@ -1284,3 +1284,23 @@ body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--dang
 .aj-row .av { width: 34px; height: 34px; flex: none; font-size: 14px; font-style: normal; }
 .aj-salir { margin-top: 18px; }
 .aj-out { justify-content: center; color: var(--danger-text); font-weight: 700; }
+
+/* Anotar rápido: una línea, pastillas con lo que entendió y frecuentes. */
+.r-form { display: flex; flex-direction: column; gap: 12px; }
+.r-linea { display: flex; align-items: center; height: 58px; padding: 0 14px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.r-linea input { width: 100%; border: 0; outline: 0; background: none; color: var(--ink); font: 700 24px var(--font); letter-spacing: -.01em; }
+.r-linea input::placeholder { color: var(--muted); font-weight: 500; font-size: 19px; }
+.r-prev { display: flex; flex-direction: column; gap: 8px; min-height: 44px; }
+.r-h { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.r-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.r-chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: 99px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.r-chip small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.r-chip.on { background: var(--ink); color: var(--on-ink); box-shadow: none; cursor: default; }
+.r-chip .av { width: 18px; height: 18px; font-size: 10px; }
+.r-cats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.r-cat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 2px; border: 0; border-radius: 12px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-2); color: var(--ink-2); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.r-cat .ic { width: 18px; height: 18px; }
+.r-cat[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
+.r-mas { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 4px; align-self: center; }
+.r-chip:focus-visible, .r-cat:focus-visible, .r-mas:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.r-linea input:focus, .r-linea input:focus-visible { outline: 0; box-shadow: none; }
