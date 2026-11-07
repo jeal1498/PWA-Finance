@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v205';
+const APP_VERSION = 'v206';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1055,7 +1055,7 @@ function guardarRapido() {
   if (c.pagado) { item.pagos.push({ fecha: fecha < toISO(HOY) ? fecha : toISO(HOY), monto: imp, quien: PERSONAS[c.resp] ? c.resp : quienDef(), t: Date.now() }); syncAbo(item); }
   movimientos.push(item); movimientos.sort(byFecha);
   lsSet(KEYS.cat, cat);
-  finish(item, `Guardado: ${nombre} ${fmtMoney(imp)}`, true);
+  finish(item, `Guardado: ${nombre} ${fmtMoney(imp)}`, false);
 }
 
 function openForm(id) {
