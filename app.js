@@ -2,6 +2,7 @@ import * as db from './js/db.js';
 import * as sync from './sync.js';
 import { migrateFinance } from './js/migrar-finanzas.js';
 import { parseImport, exportJSON, exportCSV, templateCSV } from './datos.js';
+import { haySesion, usuario, procesarRetorno, iniciarGoogle, renovar, cerrarSesion } from './auth.js';
 
 /* =========================================================
    Utilidades
@@ -77,7 +78,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v188';
+const APP_VERSION = 'v189';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1130,7 +1131,8 @@ function renderPerfil() {
       ${fila('open-import', UP, 'Importar datos', 'Archivo JSON o CSV')}
       ${fila('export-json', DOWN, 'Exportar respaldo', 'Descarga un archivo JSON')}
       ${fila('open-sync', SYNC, 'Conexión con Google Sheets', 'URL, clave y sincronizar sola')}
-    </div>`;
+    </div>
+    ${usuario() ? `<button type="button" class="s-link" data-action="cerrar-sesion">Cerrar sesión · ${esc(usuario().email)}</button>` : ''}`;
 }
 
 /* Apartar: cuánto separar por día, semana, quincena o mes para llegar a la fecha de pago de cada pendiente
@@ -1729,6 +1731,7 @@ document.addEventListener('click', async e => {
     case 'fondo': shareFondo(t.dataset); break;
     case 'fondo-apartar': shareFondo(datosFondoApartar()); break;
     case 'open-sync': openSync(); break;
+    case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
     case 'sync-push': syncPush(); break;
     case 'sync-pull': syncPull(); break;
     case 'open-import': openImport(); break;
@@ -1929,15 +1932,15 @@ setTimeout(autoSincronizar, 2000);
   const sig = new Date(); sig.setHours(24, 0, 5, 0);
   setTimeout(() => { if (refrescarHoy()) render(); programarMedianoche(); }, sig - Date.now());
 })();
-/* Portada de login. AUTH_ON se enciende cuando Supabase esté conectado (hasta entonces la app abre directo);
-   con #login en la dirección se puede ver la portada para probarla. */
-const AUTH_ON = false;
+/* Portada de login (Supabase Auth con Google, `auth.js`). Sin sesión se ve la portada; con #login en la dirección también (para probarla). */
+const errLogin = procesarRetorno();
 const loginEl = $('#login');
-const haySesion = () => false; // se reemplaza por la sesión de Supabase
-function mostrarLogin() { loginEl.hidden = !(location.hash === '#login' || (AUTH_ON && !haySesion())); }
-$('#login-google').addEventListener('click', () => toast('Falta conectar Supabase'));
+function mostrarLogin() { loginEl.hidden = haySesion() && location.hash !== '#login'; }
+$('#login-google').addEventListener('click', iniciarGoogle);
 addEventListener('hashchange', mostrarLogin);
 mostrarLogin();
+renovar();
+if (errLogin) toast('No se pudo iniciar sesión: ' + errLogin);
 $('#app-ver').textContent = `Finanzas ${APP_VERSION}`;
 await absorberPlanes();
 render();
