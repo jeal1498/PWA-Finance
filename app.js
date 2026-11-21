@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v210';
+const APP_VERSION = 'v211';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -576,16 +576,23 @@ function pagosTable(b, conMes = true) {
 
 /* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
 const DOT = { Vencido: 'danger', Pendiente: 'warn', Pagado: 'ok' }, DOT_RANK = { Vencido: 0, Pendiente: 1, Pagado: 2 };
-/* Celda de un día del calendario (mes y semana). */
-function celdaDia(iso, list, hoy, d, mo, aria, bar, wd = '') {
-  return `<button type="button" class="cal-d${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${wd}<span>${d}</span>${bar}</button>`;
+/* Celda de un día (mes y semana): número, puntos (uno por pago, máx. 3) y lo que vence ese día con el color de su peor estatus. */
+const kilo = n => n >= 1000 ? `${String(Math.round(n / 100) / 10).replace(/\.0$/, '')}k` : String(Math.round(n));
+function celdaDia(iso, list, hoy, d, mo, wd = '') {
+  let est = '', monto = '', aria = '', dots = '';
+  if (list.length) {
+    est = DOT[list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0]];
+    const pend = sum(list, 'pendiente');
+    monto = kilo(pend > 0 ? pend : sum(list, 'imp'));
+    dots = list.slice(0, 3).map(m => `<i class="${DOT[m.estado]}"></i>`).join('');
+    aria = `, ${plural(list.length, 'pago', 'pagos')}, ${pend > 0 ? 'pendiente ' + fmtMoney(pend) : 'pagado'}`;
+  }
+  return `<button type="button" class="cal-d${est ? ' ' + est : ''}${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${wd}<span class="cal-dots" aria-hidden="true">${dots}</span><span class="cal-n">${d}</span><span class="cal-m">${monto}</span></button>`;
 }
-function barraDia(list) {
-  if (!list.length) return { bar: '', aria: '' };
-  const est = list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0];
-  const imp = sum(list, 'imp'), pct = imp > 0 ? Math.round(list.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / imp * 100) : 0;
-  return { bar: `<span class="cal-bar ${DOT[est]}" aria-hidden="true"><i style="width:${pct}%"></i></span>`, aria: `, ${plural(list.length, 'pago', 'pagos')}, ${pct}% pagado` };
-}
+/* Pie del calendario: leyenda de colores y selector Mes | Semana. */
+const calPie = () => `<div class="cal-pie"><div class="cal-lg" aria-hidden="true"><span><i class="danger"></i>Atrasado</span><span><i class="warn"></i>Por vencer</span><span><i class="ok"></i>Pagado</span></div><div class="cal-seg" role="group" aria-label="Vista del calendario"><button type="button" data-action="cal-modo" data-m="mes" aria-pressed="${state.provMes}">Mes</button><button type="button" data-action="cal-modo" data-m="sem" aria-pressed="${!state.provMes}">Semana</button></div></div>`;
+/* Resumen de lo que muestra la tabla (un día, la semana o el mes). */
+const resumenCal = (titulo, list, conTodo) => `<div class="cal-sum"><div><b>${titulo}</b><small>${list.length ? plural(list.length, 'pago', 'pagos') : 'Sin pagos'}</small></div><div class="cal-sum-r"><span>Pendiente</span><b>${fmtMoney(sum(list, 'pendiente'))}</b>${conTodo ? '<button type="button" class="cal-todo" data-action="cal-dia" data-dia="">Todo el mes</button>' : ''}</div></div>`;
 function calendarioHTML(b, pliegue = '') {
   const y = state.month.year, mo = state.month.month, pre = `${y}-${String(mo + 1).padStart(2, '0')}`;
   const porDia = new Map();
@@ -596,18 +603,11 @@ function calendarioHTML(b, pliegue = '') {
   const cells = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
   for (let i = 0; i < offset; i++) cells.push('<span aria-hidden="true"></span>');
   for (let d = 1; d <= n; d++) {
-    const iso = `${pre}-${String(d).padStart(2, '0')}`, list = porDia.get(iso) || [];
-    let bar = '', aria = '';
-    if (list.length) {
-      const est = list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0];
-      const imp = sum(list, 'imp'), pct = imp > 0 ? Math.round(list.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / imp * 100) : 0;
-      bar = `<span class="cal-bar ${DOT[est]}" aria-hidden="true"><i style="width:${pct}%"></i></span>`;
-      aria = `, ${plural(list.length, 'pago', 'pagos')}, ${pct}% pagado`;
-    }
-    cells.push(celdaDia(iso, list, hoy, d, mo, aria, bar));
+    const iso = `${pre}-${String(d).padStart(2, '0')}`;
+    cells.push(celdaDia(iso, porDia.get(iso) || [], hoy, d, mo));
   }
   return `<div class="pt cal">
-      <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
+      <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
       <div class="cal-grid">${cells.join('')}</div>${pliegue}
     </div>`;
 }
@@ -616,14 +616,13 @@ function calendarioHTML(b, pliegue = '') {
 function diaHTML(b) {
   const dia = b.base.filter(m => m.fecha === state.calDia), f = parseDate(state.calDia);
   const titulo = `${DIAS[f.getDay()][0].toUpperCase()}${DIAS[f.getDay()].slice(1)} ${f.getDate()}`;
-  return `<div class="cal-tit"><b>${titulo}</b><button type="button" class="cal-todo" data-action="cal-dia" data-dia="">Todo el mes</button></div>
+  return `${resumenCal(titulo, dia, true)}
     ${dia.length ? pagosTable({ items: dia }, false) : `<div class="empty"><strong>Sin pagos este día</strong></div>`}`;
 }
 
 
 
 /* Provisional: Pagar ya, las tres cifras del mes, Día | Semana, calendario (semana o mes) y la tabla de pagos. */
-const FOLD_ARROW = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 function renderProvisional() {
   const todosMes = monthItems(), iniMes = new Date(state.month.year, state.month.month, 1);
   const hayPrev = todosMes.some(m => m.estado === 'Vencido' && m.date < iniMes);
@@ -671,22 +670,22 @@ function renderCalendario() {
   const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
   let cal;
   if (state.provMes) {
-    cal = calendarioHTML(b, `<button type="button" class="cal-fold up" data-action="prov-mes" aria-label="Ver solo la semana">${FOLD_ARROW}</button>`);
+    cal = calendarioHTML(b, calPie());
   } else {
     const lun = lunes, dom = domingo;
     const todos = movimientos.map(procesar), hoy = toISO(HOY);
     const cells = [];
     for (let i = 0; i < 7; i++) {
       const f = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() + i), iso = toISO(f);
-      const { bar, aria } = barraDia(todos.filter(m => m.fecha === iso));
-      cells.push(celdaDia(iso, null, hoy, f.getDate(), f.getMonth(), aria, bar, `<small class="cal-wd" aria-hidden="true">${'LMMJVSD'[i]}</small>`));
+      cells.push(celdaDia(iso, todos.filter(m => m.fecha === iso), hoy, f.getDate(), f.getMonth(), `<small class="cal-wd" aria-hidden="true">${'LMMJVSD'[i]}</small>`));
     }
     const rango = lun.getMonth() === dom.getMonth() ? `${lun.getDate()} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}` : `${lun.getDate()} ${MESES_CORTO[lun.getMonth()]} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}`;
-    cal = `<div class="pt cal"><div class="cal-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="cal-grid wk">${cells.join('')}</div><button type="button" class="cal-fold" data-action="prov-mes" aria-label="Ver mes completo">${FOLD_ARROW}</button></div>`;
+    cal = `<div class="pt cal"><div class="cal-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="cal-grid wk">${cells.join('')}</div>${calPie()}</div>`;
   }
   if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
   const items = state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
-  if (items.length) { $('#list').innerHTML = cal + pagosTable({ base, items }, false); return; }
+  const titulo = state.provMes ? 'Todo el mes' : state.provOff === 0 ? 'Esta semana' : `Semana del ${lunes.getDate()} ${MESES_CORTO[lunes.getMonth()]}`;
+  if (items.length) { $('#list').innerHTML = cal + resumenCal(titulo, items, false) + pagosTable({ base, items }, false); return; }
   $('#list').innerHTML = cal + `<div class="empty"><strong>${state.provMes ? 'Sin pagos' : 'Sin pagos esta semana'}</strong>${state.provMes ? '' : 'Despliega el mes para ver todos.'}</div>`;
 }
 
@@ -2012,6 +2011,8 @@ document.addEventListener('click', async e => {
     case 'prov-prev': state.provPrev = !state.provPrev; render(); break;
     case 'prov-per': state.provPer = state.provPer === t.dataset.per ? '' : t.dataset.per; render(); break;
     case 'prov-mes': state.provMes = !state.provMes; state.calDia = ''; render(); break;
+    case 'cal-modo': state.provMes = t.dataset.m === 'mes'; state.calDia = ''; render(); break;
+    case 'cal-hoy': state.month = { year: HOY.getFullYear(), month: HOY.getMonth() }; state.provOff = 0; state.calDia = toISO(HOY); render(); break;
     case 'prov-sem': state.provOff += Number(t.dataset.d); state.calDia = ''; render(); break;
     case 'cal-dia': state.calDia = state.calDia === t.dataset.dia ? '' : t.dataset.dia; render(); break;
     case 'shift-month': shiftMonth(Number(t.dataset.d)); break;
@@ -2160,6 +2161,27 @@ document.addEventListener('keydown', e => {
     const dx = t.clientX - sx, dy = t.clientY - sy;
     if (Date.now() - t0 > 700 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
     shiftMonth(dx < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
+/* Calendario: deslizar de lado sobre los días cambia de mes (o de semana, en la vista Semana). */
+(() => {
+  let sx = 0, sy = 0, t0 = 0, on = false;
+  const zona = el => el && el.closest && el.closest('.cal-grid');
+  document.addEventListener('touchstart', e => {
+    on = e.touches.length === 1 && state.view === 'calendario' && !!zona(e.target);
+    if (!on) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; t0 = Date.now();
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!on) return;
+    on = false;
+    if (!sheet.el.hidden) return;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Date.now() - t0 > 700 || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    const delta = dx < 0 ? 1 : -1;
+    if (state.provMes) { shiftMonth(delta); return; }
+    state.provOff += delta; state.calDia = ''; render();
   }, { passive: true });
 })();
 
