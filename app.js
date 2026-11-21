@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v209';
+const APP_VERSION = 'v210';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -631,14 +631,14 @@ function renderProvisional() {
   const abo = sum(base, 'abo'), pend = sum(base, 'pendiente'), tot = sum(base, 'imp');
   const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
   const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
-  /* Semana: lo pendiente ÷ 4 (siempre cuatro semanas por mes), cada pago repartido hacia arriba. Día: lo pendiente ÷ los días que quedan
-     desde hoy (o desde el 1.º si el mes es futuro) hasta la fecha del último pago pendiente del mes, ese día incluido (mínimo 1). */
-  const nSem = 4;
-  const pendL = base.filter(m => m.pendiente > 0);
+  /* Día: lo pendiente ÷ los días que quedan desde hoy (o desde el 1.º si el mes es futuro) hasta la fecha del último pago pendiente del mes,
+     ese día incluido (mínimo 1). Semana: lo pendiente ÷ esas mismas semanas (días ÷ 7, con decimales, sin redondear), nunca más que lo pendiente. */
+  const pendL = base.filter(m => m.pendiente > 0), pendTot = sum(pendL, 'pendiente');
   const ultimo = pendL.reduce((mx, m) => Math.max(mx, daysFromToday(m.date)), -Infinity);
   const nDias = pendL.length ? Math.max(1, ultimo - Math.max(0, daysFromToday(iniMes)) + 1) : 1;
-  const delSem = m => Math.ceil(m.pendiente / nSem);
-  const sem = pendL.reduce((t, m) => t + delSem(m), 0), dia = Math.ceil(sum(pendL, 'pendiente') / nDias);
+  const nSem = Math.round(nDias / 7 * 10) / 10 || 0.1;
+  const dia = Math.ceil(pendTot / nDias), sem = Math.min(pendTot, Math.ceil(pendTot * 7 / nDias));
+  const nSemTxt = String(nSem).replace(/\.0$/, '');
   const $$m = n => fmtMoney(Math.round(n));
   /* Sin atrasados, ¡Pagar ya! se atenúa y no se puede encender; Pendiente enciende solo Por vencer. */
   const yaVacio = !ya.length;
@@ -652,7 +652,7 @@ function renderProvisional() {
     <div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Atrasados: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">ATRASADOS</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><span class="pv-sw${hayPrev ? '' : ' off'}"><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button><small>Anteriores</small></span></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
-    <div class="pv-metas" role="group" aria-label="Metas: lo pendiente repartido entre los ${nDias} días que quedan hasta el último pago y entre ${nSem} semanas"><div><span class="pv-l">Meta diaria <small>×${nDias}</small></span><b>${$$m(dia)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">Meta semanal <small>×${nSem}</small></span><b>${$$m(sem)}</b></div></div>`;
+    <div class="pv-metas" role="group" aria-label="Metas: lo pendiente repartido entre los ${nDias} días que quedan hasta el último pago y entre ${nSemTxt} semanas"><div><span class="pv-l">Meta diaria <small>×${nDias}</small></span><b>${$$m(dia)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">Meta semanal <small>×${nSemTxt}</small></span><b>${$$m(sem)}</b></div></div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Inicio'; $('#list-count').textContent = '';
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
