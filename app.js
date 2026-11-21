@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v216';
+const APP_VERSION = 'v217';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1309,9 +1309,9 @@ const desglose = lista => plural(lista.length, 'pago', 'pagos');
 /* Datos del fondo 9:16 con el periodo que está elegido en Apartar (se genera desde Ajustes). */
 /* Fondo de pantalla 9:16: la misma meta diaria que muestra Inicio. */
 function datosFondoApartar() {
-  const { base, dia, nDias } = metasInicio();
+  const { base, dia, nDias, sem, nSem } = metasInicio();
   const tot = sum(base, 'imp'), pct = tot > 0 ? Math.round(base.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / tot * 100) : 0;
-  return { apartar: '1', label: 'META DIARIA', meta: dia, dias: nDias, pct, porv: base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).length };
+  return { apartar: '1', label: 'META DIARIA', meta: dia, dias: nDias, sem, nSemTxt: String(nSem).replace(/\.0$/, ''), pct, porv: base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).length };
 }
 
 
@@ -1415,29 +1415,35 @@ async function shareFondo(d) {
     g.addColorStop(0, 'rgba(250,204,21,.14)'); g.addColorStop(1, 'rgba(250,204,21,0)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-    if ('letterSpacing' in x) x.letterSpacing = '12px';
-    x.fillStyle = 'rgba(244,244,239,.55)'; x.font = '600 34px "JetBrains Mono"'; x.fillText(d.label || 'META DIARIA', 546, 740);
-    x.letterSpacing = '-10px';
-    const num = meta.toLocaleString('es-MX'), nf = '800 250px "Bricolage Grotesque"';
-    x.font = nf; const nw = x.measureText(num).width;
-    x.font = '800 110px "Bricolage Grotesque"'; const sw = x.measureText('$').width + 8;
-    const x0 = 540 - (nw + sw) / 2;
-    x.textAlign = 'left'; x.fillStyle = '#FACC15'; x.fillText('$', x0, 905);
-    x.fillStyle = '#F4F4EF'; x.font = nf; x.fillText(num, x0 + sw, 970);
-    x.textAlign = 'center'; if ('letterSpacing' in x) x.letterSpacing = '0px';
-    x.fillStyle = 'rgba(244,244,239,.5)'; x.font = '500 38px "DM Sans"';
-    x.fillText(d.texto || `para cubrir los próximos ${plural(dias, 'día', 'días')}`, 540, 1040);
-    x.fillStyle = '#16161C'; x.beginPath(); x.roundRect(260, 1110, 560, 10, 5); x.fill();
-    if (pct > 0) { x.fillStyle = '#22C55E'; x.beginPath(); x.roundRect(260, 1110, Math.max(10, 560 * pct / 100), 10, 5); x.fill(); }
+    /* Dos columnas: Diaria | Semanal (las mismas cifras que Inicio). Si una cifra no cabe en su columna, las dos bajan de tamaño juntas. */
+    const sem = +d.sem || 0, nSemTxt = String(d.nSemTxt || ''), numF = fs => `800 ${fs}px "Bricolage Grotesque"`;
+    const ancho = (n, fs) => { x.font = numF(fs); const w = x.measureText(n.toLocaleString('es-MX')).width; x.font = numF(Math.round(fs * .45)); return w + x.measureText('$').width + 8; };
+    if ('letterSpacing' in x) x.letterSpacing = '-3px';
+    let esc = 1; while (esc > .5 && (ancho(meta, 168 * esc) > 460 || ancho(sem, 140 * esc) > 460)) esc -= .04;
+    const cols = [[270, 'DIARIA', meta, 168, plural(dias, 'día', 'días')], [810, 'SEMANAL', sem, 140, `${nSemTxt} ${nSemTxt === '1' ? 'semana' : 'semanas'}`]];
+    cols.forEach(([cx, lab, val, base, sub]) => {
+      const fs = Math.round(base * esc), num = val.toLocaleString('es-MX');
+      if ('letterSpacing' in x) x.letterSpacing = '9px';
+      x.textAlign = 'center'; x.fillStyle = 'rgba(244,244,239,.55)'; x.font = '600 28px "JetBrains Mono"'; x.fillText(lab, cx + 5, 720);
+      if ('letterSpacing' in x) x.letterSpacing = '-3px';
+      x.font = numF(fs); const nw = x.measureText(num).width; x.font = numF(Math.round(fs * .45)); const sw = x.measureText('$').width + 8, x0 = cx - (nw + sw) / 2;
+      x.textAlign = 'left'; x.fillStyle = '#FACC15'; x.font = numF(Math.round(fs * .45)); x.fillText('$', x0, 880 - fs * .46);
+      x.fillStyle = '#F4F4EF'; x.font = numF(fs); x.fillText(num, x0 + sw, 880);
+      x.textAlign = 'center'; if ('letterSpacing' in x) x.letterSpacing = '0px';
+      x.fillStyle = 'rgba(244,244,239,.5)'; x.font = '500 34px "DM Sans"'; x.fillText(sub, cx, 945);
+    });
+    x.strokeStyle = 'rgba(244,244,239,.12)'; x.lineWidth = 2; x.beginPath(); x.moveTo(540, 690); x.lineTo(540, 960); x.stroke();
+    x.fillStyle = '#16161C'; x.beginPath(); x.roundRect(260, 1040, 560, 10, 5); x.fill();
+    if (pct > 0) { x.fillStyle = '#22C55E'; x.beginPath(); x.roundRect(260, 1040, Math.max(10, 560 * pct / 100), 10, 5); x.fill(); }
     const chips = [['#22C55E', `${pct}%`], ['#FACC15', `${porv} por vencer`]];
     x.font = '500 30px "JetBrains Mono"';
     const ws = chips.map(c => x.measureText(c[1]).width + 26 + 52), tot = ws.reduce((a, b) => a + b) + 18 * (chips.length - 1);
     let cx = 540 - tot / 2;
     chips.forEach((c, i) => {
       x.fillStyle = '#16161C'; x.strokeStyle = 'rgba(244,244,239,.1)'; x.lineWidth = 2;
-      x.beginPath(); x.roundRect(cx, 1160, ws[i], 62, 31); x.fill(); x.stroke();
-      x.fillStyle = c[0]; x.beginPath(); x.arc(cx + 26 + 7, 1191, 7, 0, 7); x.fill();
-      x.fillStyle = '#F4F4EF'; x.textAlign = 'left'; x.fillText(c[1], cx + 26 + 26, 1202); cx += ws[i] + 18;
+      x.beginPath(); x.roundRect(cx, 1090, ws[i], 62, 31); x.fill(); x.stroke();
+      x.fillStyle = c[0]; x.beginPath(); x.arc(cx + 26 + 7, 1121, 7, 0, 7); x.fill();
+      x.fillStyle = '#F4F4EF'; x.textAlign = 'left'; x.fillText(c[1], cx + 26 + 26, 1132); cx += ws[i] + 18;
     });
     x.textAlign = 'center'; if ('letterSpacing' in x) x.letterSpacing = '9px';
     x.fillStyle = 'rgba(244,244,239,.25)'; x.font = '600 28px "JetBrains Mono"'; x.fillText('FINANZAS', 544, 1800);
