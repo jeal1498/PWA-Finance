@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v215';
+const APP_VERSION = 'v216';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -622,21 +622,25 @@ function diaHTML(b) {
 
 
 
-/* Provisional: Pagar ya, las tres cifras del mes, Día | Semana, calendario (semana o mes) y la tabla de pagos. */
-function renderProvisional() {
+/* Base de Inicio y sus metas: Inicio y el fondo de pantalla 9:16 usan los mismos números.
+   Día: lo pendiente ÷ los días que quedan desde hoy (o desde el 1.º si el mes es futuro) hasta la fecha del último pago pendiente del mes, ese día incluido (mínimo 1).
+   Semana: lo pendiente ÷ esas mismas semanas (días ÷ 7, un decimal, sin redondear hacia arriba), nunca más que lo pendiente. */
+function metasInicio() {
   const todosMes = monthItems(), iniMes = new Date(state.month.year, state.month.month, 1);
   const hayPrev = todosMes.some(m => m.estado === 'Vencido' && m.date < iniMes);
-  const base = state.provPrev || !hayPrev ? todosMes : todosMes.filter(m => !(m.estado === 'Vencido' && m.date < iniMes)), b = { base, items: base };
-  const abo = sum(base, 'abo'), pend = sum(base, 'pendiente'), tot = sum(base, 'imp');
-  const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
-  const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
-  /* Día: lo pendiente ÷ los días que quedan desde hoy (o desde el 1.º si el mes es futuro) hasta la fecha del último pago pendiente del mes,
-     ese día incluido (mínimo 1). Semana: lo pendiente ÷ esas mismas semanas (días ÷ 7, con decimales, sin redondear), nunca más que lo pendiente. */
+  const base = state.provPrev || !hayPrev ? todosMes : todosMes.filter(m => !(m.estado === 'Vencido' && m.date < iniMes));
   const pendL = base.filter(m => m.pendiente > 0), pendTot = sum(pendL, 'pendiente');
   const ultimo = pendL.reduce((mx, m) => Math.max(mx, daysFromToday(m.date)), -Infinity);
   const nDias = pendL.length ? Math.max(1, ultimo - Math.max(0, daysFromToday(iniMes)) + 1) : 1;
   const nSem = Math.round(nDias / 7 * 10) / 10 || 0.1;
-  const dia = Math.ceil(pendTot / nDias), sem = Math.min(pendTot, Math.ceil(pendTot * 7 / nDias));
+  return { base, hayPrev, pendL, pendTot, nDias, nSem, dia: Math.ceil(pendTot / nDias), sem: Math.min(pendTot, Math.ceil(pendTot * 7 / nDias)) };
+}
+/* Provisional: Pagar ya, las tres cifras del mes, Día | Semana, calendario (semana o mes) y la tabla de pagos. */
+function renderProvisional() {
+  const { base, hayPrev, pendL, nDias, nSem, dia, sem } = metasInicio(), b = { base, items: base };
+  const abo = sum(base, 'abo'), pend = sum(base, 'pendiente'), tot = sum(base, 'imp');
+  const ya = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) <= 0);
+  const fut = base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0);
   const nSemTxt = String(nSem).replace(/\.0$/, '');
   const $$m = n => fmtMoney(Math.round(n));
   /* Sin atrasados, ¡Pagar ya! se atenúa y no se puede encender; Pendiente enciende solo Por vencer. */
@@ -1303,15 +1307,11 @@ const apartarMonto = (m, len) => Math.ceil(m.pend / Math.max(1, Math.ceil(m.d / 
 const desglose = lista => plural(lista.length, 'pago', 'pagos');
 
 /* Datos del fondo 9:16 con el periodo que está elegido en Apartar (se genera desde Ajustes). */
+/* Fondo de pantalla 9:16: la misma meta diaria que muestra Inicio. */
 function datosFondoApartar() {
-  const all = apartarItems(), fut = all.filter(m => m.d > 0);
-  const k = (APARTAR.find(p => p[0] === state.apartar) || APARTAR[0])[0];
-  const lim = k === 'semana' ? diasHastaDomingo() : apDias();
-  const meta = k === 'dia' ? fut.reduce((t, m) => t + apartarMonto(m, 1), 0) : fut.filter(m => m.d <= lim).reduce((t, m) => t + m.pend, 0);
-  const ini = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const ventana = movimientos.map(procesar).filter(m => (m.date >= ini && daysFromToday(m.date) <= apDias()) || m.estado === 'Vencido');
-  const pct = sum(ventana, 'imp') > 0 ? Math.round(sum(ventana, 'abo') / sum(ventana, 'imp') * 100) : 0;
-  return { apartar: '1', label: `META ${k === 'dia' ? 'DIARIA' : k === 'semana' ? 'SEMANAL' : 'DEL MES'}`, meta, dias: apDias(), pct, porv: all.filter(m => m.d >= 0).length };
+  const { base, dia, nDias } = metasInicio();
+  const tot = sum(base, 'imp'), pct = tot > 0 ? Math.round(base.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / tot * 100) : 0;
+  return { apartar: '1', label: 'META DIARIA', meta: dia, dias: nDias, pct, porv: base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).length };
 }
 
 
