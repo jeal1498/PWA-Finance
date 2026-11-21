@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v211';
+const APP_VERSION = 'v212';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1454,38 +1454,55 @@ async function shareFondo(d) {
    y resumen operativo (total cartera; vuelve a mostrar todo). */
 /* Análisis: números de todos los pagos pendiente por categoría y total contra pagado de los últimos meses. */
 const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : fmtMoney(n);
-/* Por concepto: cuánto suma cada nombre en el mes (actual), el año (actual) o todo. */
-function conceptosHTML() {
-  const per = state.conceptoPer || 'mes', hoy = toISO(HOY);
-  const dentro = x => per === 'todo' || x.fecha.slice(0, per === 'mes' ? 7 : 4) === hoy.slice(0, per === 'mes' ? 7 : 4);
+/* Los pagos numerados («Tanda 3/18», «Préstamo Mamá 1/10») cuentan bajo un mismo nombre. */
+const baseNombre = s => String(s).replace(/\s+\d+\/\d+(?=\s|\)|$)/, '').trim();
+/* Por concepto del mes que se ve: cuánto suma cada nombre (los 5 mayores y «Ver todos»). */
+function conceptosHTML(items) {
   const g = new Map();
-  for (const x of movimientos.slice().sort(byFecha)) {
-    if (!dentro(x)) continue;
-    const k = llaveC(x), e = g.get(k) || { nombre: x.conc, cat: x.cat, n: 0, total: 0 };
-    e.nombre = x.conc; e.cat = x.cat; e.n++; e.total += x.imp;
+  for (const x of items.slice().sort(byFecha)) {
+    const nombre = baseNombre(x.conc), k = llaveC({ conc: nombre, cat: x.cat }), e = g.get(k) || { nombre, cat: x.cat, n: 0, total: 0 };
+    e.n++; e.total += x.imp;
     g.set(k, e);
   }
   const lista = [...g.values()].sort((a, b) => b.total - a.total);
   const max = lista.length ? lista[0].total : 1, ver = state.conceptosTodos ? lista : lista.slice(0, 5);
-  const chips = [['mes', MESES[HOY.getMonth()]], ['anio', String(HOY.getFullYear())], ['todo', 'Todo']].map(([k, l]) => `<button type="button" class="pchip" data-action="conc-per" data-per="${k}" aria-pressed="${k === per}">${l}</button>`).join('');
   return `<section class="an-card" aria-label="Por concepto">
-      <h2 class="an-h">Por concepto</h2>
-      <div class="cp-chips">${chips}</div>
-      ${lista.length ? `<div class="cp-total">TOTAL ${fmtMoney(sum(lista, 'total'))} · ${plural(lista.length, 'concepto', 'conceptos')}</div>
-      ${ver.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em><em class="pt-tag">×${e.n}</em></span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}${lista.length > 5 ? `<button type="button" class="an-more" data-action="conc-todos">${state.conceptosTodos ? 'Ver menos' : `Ver todos (${lista.length})`}</button>` : ''}`
-        : '<p class="an-vacio">No hay pagos en este periodo.</p>'}
-    </section>
-    `;
+      <h2 class="an-h">Por concepto${lista.length ? ` · ${plural(lista.length, 'concepto', 'conceptos')}` : ''}</h2>
+      ${lista.length ? `${ver.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}<em class="pt-tag">${esc(catLabelOf(e.cat))}</em>${e.n > 1 ? `<em class="pt-tag">×${e.n}</em>` : ''}</span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i data-cat="${esc(catLabelOf(e.cat))}" style="width:${Math.max(3, Math.round(e.total / max * 100))}%"></i></div></div>`).join('')}${lista.length > 5 ? `<button type="button" class="an-more" data-action="conc-todos">${state.conceptosTodos ? 'Ver menos' : `Ver todos (${lista.length})`}</button>` : ''}`
+        : '<p class="an-vacio">No hay pagos en este mes.</p>'}
+    </section>`;
 }
 
+/* Avance de metas: los pagos numerados («Préstamo Mamá 1/10») agrupados por nombre y total de pagos. */
+function metasHTML(all) {
+  const g = new Map();
+  for (const m of all) {
+    const r = String(m.conc).match(/^(.*?)\s+(\d+)\/(\d+)(?=\s|\)|$)/);
+    if (!r) continue;
+    const k = `${llave(r[1])}|${r[3]}`, e = g.get(k) || { nombre: r[1].trim(), tot: +r[3], items: [] };
+    e.items.push(m); g.set(k, e);
+  }
+  const lista = [...g.values()].map(e => {
+    e.items.sort(byFecha);
+    const pagados = e.items.filter(m => m.pendiente <= 0).length, sig = e.items.find(m => m.pendiente > 0);
+    return { ...e, pagados, sig, total: sum(e.items, 'imp'), abo: e.items.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) };
+  }).sort((a, b) => (a.sig ? a.sig.fecha : '9') < (b.sig ? b.sig.fecha : '9') ? -1 : 1);
+  if (!lista.length) return '';
+  const dia = f => { const d = parseDate(f); return `${d.getDate()} ${MESES_CORTO[d.getMonth()]}`; };
+  return `<section class="an-card" aria-label="Avance de metas">
+      <h2 class="an-h">Avance de metas</h2>
+      ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}</span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i style="width:${e.total ? Math.round(e.abo / e.total * 100) : 0}%"></i></div><div class="an-meta"><span>${e.pagados} de ${e.tot} pagos</span><span>${e.sig ? `Próximo ${dia(e.sig.fecha)} · ${fmtMoney(e.sig.pendiente)}` : 'Completa'}</span></div></div>`).join('')}
+    </section>`;
+}
+
+/* Análisis: todo sigue al mes elegido (flechas, gráfica de meses o deslizar de lado). */
 function renderAnalisis() {
   const all = movimientos.map(procesar);
   const pend = all.filter(m => m.pendiente > 0);
-  const mesHoy = toISO(HOY).slice(0, 7);
-  const abonadoMes = movimientos.reduce((t, m) => t + (m.pagos || []).reduce((s, p) => s + ((p.fecha || m.fecha).slice(0, 7) === mesHoy ? p.monto : 0), 0), 0);
-  /* El mes: lo mismo que la tabla de Pagos (pagos del mes + atrasados de meses anteriores). */
-  const iniMes = new Date(HOY.getFullYear(), HOY.getMonth(), 1);
-  const delMesL = all.filter(m => (m.date.getFullYear() === HOY.getFullYear() && m.date.getMonth() === HOY.getMonth()) || (m.estado === 'Vencido' && m.date < iniMes));
+  const y = state.month.year, mo = state.month.month, mesSel = `${y}-${String(mo + 1).padStart(2, '0')}`, nomMes = MESES[mo];
+  const abonadoMes = movimientos.reduce((t, m) => t + (m.pagos || []).reduce((s, p) => s + ((p.fecha || m.fecha).slice(0, 7) === mesSel ? p.monto : 0), 0), 0);
+  /* El mes: lo mismo que la tabla de Inicio (pagos del mes; en el mes actual, también los atrasados de meses anteriores). */
+  const delMesL = monthItems();
   const totMes = sum(delMesL, 'imp'), aboMes = delMesL.reduce((t, m) => t + Math.min(m.abo, m.imp), 0), faltaMes = sum(delMesL, 'pendiente');
   const pctMes = totMes ? Math.round(aboMes / totMes * 100) : 0;
   const tiles = [
@@ -1493,8 +1510,9 @@ function renderAnalisis() {
     ['Próx. 30 días', pend.filter(m => { const d = daysFromToday(m.date); return d >= 0 && d <= 30; }).length],
     ['Liquidados', all.filter(m => m.estado === 'Pagado').length]
   ].map(([l, v, k]) => `<div class="kpi-lg an-t ${k || ''}"><span class="kpi-lg-t">${l}</span><span><span class="kpi-lg-m">${v}</span></span></div>`).join('');
-  $('#kpi-dash').innerHTML = `<div class="an-hero">
-      <span class="an-hero-t">${MESES[HOY.getMonth()]}</span>
+  $('#kpi-dash').innerHTML = `<div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
+    <div class="an-hero">
+      <span class="an-hero-t">${nomMes}</span>
       <div class="an-hero-b">
         <div class="an-ring" role="img" aria-label="${pctMes} % pagado"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" style="stroke:var(--line-3)" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" style="stroke:var(--ink)" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="${pctMes} 100"/></svg><span>${pctMes} %</span></div>
         <div class="an-hero-n"><small>Falta por pagar</small><b>${fmtMoney(faltaMes)}</b><small>Abonado ${fmtMoney(aboMes)} de ${fmtMoney(totMes)}</small></div>
@@ -1503,21 +1521,34 @@ function renderAnalisis() {
     <div class="kpi-legend sin-sub an">${tiles}</div>`;
   $('#kpi-dash').hidden = false;
 
-  const porCat = new Map();
-  pend.forEach(m => { const c = catOf(m.cat); porCat.set(c.id, { c, v: ((porCat.get(c.id) || {}).v || 0) + m.pendiente }); });
-  const cats = [...porCat.values()].sort((a, c) => c.v - a.v), max = cats.length ? cats[0].v : 0;
-  const base = HOY.getFullYear() * 12 + HOY.getMonth();
-  let meses = [-2, -1, 0, 1].map(k => {
-    const idx = base + k, y = Math.floor(idx / 12), mo = idx % 12;
-    const l = all.filter(m => m.date.getFullYear() === y && m.date.getMonth() === mo);
-    return { mo, total: sum(l, 'imp'), pagado: Math.min(sum(l, 'abo'), sum(l, 'imp')) };
+  /* Mes a mes: nueve meses desde el actual (o desde el elegido si queda fuera); tocar uno lo elige. */
+  const idxSel = y * 12 + mo, idxHoy = HOY.getFullYear() * 12 + HOY.getMonth();
+  let ini = idxHoy; if (idxSel < ini) ini = idxSel; else if (idxSel > ini + 8) ini = idxSel - 8;
+  const meses = Array.from({ length: 9 }, (_, k) => {
+    const idx = ini + k, yy = Math.floor(idx / 12), mm = idx % 12;
+    const l = all.filter(m => m.date.getFullYear() === yy && m.date.getMonth() === mm);
+    return { idx, mo: mm, total: sum(l, 'imp'), pagado: Math.min(sum(l, 'abo'), sum(l, 'imp')) };
   });
-  while (meses.length > 1 && !meses[0].total) meses.shift();
-  const top = Math.max(1, ...meses.map(m => m.total));
-  /* Aportado este mes por cada persona (abonos de pagos con fecha de este mes). */
+  const top = Math.max(1, ...meses.map(m => m.total)), pesado = meses.reduce((a, m) => m.total > a.total ? m : a, meses[0]), prom = sum(meses, 'total') / meses.length;
+  const grafica = `<section class="an-card" aria-label="Mes a mes">
+      <h2 class="an-h">Mes a mes · total y pagado</h2>
+      <div class="an2-chart">${meses.map(m => `<button type="button" class="an2-col" data-action="an-mes" data-idx="${m.idx}" aria-pressed="${m.idx === idxSel}" aria-label="${MESES[m.mo]}: total ${fmtMoney(m.total)}, pagado ${fmtMoney(m.pagado)}"><b>${m.total ? fmtK(m.total) : ''}</b><span class="an2-bar" style="height:${m.total ? Math.max(3, Math.round(m.total / top * 112)) : 0}px"><i style="height:${m.total ? (m.pagado / m.total * 100).toFixed(1) : 0}%"></i></span><small>${MESES_CORTO[m.mo]}</small></button>`).join('')}</div>
+      <div class="an2-nota"><span>${pesado.total ? `Más pesado: ${MESES[pesado.mo]} ${fmtMoney(pesado.total)}` : ''}</span><span>Promedio ${fmtMoney(Math.round(prom))}</span></div>
+    </section>`;
+
+  /* Por categoría: lo del mes elegido, con su % */
+  const porCat = new Map();
+  delMesL.forEach(m => { const c = catOf(m.cat); porCat.set(c.id, { c, v: ((porCat.get(c.id) || {}).v || 0) + m.imp }); });
+  const cats = [...porCat.values()].sort((a, c) => c.v - a.v), max = cats.length ? cats[0].v : 0;
+  const porCategoria = `<section class="an-card" aria-label="Por categoría">
+      <h2 class="an-h">Por categoría${cats.length ? ` · ${plural(cats.length, 'categoría', 'categorías')}` : ''}</h2>
+      ${cats.length ? cats.map(({ c, v }) => `<div class="cp-row" data-cat="${esc(c.id)}"><div class="cp-top"><span class="cp-n">${esc(c.id)}<em class="pt-tag">${totMes ? Math.round(v / totMes * 100) : 0} %</em></span><b>${fmtMoney(v)}</b></div><div class="cp-bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="an-vacio">No hay pagos en este mes.</p>'}
+    </section>`;
+
+  /* Aportado en el mes elegido por cada persona (abonos de pagos con fecha de ese mes). */
   const delMes = [], apCat = new Map();
   movimientos.forEach(m => (m.pagos || []).forEach(p => {
-    if ((p.fecha || m.fecha).slice(0, 7) !== mesHoy) return;
+    if ((p.fecha || m.fecha).slice(0, 7) !== mesSel) return;
     delMes.push(p);
     if (!PERSONAS[p.quien]) return;
     const c = catOf(m.cat), e = apCat.get(c.id) || { c, por: Object.fromEntries(Object.keys(PERSONAS).map(k => [k, 0])) };
@@ -1526,25 +1557,17 @@ function renderAnalisis() {
   const { por, sin } = porPersona(delMes), conQ = r2(abonadoMes - sin), ks = Object.keys(PERSONAS);
   const dif = ks.length === 2 ? r2(Math.abs(por[ks[0]] - por[ks[1]]) / 2) : 0, menos = ks.length === 2 && por[ks[0]] < por[ks[1]] ? ks[0] : ks[1];
   const catsAp = [...apCat.values()].map(e => ({ ...e, t: r2(ks.reduce((t, k) => t + e.por[k], 0)) })).sort((a, c) => c.t - a.t), maxAp = catsAp.length ? catsAp[0].t : 0;
-  const aporte = `
-    <section class="an-card" aria-label="Aportado en ${MESES[HOY.getMonth()].toLowerCase()}">
-      <h2 class="an-h">Aportado en ${MESES[HOY.getMonth()].toLowerCase()}</h2>
+  const aporte = ks.length < 2 ? `
+    <section class="an-card an-linea" aria-label="Aportado en ${nomMes.toLowerCase()}"><span>Aportado en ${nomMes.toLowerCase()}</span><span>${ks.length ? `<b>${esc(PERSONAS[ks[0]])}</b> · ` : ''}<b>${fmtMoney(abonadoMes)}</b></span></section>` : `
+    <section class="an-card" aria-label="Aportado en ${nomMes.toLowerCase()}">
+      <h2 class="an-h">Aportado en ${nomMes.toLowerCase()}</h2>
       ${conQ ? `<div class="ap-dos">${ks.map((k, i) => `${i ? '<span class="ap-div" aria-hidden="true"></span>' : ''}<div><span class="ap-n">${avatar(k)}${PERSONAS[k]}</span><b>${fmtMoney(por[k])}</b><small>${Math.round(por[k] / conQ * 100)} %</small></div>`).join('')}</div>
       ${aportesBar(por, conQ)}
       <p class="ap-bal">${dif < 1 ? 'Van parejos' : `Para quedar a mitades, <b>${PERSONAS[menos]}</b> pondría <b>${fmtMoney(dif)}</b> más`}</p>
       ${catsAp.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.c.id)}</span><span class="ap-cv">${ks.map(k => fmtMoney(e.por[k])).join(' · ')}</span></div><div class="ap-bar" style="width:${(e.t / maxAp * 100).toFixed(1)}%">${ks.map(k => `<i class="ap-${k}" style="width:${e.t ? (e.por[k] / e.t * 100).toFixed(1) : 0}%"></i>`).join('')}</div></div>`).join('')}` : '<p class="an-vacio">Al abonar, elige quién aporta y aquí verás cuánto puso cada uno.</p>'}
       ${sin ? `<p class="ap-sin">Sin asignar: ${fmtMoney(sin)}</p>` : ''}
     </section>`;
-  $('#list').innerHTML = `${aporte}
-    <section class="an-card" aria-label="Pendiente por categoría">
-      <h2 class="an-h">Pendiente por categoría</h2>
-      ${cats.length ? cats.map(({ c, v }) => `<div class="cp-row" data-cat="${esc(c.id)}"><div class="cp-top"><span class="cp-n">${esc(c.id)}</span><b>${fmtMoney(v)}</b></div><div class="cp-bar"><i style="width:${(v / max * 100).toFixed(1)}%"></i></div></div>`).join('') : '<p class="an-vacio">No hay saldos pendientes.</p>'}
-    </section>
-    ${conceptosHTML()}<section class="an-card" aria-label="Total y pagado por mes">
-      <h2 class="an-h">Últimos meses · total y pagado</h2>
-      <div class="an-chart" style="grid-template-columns:repeat(${meses.length},minmax(0,1fr))">${meses.map(m => `<div class="an-col" aria-label="${MESES[m.mo]}: total ${fmtMoney(m.total)}, pagado ${fmtMoney(m.pagado)}"><b>${fmtK(m.total)}</b><span class="an-bar" style="height:${Math.max(2, m.total / top * 100).toFixed(1)}%"><i style="height:${m.total ? (m.pagado / m.total * 100).toFixed(1) : 0}%"></i></span><small>${MESES_CORTO[m.mo]}</small></div>`).join('')}</div>
-      <div class="an-ley"><span class="p">Pagado</span><span>Total del mes</span></div>
-    </section>`;
+  $('#list').innerHTML = `${grafica}${porCategoria}${metasHTML(all)}${conceptosHTML(delMesL)}${aporte}`;
 }
 
 function kpiDashboard(base, todo = false, vis = base) {
@@ -2031,7 +2054,7 @@ document.addEventListener('click', async e => {
       $('#' + t.getAttribute('aria-controls')).hidden = !open;
       break;
     }
-    case 'conc-per': state.conceptoPer = t.dataset.per; render(); break;
+    case 'an-mes': { const ix = Number(t.dataset.idx); state.month = { year: Math.floor(ix / 12), month: ix % 12 }; state.conceptosTodos = false; render(); break; }
     case 'conc-todos': state.conceptosTodos = !state.conceptosTodos; render(); break;
     case 'sync-card': { const sm = $('small', t); if (sm) sm.textContent = 'Sincronizando…'; await syncRapido(t); break; }
     case 'resp': { const ya = t.getAttribute('aria-pressed') === 'true'; $$('button', t.parentElement).forEach(b => b.setAttribute('aria-pressed', String(b === t && !ya))); break; }
@@ -2164,12 +2187,12 @@ document.addEventListener('keydown', e => {
   }, { passive: true });
 })();
 
-/* Calendario: deslizar de lado sobre los días cambia de mes (o de semana, en la vista Semana). */
+/* Deslizar de lado cambia de mes: sobre los días del Calendario (o de semana, en la vista Semana) y en cualquier parte de Análisis. */
 (() => {
   let sx = 0, sy = 0, t0 = 0, on = false;
-  const zona = el => el && el.closest && el.closest('.cal-grid');
+  const zona = el => el && el.closest && (state.view === 'analisis' ? el.closest('#kpi-dash, #list') : el.closest('.cal-grid'));
   document.addEventListener('touchstart', e => {
-    on = e.touches.length === 1 && state.view === 'calendario' && !!zona(e.target);
+    on = e.touches.length === 1 && (state.view === 'calendario' || state.view === 'analisis') && !!zona(e.target);
     if (!on) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; t0 = Date.now();
   }, { passive: true });
@@ -2180,7 +2203,7 @@ document.addEventListener('keydown', e => {
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if (Date.now() - t0 > 700 || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     const delta = dx < 0 ? 1 : -1;
-    if (state.provMes) { shiftMonth(delta); return; }
+    if (state.view === 'analisis' || state.provMes) { shiftMonth(delta); return; }
     state.provOff += delta; state.calDia = ''; render();
   }, { passive: true });
 })();
