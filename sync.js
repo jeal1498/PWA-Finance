@@ -97,6 +97,14 @@ export async function push(movimientos, metas, { force = false, dbOk = true } = 
   setCfg({ last: Date.now(), error: '', count: total });
 }
 
+/* Vacía la copia de la nube (botón «Eliminar todos los datos»). `borr` lleva una marca de borrado por cada registro y abono,
+   para que otro teléfono que aún los tenga no los vuelva a subir al sincronizar. Es la única vía que envía una copia vacía. */
+export async function vaciarNube(borr) {
+  if (!connection()) throw new Error('Inicia sesión para sincronizar');
+  await nubePush({ app: 'finanzas', movimientos: [], metas: [], borrados: borr });
+  setCfg({ last: Date.now(), error: '', count: 0 });
+}
+
 /* Trae la última copia de la nube: { movimientos, metas, borrados } (o null si aún no hay). */
 export async function pull() {
   if (!connection()) throw new Error('Inicia sesión para sincronizar');
