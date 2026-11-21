@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v207';
+const APP_VERSION = 'v208';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -1278,6 +1278,7 @@ function renderPerfil() {
       ${ajFila('export-json', AJ_ICONOS.DOWN, 'Exportar respaldo', 'Archivo JSON')}
       ${conn ? ajFila('sync-card', AJ_ICONOS.SYNC, 'Sincronizar ahora', cfg.error ? esc(cfg.error) : `Última vez: ${cuandoLargo}`) : ''}
     </div>
+    <div class="aj-grp aj-salir"><button type="button" class="aj-row aj-out" data-action="borrar-todo">Eliminar todos los datos</button></div>
     ${u ? '<div class="aj-grp aj-salir"><button type="button" class="aj-row aj-out" data-action="cerrar-sesion">Cerrar sesión</button></div>' : ''}`;
   cargarCompartir();
 }
@@ -1714,6 +1715,35 @@ async function submitInvitar() {
     btn.disabled = false; btn.textContent = 'Invitar';
   }
 }
+/* «Eliminar todos los datos» (Ajustes): vacía este teléfono y, con sesión, la nube de la cuenta. Antes de vaciar anota una marca de
+   borrado por cada registro y abono (los de este teléfono y los de la nube): otro teléfono que aún los tenga los pierde al sincronizar
+   en vez de volver a subirlos. Lo que se importe después (con fecha de cambio posterior) sí se queda. */
+async function borrarTodo() {
+  const conn = sync.connection(), compartida = ultimaPareja.miembros.length > 1, n = movimientos.length + metas.length;
+  if (!window.confirm(`¿Eliminar TODOS los datos? Se borran ${plural(n, 'pago', 'pagos')} de este teléfono${conn ? ' y de la nube de tu cuenta' : ''}${compartida ? '. Como comparten cuenta, la otra persona también los perderá' : ''}. No se puede deshacer.`)) return;
+  if (compartida && !window.confirm('Segunda confirmación: la cuenta compartida quedará vacía para los dos. ¿Eliminar todo?')) return;
+  clearTimeout(autoTimer);
+  try {
+    if (sincronizando) await sincronizando.catch(() => {});
+    const ahora = Date.now(), b = { ...sync.borrados() };
+    const marcar = (store, lista) => (lista || []).forEach(x => {
+      if (!x || x.id == null) return;
+      b[`${store}:${x.id}`] = ahora;
+      (x.pagos || []).forEach(p => { if (p && p.t) b[`p:${p.t}`] = ahora; });
+    });
+    marcar('movimientos', movimientos); marcar('metas', metas);
+    if (conn) {
+      const data = await sync.pull();
+      if (data) { marcar('movimientos', data.movimientos); marcar('metas', data.metas); }
+      await sync.vaciarNube(b);
+    }
+    await dbBatch({ movimientos: { clear: true }, metas: { clear: true } });
+    sync.guardarBorrados(b);
+    sync.setCfg({ count: 0, ...(conn ? {} : { last: 0 }), error: '' });
+    movimientos = []; metas = [];
+    closeSheet(); render(); toast('Datos eliminados');
+  } catch (e) { toast(e.message || 'No se pudo eliminar'); }
+}
 async function salirCompartir() {
   if (!window.confirm('¿Dejar de compartir? Te quedas solo con los pagos donde eres el responsable; los demás se quedan con la otra persona, y ya no verán lo que anote el otro.')) return;
   try { await comp.salir(); sync.olvidarHogar(); sync.guardarBorrados({}); await refrescarPersonas(); toast('Dejaste de compartir'); try { await sincronizar(); } catch (e) { /* se sincroniza sola después */ } renderPerfil(); } catch (e) { toast(e.message || 'No se pudo salir'); }
@@ -1930,6 +1960,7 @@ document.addEventListener('click', async e => {
     case 'pareja-salir': closeSheet(); salirCompartir(); break;
     case 'pareja-quitar': { const em = t.dataset.email; closeSheet(); comp.quitarInvitacion(em).then(() => cargarCompartir()).catch(e => toast(e.message || 'No se pudo quitar')); break; }
     case 'sync-estado': { const c = sync.getCfg(); toast(c.error ? c.error : c.last ? `Sincronizado a las ${new Date(c.last).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })}` : 'Aún no se ha sincronizado'); break; }
+    case 'borrar-todo': borrarTodo(); break;
     case 'cerrar-sesion': cerrarSesion().then(() => { loginEl.hidden = false; }); break;
     case 'open-import': openImport(); break;
     case 'export-json':
