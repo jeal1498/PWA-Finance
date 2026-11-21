@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v213';
+const APP_VERSION = 'v214';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -2187,12 +2187,12 @@ document.addEventListener('keydown', e => {
   }, { passive: true });
 })();
 
-/* Deslizar de lado cambia de mes: sobre los días del Calendario (o de semana, en la vista Semana) y en cualquier parte de Análisis. */
+/* Deslizar de lado cambia de mes en Inicio, Calendario y Análisis (en cualquier parte de la pantalla; en la vista Semana del Calendario cambia de semana). */
 (() => {
   let sx = 0, sy = 0, t0 = 0, on = false;
-  const zona = el => el && el.closest && (state.view === 'analisis' ? el.closest('#kpi-dash, #list') : el.closest('.cal-grid'));
+  const VISTAS = ['provisional', 'calendario', 'analisis'];
   document.addEventListener('touchstart', e => {
-    on = e.touches.length === 1 && (state.view === 'calendario' || state.view === 'analisis') && !!zona(e.target);
+    on = e.touches.length === 1 && VISTAS.includes(state.view) && sheet.el.hidden && !!(e.target.closest && e.target.closest('#kpi-dash, #list'));
     if (!on) return;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; t0 = Date.now();
   }, { passive: true });
@@ -2203,8 +2203,8 @@ document.addEventListener('keydown', e => {
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if (Date.now() - t0 > 700 || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     const delta = dx < 0 ? 1 : -1;
-    if (state.view === 'analisis' || state.provMes) { shiftMonth(delta); return; }
-    state.provOff += delta; state.calDia = ''; render();
+    if (state.view === 'calendario' && !state.provMes) { state.provOff += delta; state.calDia = ''; render(); return; }
+    shiftMonth(delta);
   }, { passive: true });
 })();
 
