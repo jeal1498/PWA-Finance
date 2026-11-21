@@ -1350,5 +1350,7 @@ body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--dang
 .an-card.an-linea { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
 .an-linea b { font-family: var(--font-data); font-weight: 600; }
 .an-card .cp-bar { background: rgb(var(--ink-rgb) / .12); }
-#list > .pv-head { margin-bottom: 6px; }
+/* El encabezado de mes mide y se coloca igual en Inicio, Calendario y Análisis: mismo borde superior y 8 px hasta lo siguiente. */
+#list > .pv-head { margin-top: -8px; margin-bottom: 8px; }
+.pv-head + .an-hero { margin-top: 8px; }
 .cal-ctl { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
