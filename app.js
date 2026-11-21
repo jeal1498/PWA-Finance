@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v212';
+const APP_VERSION = 'v213';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -590,7 +590,7 @@ function celdaDia(iso, list, hoy, d, mo, wd = '') {
   return `<button type="button" class="cal-d${est ? ' ' + est : ''}${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${wd}<span class="cal-dots" aria-hidden="true">${dots}</span><span class="cal-n">${d}</span><span class="cal-m">${monto}</span></button>`;
 }
 /* Pie del calendario: leyenda de colores y selector Mes | Semana. */
-const calPie = () => `<div class="cal-pie"><div class="cal-lg" aria-hidden="true"><span><i class="danger"></i>Atrasado</span><span><i class="warn"></i>Por vencer</span><span><i class="ok"></i>Pagado</span></div><div class="cal-seg" role="group" aria-label="Vista del calendario"><button type="button" data-action="cal-modo" data-m="mes" aria-pressed="${state.provMes}">Mes</button><button type="button" data-action="cal-modo" data-m="sem" aria-pressed="${!state.provMes}">Semana</button></div></div>`;
+const calPie = () => `<div class="cal-pie"><div class="cal-lg" aria-hidden="true"><span><i class="danger"></i>Atrasado</span><span><i class="warn"></i>Por vencer</span><span><i class="ok"></i>Pagado</span></div><div class="cal-ctl"><button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><div class="cal-seg" role="group" aria-label="Vista del calendario"><button type="button" data-action="cal-modo" data-m="mes" aria-pressed="${state.provMes}">Mes</button><button type="button" data-action="cal-modo" data-m="sem" aria-pressed="${!state.provMes}">Semana</button></div></div></div>`;
 /* Resumen de lo que muestra la tabla (un día, la semana o el mes). */
 const resumenCal = (titulo, list, conTodo) => `<div class="cal-sum"><div><b>${titulo}</b><small>${list.length ? plural(list.length, 'pago', 'pagos') : 'Sin pagos'}</small></div><div class="cal-sum-r"><span>Pendiente</span><b>${fmtMoney(sum(list, 'pendiente'))}</b>${conTodo ? '<button type="button" class="cal-todo" data-action="cal-dia" data-dia="">Todo el mes</button>' : ''}</div></div>`;
 function calendarioHTML(b, pliegue = '') {
@@ -606,8 +606,8 @@ function calendarioHTML(b, pliegue = '') {
     const iso = `${pre}-${String(d).padStart(2, '0')}`;
     cells.push(celdaDia(iso, porDia.get(iso) || [], hoy, d, mo));
   }
-  return `<div class="pt cal">
-      <div class="cal-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
+  return `<div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
+    <div class="pt cal">
       <div class="cal-grid">${cells.join('')}</div>${pliegue}
     </div>`;
 }
@@ -680,7 +680,7 @@ function renderCalendario() {
       cells.push(celdaDia(iso, todos.filter(m => m.fecha === iso), hoy, f.getDate(), f.getMonth(), `<small class="cal-wd" aria-hidden="true">${'LMMJVSD'[i]}</small>`));
     }
     const rango = lun.getMonth() === dom.getMonth() ? `${lun.getDate()} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}` : `${lun.getDate()} ${MESES_CORTO[lun.getMonth()]} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}`;
-    cal = `<div class="pt cal"><div class="cal-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="cal-grid wk">${cells.join('')}</div>${calPie()}</div>`;
+    cal = `<div class="pv-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="pt cal"><div class="cal-grid wk">${cells.join('')}</div>${calPie()}</div>`;
   }
   if (state.calDia) { $('#list').innerHTML = cal + diaHTML(b); return; }
   const items = state.provMes ? base : base.filter(m => toISO(m.date) >= toISO(lunes) && toISO(m.date) <= toISO(domingo));
