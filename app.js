@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v220';
+const APP_VERSION = 'v221';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -576,20 +576,35 @@ function pagosTable(b, conMes = true) {
 /* Calendario del mes (siempre todo el mes, sin filtros): cada día con pagos lleva una barrita del color de su peor estatus que se llena con lo abonado; al tocar un día la tabla muestra solo sus pagos. */
 const DOT = { Vencido: 'danger', Pendiente: 'warn', Pagado: 'ok' }, DOT_RANK = { Vencido: 0, Pendiente: 1, Pagado: 2 };
 /* Celda de un día (mes y semana): número, puntos (uno por pago, máx. 3) y lo que vence ese día con el color de su peor estatus. */
+/* Mapa de calor (v221): cada día se pinta según lo que vence ese día. Verde = $0 (sin pagos), amarillo = la mediana de los días con pagos, rojo = el día más pesado del mes. */
+const HEAT = { g: [0x57, 0xBB, 0x8A], y: [0xFF, 0xD6, 0x66], r: [0xE6, 0x7C, 0x73] };
+let calEsc = { med: 0, hi: 0 };
+const montoDia = list => { const pend = sum(list, 'pendiente'); return pend > 0 ? pend : sum(list, 'imp'); };
+function calEscala(items) {
+  const porDia = new Map();
+  items.filter(m => enMes(m.date)).forEach(m => (porDia.get(m.fecha) || porDia.set(m.fecha, []).get(m.fecha)).push(m));
+  const v = [...porDia.values()].map(montoDia).filter(x => x > 0).sort((a, c) => a - c);
+  calEsc = { med: v.length ? v[Math.floor(v.length / 2)] : 0, hi: v.length ? v[v.length - 1] : 0 };
+}
+function calColor(v) {
+  const mez = (a, b, t) => `rgb(${a.map((x, i) => Math.round(x + (b[i] - x) * t)).join(',')})`, { med, hi } = calEsc;
+  if (!hi || v <= 0) return mez(HEAT.g, HEAT.g, 0);
+  return v <= med ? mez(HEAT.g, HEAT.y, v / med) : mez(HEAT.y, HEAT.r, (v - med) / (hi - med));
+}
 const kilo = n => n >= 1000 ? `${String(Math.round(n / 100) / 10).replace(/\.0$/, '')}k` : String(Math.round(n));
 function celdaDia(iso, list, hoy, d, mo, wd = '') {
-  let est = '', monto = '', aria = '', dots = '';
+  let est = '', monto = '', aria = '', dots = '', v = 0;
   if (list.length) {
     est = DOT[list.map(m => m.estado).sort((a, c) => DOT_RANK[a] - DOT_RANK[c])[0]];
     const pend = sum(list, 'pendiente');
-    monto = kilo(pend > 0 ? pend : sum(list, 'imp'));
+    v = montoDia(list); monto = kilo(v);
     dots = list.slice(0, 3).map(m => `<i class="${DOT[m.estado]}"></i>`).join('');
     aria = `, ${plural(list.length, 'pago', 'pagos')}, ${pend > 0 ? 'pendiente ' + fmtMoney(pend) : 'pagado'}`;
   }
-  return `<button type="button" class="cal-d${est ? ' ' + est : ''}${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${wd}<span class="cal-dots" aria-hidden="true">${dots}</span><span class="cal-n">${d}</span><span class="cal-m">${monto}</span></button>`;
+  return `<button type="button" class="cal-d${est ? ' ' + est : ''}${iso === hoy ? ' hoy' : ''}" data-action="cal-dia" data-dia="${iso}" aria-pressed="${iso === state.calDia}" style="--c:${calColor(v)}" aria-label="${d} de ${MESES[mo].toLowerCase()}${aria}">${wd}<span class="cal-dots" aria-hidden="true">${dots}</span><span class="cal-n">${d}</span><span class="cal-m">${monto}</span></button>`;
 }
 /* Pie del calendario: leyenda de colores y selector Mes | Semana. */
-const calPie = () => `<div class="cal-pie"><div class="cal-lg" aria-hidden="true"><span><i class="danger"></i>Atrasado</span><span><i class="warn"></i>Por vencer</span><span><i class="ok"></i>Pagado</span></div><div class="cal-ctl"><button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><div class="cal-seg" role="group" aria-label="Vista del calendario"><button type="button" data-action="cal-modo" data-m="mes" aria-pressed="${state.provMes}">Mes</button><button type="button" data-action="cal-modo" data-m="sem" aria-pressed="${!state.provMes}">Semana</button></div></div></div>`;
+const calPie = () => `<div class="cal-pie"><div class="cal-lg" aria-hidden="true"><span>$0</span><i class="cal-esc"></i><span>${fmtMoney(calEsc.hi)}</span></div><div class="cal-ctl"><button type="button" class="cal-hoy" data-action="cal-hoy">Hoy</button><div class="cal-seg" role="group" aria-label="Vista del calendario"><button type="button" data-action="cal-modo" data-m="mes" aria-pressed="${state.provMes}">Mes</button><button type="button" data-action="cal-modo" data-m="sem" aria-pressed="${!state.provMes}">Semana</button></div></div></div>`;
 /* Resumen de lo que muestra la tabla (un día, la semana o el mes). */
 const resumenCal = (titulo, list, conTodo) => `<div class="cal-sum"><div><b>${titulo}</b><small>${list.length ? plural(list.length, 'pago', 'pagos') : 'Sin pagos'}</small></div><div class="cal-sum-r"><span>Pendiente</span><b>${fmtMoney(sum(list, 'pendiente'))}</b>${conTodo ? '<button type="button" class="cal-todo" data-action="cal-dia" data-dia="">Todo el mes</button>' : ''}</div></div>`;
 function calendarioHTML(b, pliegue = '') {
@@ -600,11 +615,13 @@ function calendarioHTML(b, pliegue = '') {
   if (!state.calDia.startsWith(pre)) state.calDia = '';
   const offset = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
   const cells = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
-  for (let i = 0; i < offset; i++) cells.push('<span aria-hidden="true"></span>');
+  const diasAnt = new Date(y, mo, 0).getDate();
+  for (let i = 0; i < offset; i++) cells.push(`<span class="cal-f" aria-hidden="true">${diasAnt - offset + 1 + i}</span>`);
   for (let d = 1; d <= n; d++) {
     const iso = `${pre}-${String(d).padStart(2, '0')}`;
     cells.push(celdaDia(iso, porDia.get(iso) || [], hoy, d, mo));
   }
+  for (let i = 1; (offset + n + i - 1) % 7 !== 0; i++) cells.push(`<span class="cal-f" aria-hidden="true">${i}</span>`);
   return `<div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pt cal">
       <div class="cal-grid">${cells.join('')}</div>${pliegue}
@@ -668,6 +685,7 @@ function renderProvisional() {
 /* Calendario: semana (con flechas) o mes completo (pliegue), y debajo los pagos de lo que se ve; tocar un día muestra solo los suyos. */
 function renderCalendario() {
   const base = monthItems(), b = { base, items: base };
+  calEscala(base);
   $('#kpi-dash').hidden = true;
   $('#list-caption').textContent = 'Calendario'; $('#list-count').textContent = '';
   const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
