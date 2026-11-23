@@ -32,6 +32,7 @@
   --ink-2: #C9C9C2;
   --muted: #A3A3AD;
   --on-ink: #0C0C10;
+  --heat-g: #57BB8A; --heat-y: #FFD666; --heat-r: #E67C73; --heat-ink: #0C0C10; --heat-ink-inv: #F4F4EF;
   --accent: #F4F4EF;
   --on-accent: #0C0C10;
   --focus: #F4F4EF;
@@ -1354,3 +1355,16 @@ body[data-view="provisional"] .pv-ya.on { box-shadow: inset 0 0 0 2px var(--dang
 #list > .pv-head { margin-top: -8px; margin-bottom: 8px; }
 .pv-head + .an-hero { margin-top: 8px; }
 .cal-ctl { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+/* Calendario con mapa de calor (v221): la celda de cada día se tiñe según su monto (--c lo pone app.js); texto siempre oscuro sobre el tono; celdas pegadas con línea fina. */
+.cal-grid { gap: 1px; padding: 0; background: var(--line-2); border-bottom: 1px solid var(--line-2); }
+.cal-grid.wk { padding: 0; }
+.cal-wd { background: var(--surface); line-height: 30px; }
+.cal-d { border-radius: 0; background: var(--c); color: var(--heat-ink); }
+.cal-d .cal-n, .cal-d .cal-m, .cal-d.danger .cal-m, .cal-d.warn .cal-m, .cal-d.ok .cal-m { color: var(--heat-ink); }
+.cal-d.hoy .cal-n { background: var(--heat-ink); color: var(--heat-ink-inv); }
+.cal-d .cal-dots i, .cal-dots i.danger, .cal-dots i.warn, .cal-dots i.ok { background: var(--heat-ink); opacity: .55; }
+.cal-d[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--heat-ink); }
+.cal-d:focus-visible { outline-color: var(--heat-ink); outline-offset: -3px; }
+.cal-f { display: grid; place-items: center; background: var(--surface); color: var(--muted); font: 700 14px var(--font); opacity: .5; min-height: 46px; }
+.cal-lg { align-items: center; gap: 10px; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.cal-lg .cal-esc { flex: 1; width: auto; height: 10px; border-radius: 5px; border: 1px solid var(--line-2); background: linear-gradient(90deg, var(--heat-g), var(--heat-y), var(--heat-r)); }
