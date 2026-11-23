@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v221';
+const APP_VERSION = 'v222';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -591,6 +591,8 @@ function calColor(v) {
   if (!hi || v <= 0) return mez(HEAT.g, HEAT.g, 0);
   return v <= med ? mez(HEAT.g, HEAT.y, v / med) : mez(HEAT.y, HEAT.r, (v - med) / (hi - med));
 }
+const CAL_DIAS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+const calTotal = (v, wd = '') => `<span class="cal-tot${v ? '' : ' cero'}" aria-label="Total de la semana: ${v ? fmtMoney(v) : 'sin pagos'}">${wd}<b>${v ? kilo(v) : '—'}</b></span>`;
 const kilo = n => n >= 1000 ? `${String(Math.round(n / 100) / 10).replace(/\.0$/, '')}k` : String(Math.round(n));
 function celdaDia(iso, list, hoy, d, mo, wd = '') {
   let est = '', monto = '', aria = '', dots = '', v = 0;
@@ -613,15 +615,20 @@ function calendarioHTML(b, pliegue = '') {
   b.base.filter(m => enMes(m.date)).forEach(m => (porDia.get(m.fecha) || porDia.set(m.fecha, []).get(m.fecha)).push(m));
   const hoy = toISO(HOY);
   if (!state.calDia.startsWith(pre)) state.calDia = '';
-  const offset = (new Date(y, mo, 1).getDay() + 6) % 7, n = new Date(y, mo + 1, 0).getDate();
-  const cells = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
-  const diasAnt = new Date(y, mo, 0).getDate();
-  for (let i = 0; i < offset; i++) cells.push(`<span class="cal-f" aria-hidden="true">${diasAnt - offset + 1 + i}</span>`);
-  for (let d = 1; d <= n; d++) {
-    const iso = `${pre}-${String(d).padStart(2, '0')}`;
-    cells.push(celdaDia(iso, porDia.get(iso) || [], hoy, d, mo));
+  /* La semana empieza en domingo; la última columna suma lo que vence en esa semana (incluye días de los meses vecinos). */
+  const offset = new Date(y, mo, 1).getDay(), n = new Date(y, mo + 1, 0).getDate();
+  const cells = [...CAL_DIAS, 'Total'].map(d => `<span class="cal-wd" aria-hidden="true">${d}</span>`);
+  const diasAnt = new Date(y, mo, 0).getDate(), porFecha = new Map();
+  movimientos.map(procesar).forEach(m => (porFecha.get(m.fecha) || porFecha.set(m.fecha, []).get(m.fecha)).push(m));
+  const totalSem = ini => calTotal(Array.from({ length: 7 }, (_, i) => montoDia(porFecha.get(toISO(new Date(y, mo, ini + i))) || [])).reduce((t, x) => t + x, 0));
+  const filas = Math.ceil((offset + n) / 7);
+  for (let i = 0; i < filas * 7; i++) {
+    const d = i - offset + 1;
+    if (d < 1) cells.push(`<span class="cal-f" aria-hidden="true">${diasAnt + d}</span>`);
+    else if (d > n) cells.push(`<span class="cal-f" aria-hidden="true">${d - n}</span>`);
+    else { const iso = `${pre}-${String(d).padStart(2, '0')}`; cells.push(celdaDia(iso, porDia.get(iso) || [], hoy, d, mo)); }
+    if (i % 7 === 6) cells.push(totalSem(i - 5 - offset));
   }
-  for (let i = 1; (offset + n + i - 1) % 7 !== 0; i++) cells.push(`<span class="cal-f" aria-hidden="true">${i}</span>`);
   return `<div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pt cal">
       <div class="cal-grid">${cells.join('')}</div>${pliegue}
@@ -688,18 +695,20 @@ function renderCalendario() {
   calEscala(base);
   $('#kpi-dash').hidden = true;
   $('#list-caption').textContent = 'Calendario'; $('#list-count').textContent = '';
-  const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - ((HOY.getDay() + 6) % 7) + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
+  const lunes = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() - HOY.getDay() + 7 * state.provOff), domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
   let cal;
   if (state.provMes) {
     cal = calendarioHTML(b, calPie());
   } else {
     const lun = lunes, dom = domingo;
     const todos = movimientos.map(procesar), hoy = toISO(HOY);
-    const cells = [];
+    const cells = []; let tot = 0;
     for (let i = 0; i < 7; i++) {
-      const f = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() + i), iso = toISO(f);
-      cells.push(celdaDia(iso, todos.filter(m => m.fecha === iso), hoy, f.getDate(), f.getMonth(), `<small class="cal-wd" aria-hidden="true">${'LMMJVSD'[i]}</small>`));
+      const f = new Date(lun.getFullYear(), lun.getMonth(), lun.getDate() + i), iso = toISO(f), lista = todos.filter(m => m.fecha === iso);
+      tot += montoDia(lista);
+      cells.push(celdaDia(iso, lista, hoy, f.getDate(), f.getMonth(), `<small class="cal-wd" aria-hidden="true">${CAL_DIAS[i]}</small>`));
     }
+    cells.push(calTotal(tot, '<small class="cal-wd" aria-hidden="true">Total</small>'));
     const rango = lun.getMonth() === dom.getMonth() ? `${lun.getDate()} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}` : `${lun.getDate()} ${MESES_CORTO[lun.getMonth()]} – ${dom.getDate()} ${MESES_CORTO[dom.getMonth()]}`;
     cal = `<div class="pv-head"><button type="button" class="cal-arr" data-action="prov-sem" data-d="-1" aria-label="Semana anterior">‹</button><span class="pt-mes">${state.provOff === 0 ? 'Esta semana · ' : ''}${rango}</span><button type="button" class="cal-arr" data-action="prov-sem" data-d="1" aria-label="Semana siguiente">›</button></div><div class="pt cal"><div class="cal-grid wk">${cells.join('')}</div>${calPie()}</div>`;
   }
