@@ -79,7 +79,7 @@ const catOf = str => CATS.find(c => c.id === catLabelOf(str)) || { id: catLabelO
    Lo que solo es de esta pantalla (tema, agrupación) queda en localStorage.
    ========================================================= */
 /* Versión visible al final de cada pantalla: súbela junto con CACHE en sw.js. */
-const APP_VERSION = 'v219';
+const APP_VERSION = 'v220';
 const KEYS = { theme: 'finanzas_theme', group: 'finanzas_grouping', hint: 'finanzas_hint_swipe', view: 'finanzas_vista', cat: 'finanzas_ultima_cat' };
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
@@ -654,7 +654,7 @@ function renderProvisional() {
     <div class="pv-head"><button type="button" class="cal-arr" data-action="shift-month" data-d="-1" aria-label="Mes anterior">‹</button>${mesBar()}<button type="button" class="cal-arr" data-action="shift-month" data-d="1" aria-label="Mes siguiente">›</button></div>
     <div class="pv-mes">${btn('pagado', 'pv-c ok', `<span class="pv-l">PAGADO</span><b>${$$m(abo)}</b>`, 'Pagado: mostrar pagos con abono')}<i aria-hidden="true"></i>${btn('pend', 'pv-c warn', `<span class="pv-l">PENDIENTE</span><b>${$$m(pend)}</b>`, 'Pendiente: mostrar lo atrasado y lo por vencer')}<i aria-hidden="true"></i>${btn('total', 'pv-c', `<span class="pv-l">TOTAL</span><b>${$$m(tot)}</b>`, 'Total del mes: mostrar todos')}</div>
     <div class="pv-hijos"><div class="pv-ya${on('ya') ? ' on' : ''}${yaVacio ? ' vacio' : ''}"><button type="button" class="pv-ya-main" data-action="prov-f" data-f="ya" aria-pressed="${on('ya')}"${yaVacio ? ' disabled' : ''} aria-label="Atrasados: ${yaVacio ? 'nada atrasado' : 'mostrar atrasados y lo de hoy'}"><span class="pv-l danger">ATRASADOS</span><b>${yaVacio ? 'nada atrasado' : $$m(sum(ya, 'pendiente'))}</b></button><span class="pv-sw${hayPrev ? '' : ' off'}"><button type="button" role="switch" class="mini-sw" data-action="prov-prev" aria-checked="${hayPrev && state.provPrev}" aria-label="Incluir atrasados de meses anteriores"${hayPrev ? '' : ' disabled'} title="Meses anteriores"></button><small>Anteriores</small></span></div>${btn('porvencer', 'pv-v', `<span class="pv-l warn">POR VENCER</span><b>${$$m(porV)}</b>`, 'Por vencer: mostrar lo que vence de mañana en adelante')}</div>
-    <div class="pv-metas" role="group" aria-label="Metas: lo pendiente repartido entre los ${nDias} días que quedan hasta el último pago y entre ${nSemTxt} semanas"><div><span class="pv-l">Meta diaria <small>×${nDias}</small></span><b>${$$m(dia)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">Meta semanal <small>×${nSemTxt}</small></span><b>${$$m(sem)}</b></div></div>`;
+    <div class="pv-metas" role="group" aria-label="Apartados: lo pendiente repartido entre los ${nDias} días que quedan hasta el último pago y entre ${nSemTxt} semanas"><div><span class="pv-l">Apartado diario <small>×${nDias}</small></span><b>${$$m(dia)}</b></div><i aria-hidden="true"></i><div><span class="pv-l">Apartado semanal <small>×${nSemTxt}</small></span><b>${$$m(sem)}</b></div></div>`;
   $('#kpi-dash').hidden = false;
   $('#list-caption').textContent = 'Inicio'; $('#list-count').textContent = '';
   /* Al entrar y sin mosaico encendido salen todos los pagos del mes; los mosaicos filtran. */
@@ -1310,7 +1310,7 @@ const desglose = lista => plural(lista.length, 'pago', 'pagos');
 function datosFondoApartar() {
   const { base, dia, nDias, sem, nSem } = metasInicio();
   const tot = sum(base, 'imp'), pct = tot > 0 ? Math.round(base.reduce((t, m) => t + Math.min(m.abo, m.imp), 0) / tot * 100) : 0;
-  return { apartar: '1', label: 'META DIARIA', meta: dia, dias: nDias, sem, nSemTxt: String(nSem).replace(/\.0$/, ''), pct, porv: base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).length };
+  return { apartar: '1', label: 'APARTADO DIARIO', meta: dia, dias: nDias, sem, nSemTxt: String(nSem).replace(/\.0$/, ''), pct, porv: base.filter(m => m.pendiente > 0 && daysFromToday(m.date) > 0).length };
 }
 
 
@@ -1447,8 +1447,8 @@ async function shareFondo(d) {
     x.textAlign = 'center'; if ('letterSpacing' in x) x.letterSpacing = '9px';
     x.fillStyle = 'rgba(244,244,239,.25)'; x.font = '600 28px "JetBrains Mono"'; x.fillText('FINANZAS', 544, 1800);
     const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
-    const file = new File([blob], `fondo-meta-diaria-${toISO(HOY)}.png`, { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Meta diaria' }); return; }
+    const file = new File([blob], `fondo-apartado-diario-${toISO(HOY)}.png`, { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Apartado diario' }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast('Fondo descargado');
@@ -1494,8 +1494,8 @@ function metasHTML(all) {
   }).sort((a, b) => (a.sig ? a.sig.fecha : '9') < (b.sig ? b.sig.fecha : '9') ? -1 : 1);
   if (!lista.length) return '';
   const dia = f => { const d = parseDate(f); return `${d.getDate()} ${MESES_CORTO[d.getMonth()]}`; };
-  return `<section class="an-card" aria-label="Avance de metas">
-      <h2 class="an-h">Avance de metas</h2>
+  return `<section class="an-card" aria-label="Avance de apartados">
+      <h2 class="an-h">Avance de apartados</h2>
       ${lista.map(e => `<div class="cp-row"><div class="cp-top"><span class="cp-n">${esc(e.nombre)}</span><b>${fmtMoney(e.total)}</b></div><div class="cp-bar"><i style="width:${e.total ? Math.round(e.abo / e.total * 100) : 0}%"></i></div><div class="an-meta"><span>${e.pagados} de ${e.tot} pagos</span><span>${e.sig ? `Próximo ${dia(e.sig.fecha)} · ${fmtMoney(e.sig.pendiente)}` : 'Completa'}</span></div></div>`).join('')}
     </section>`;
 }
