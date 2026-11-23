@@ -57,6 +57,14 @@ PWA de uso propio para llevar **pagos con abonos** (el ahorro es una categoría 
 - **Nombres configurables (v198)**: `miembros.alias` (columna nueva; función `poner_alias`). Cada quien se pone su nombre en Ajustes → Finanzas compartidas → «Cambiar nombre»; sin alias se usa el primer nombre de su cuenta de Google. Cada miembro tiene su letra fija en `miembros.slot` (`e` o `k`; v199): la primera persona es `e`, quien se une toma la letra libre y **la letra se conserva aunque se separen**; si al unirse la letra cambia, `remapearPersona()` pasa lo suyo a la nueva. `refrescarPersonas()` (al abrir, al volver a la app, al aceptar/salir/cambiar nombre) guarda la lista en `finanzas_personas2` (por letra) para que funcione sin internet. Con una sola persona solo sale su botón. Lo único que queda con nombres propios es `CAT_VIEJAS` («Karen» como categoría vieja al importar).
 - La primera persona en sincronizar crea su hogar (`asegurar()` en `sync.js`). `compartir.js` hace las llamadas.
 
+## Reportes en el chat (tabla e imagen)
+Cuando el usuario pida totales, resúmenes o tablas de sus pagos, entregar así (sin guardar datos personales en el repo):
+- **Datos**: salen de la copia de la nube (proyecto Supabase `finanzas`, tabla `copias`, una fila por `hogar_id`). Filtrar **siempre por el hogar de la cuenta que indique el usuario** (correo en `miembros`/`auth.users`); nunca mezclar hogares. Los totales son el **importe** de cada pago (`imp`), no lo abonado.
+- **Tabla de totales por mes** (de noviembre en adelante, un renglón por mes): `Mes | Pagos | Total | Por semana | Por día (lun–sáb)`. Por semana = total ÷ (días del mes ÷ 7); Por día = total ÷ días de lunes a sábado (no trabaja domingos). Montos con `$` y comas, sin centavos. Debajo, 2–3 viñetas cortas con lo notable (mes más alto, por qué sube o baja).
+- **Tabla de un mes**: `Fecha | Concepto | Monto`, ordenada por fecha (fechas como «5-dic»), con renglón final de **Total** y número de pagos.
+- **Imagen**: PNG con Playwright (HTML → `screenshot`, `deviceScaleFactor: 2`, ancho 900–1000 px), estilo familia Checa: fondo `#0C0C10`, filas `#1C1C23`, texto `#F4F4EF`, encabezados en mayúsculas gris `#9A9AA5`, título 800, subtítulo con el rango y la fórmula, cifras tabulares alineadas a la derecha; el **mes más alto** resaltado (`#26262F`, negrita) y, en la tabla de un mes, los montos ≥ $2,000 en negrita; si pasa de ~25 renglones, dos columnas. Se guarda en el scratchpad y se manda con `SendUserFile` (`display: render`) diciendo la ruta completa.
+- Responder corto: la tabla en el chat, luego la imagen si la piden.
+
 ## Ideas pendientes
 En este orden:
 1. **Después de todo lo anterior: empaquetarla como APK** (p. ej. TWA/Capacitor).
